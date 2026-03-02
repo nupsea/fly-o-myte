@@ -1,0 +1,199 @@
+# Travo School Holiday Calendar
+# Australian state school holidays by state/territory
+# Source: Individual state education department websites
+# Update: Check annually around October for the following year's dates
+#
+# State schools vs independent/Catholic schools:
+#   - State schools follow these exact dates
+#   - Independent/Catholic schools may vary by up to 7 days — set school_type in config
+#   - Individual independent schools set their own calendars; verify with the school
+#
+# Timezone note:
+#   - QLD, NSW, VIC, TAS, ACT: AEST (UTC+10), no DST
+#   - SA, NT: ACST (UTC+9:30)
+#   - WA: AWST (UTC+8), no DST
+
+QLD:
+  state_name: Queensland
+  timezone: Australia/Brisbane
+  department_url: https://education.qld.gov.au/about-us/calendar/term-dates
+  2025:
+    term_1:
+      start: "2025-01-28"
+      end: "2025-04-04"
+    autumn_break:
+      start: "2025-04-05"
+      end: "2025-04-22"
+      label: Autumn holidays
+      weeks: 2.5
+    term_2:
+      start: "2025-04-23"
+      end: "2025-06-27"
+    mid_year_break:
+      start: "2025-06-28"
+      end: "2025-07-13"
+      label: Mid-year holidays
+      weeks: 2
+    term_3:
+      start: "2025-07-14"
+      end: "2025-09-19"
+    spring_break:
+      start: "2025-09-20"
+      end: "2025-10-05"
+      label: Spring holidays
+      weeks: 2
+    term_4:
+      start: "2025-10-06"
+      end: "2025-12-12"
+    summer_break:
+      start: "2025-12-13"
+      end: "2026-01-26"
+      label: Summer holidays
+      weeks: 6.5
+  2026:
+    term_1:
+      start: "2026-01-27"
+      end: "2026-04-02"
+    autumn_break:
+      start: "2026-04-03"
+      end: "2026-04-19"
+      label: Autumn holidays
+      weeks: 2.5
+    term_2:
+      start: "2026-04-20"
+      end: "2026-06-26"
+    mid_year_break:
+      start: "2026-06-27"
+      end: "2026-07-12"
+      label: Mid-year holidays
+      weeks: 2
+    term_3:
+      start: "2026-07-13"
+      end: "2026-09-18"
+    spring_break:
+      start: "2026-09-19"
+      end: "2026-10-05"
+      label: Spring holidays
+      weeks: 2.5
+    term_4:
+      start: "2026-10-06"
+      end: "2026-12-18"
+    summer_break:
+      start: "2026-12-19"
+      end: "2027-01-26"
+      label: Summer holidays
+      weeks: 6
+  2027:
+    # TODO: Update when QLD DoE publishes 2027 term dates (usually October 2026)
+    # Approximate dates based on historical patterns
+    term_1:
+      start: "2027-01-26"
+      end: "2027-04-01"
+    autumn_break:
+      start: "2027-04-02"
+      end: "2027-04-18"
+      label: Autumn holidays
+      approximate: true
+    term_2:
+      start: "2027-04-19"
+      end: "2027-06-25"
+    mid_year_break:
+      start: "2027-06-26"
+      end: "2027-07-11"
+      label: Mid-year holidays
+      approximate: true
+    term_3:
+      start: "2027-07-12"
+      end: "2027-09-17"
+    spring_break:
+      start: "2027-09-18"
+      end: "2027-10-04"
+      label: Spring holidays
+      approximate: true
+    term_4:
+      start: "2027-10-05"
+      end: "2027-12-17"
+    summer_break:
+      start: "2027-12-18"
+      end: "2028-01-25"
+      label: Summer holidays
+      approximate: true
+
+# ─── Phase 2: All Australian States ──────────────────────────────────────────
+# Populated in Phase 2. Sources listed for each state.
+
+NSW:
+  state_name: New South Wales
+  timezone: Australia/Sydney
+  department_url: https://education.nsw.gov.au/schooling/school-term-dates
+  # TODO: Phase 2
+
+VIC:
+  state_name: Victoria
+  timezone: Australia/Melbourne
+  department_url: https://www.education.vic.gov.au/school/parents/primary/Pages/year.aspx
+  # TODO: Phase 2
+
+WA:
+  state_name: Western Australia
+  timezone: Australia/Perth
+  department_url: https://www.education.wa.edu.au/term-dates
+  # TODO: Phase 2
+
+SA:
+  state_name: South Australia
+  timezone: Australia/Adelaide
+  department_url: https://www.education.sa.gov.au/parents-and-families/term-dates-and-public-holidays
+  # TODO: Phase 2
+
+TAS:
+  state_name: Tasmania
+  timezone: Australia/Hobart
+  department_url: https://www.education.tas.gov.au/parents-carers/term-dates/
+  # TODO: Phase 2
+
+NT:
+  state_name: Northern Territory
+  timezone: Australia/Darwin
+  department_url: https://education.nt.gov.au/term-dates
+  # TODO: Phase 2
+
+ACT:
+  state_name: Australian Capital Territory
+  timezone: Australia/Sydney
+  department_url: https://www.education.act.gov.au/school-education/term-dates
+  # TODO: Phase 2
+
+# ─── Phase 3: International ───────────────────────────────────────────────────
+# Key destination countries for Australian families
+
+NZ:
+  country_name: New Zealand
+  timezone: Pacific/Auckland
+  # TODO: Phase 3
+
+SG:
+  country_name: Singapore
+  timezone: Asia/Singapore
+  # TODO: Phase 3
+
+JP:
+  country_name: Japan
+  timezone: Asia/Tokyo
+  # TODO: Phase 3
+
+UK:
+  country_name: United Kingdom
+  timezone: Europe/London
+  # TODO: Phase 3
+
+TH:
+  country_name: Thailand
+  timezone: Asia/Bangkok
+  # TODO: Phase 3
+
+US:
+  country_name: United States
+  timezone: varies
+  notes: "US school holidays vary significantly by state and district. Use generalised public holidays only."
+  # TODO: Phase 3

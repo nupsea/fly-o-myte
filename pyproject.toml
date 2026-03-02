@@ -1,0 +1,126 @@
+[project]
+name = "travo"
+version = "0.1.0"
+description = "Smart travel expense optimizer for Australian families"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+keywords = ["travel", "flights", "family", "australia", "cli", "optimizer"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Scheduling",
+]
+dependencies = [
+    # CLI + terminal output
+    "typer>=0.12",
+    "rich>=13",
+
+    # Data storage — OLTP (transactional: trips, snapshots, recs)
+    "sqlmodel>=0.0.19",
+
+    # Data storage — OLAP (analytics: aggregations, Parquet, route stats)
+    "duckdb>=1.4",
+    "pyarrow>=16",
+
+    # Config + validation
+    "pydantic-settings>=2",
+    "pyyaml>=6",
+
+    # HTTP client with retry
+    "httpx>=0.27",
+    "tenacity>=9",
+
+    # LLM (Claude API + Ollama via unified interface)
+    "pydantic-ai[anthropic]>=1.63",
+
+    # Price source plugin system
+    "pluggy>=1.4",
+
+    # Data validation for Parquet schemas
+    "pandera>=0.20",
+
+    # Utilities
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# Local LLM via Ollama
+ollama = ["ollama>=0.3"]
+
+# International flight data (Phase 2/3)
+amadeus = ["amadeus>=8.0"]
+
+# LLM call observability
+logfire = ["logfire>=3"]
+
+# HTML analytics reports (Phase 2)
+report = []   # Evidence CLI installed separately: uv tool install evidence
+
+# Development
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "pytest-httpx>=0.30",    # mock httpx for API tests
+    "syrupy>=4",             # snapshot tests for Rich output
+    "ruff>=0.5",             # lint + format (replaces flake8/black/isort)
+    "pyright>=1.1",          # type checking
+]
+
+[project.scripts]
+travo = "travo.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["travo"]
+
+# ─── Ruff ────────────────────────────────────────────────────────────────────
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "W",   # pycodestyle warnings
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+]
+ignore = ["E501"]  # line length handled by formatter
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ─── Pyright ─────────────────────────────────────────────────────────────────
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
+reportMissingImports = true
+reportMissingTypeStubs = false
+
+# ─── Pytest ──────────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["travo"]
+omit = ["tests/*", "travo/data/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
