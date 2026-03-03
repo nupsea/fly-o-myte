@@ -288,3 +288,28 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
   - Rich Console renders markup-free in CliRunner (non-TTY context) so snapshots are
     plain text — deterministic and human-readable in test_cli.ambr.
 ---
+
+## 2026-03-04T00:00:00+10:00 - S23 - Route market context DuckDB percentile queries
+- Implemented: RouteContext dataclass (p25, p50, p75, min_price, max_price,
+  sample_count, school_holiday_premium_pct) in db/duckdb.py. Added
+  query_route_context(analytics_dir, origin, destination) -> RouteContext | None.
+  Added print_route_context() to display.py. Wired into fom check command in cli.py
+  (after print_trip_detail; skips gracefully when no analytics data).
+  Added TestQueryRouteContext to tests/test_analytics.py with 2 tests.
+- Files changed:
+  - fly_o_myte/db/duckdb.py (RouteContext dataclass + query_route_context)
+  - fly_o_myte/display.py (import RouteContext + print_route_context function)
+  - fly_o_myte/cli.py (market context block after print_trip_detail in check command)
+  - tests/test_analytics.py (TestQueryRouteContext class: 2 tests)
+  - scripts/ralph/prd.json (S23 passes:true)
+- make ci: 169 passed, 1 deselected. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - RouteContext queries snapshot Parquet (not route_stats) for accurate per-row
+    percentiles; route_stats used only for school_holiday_premium_pct computation.
+  - Use duckdb.connect() (in-memory) for read-only Parquet queries — no need for
+    get_analytics_connection() which loads the sqlite extension unnecessarily.
+  - query_route_context returns None when sample_count < 5 (insufficient data).
+  - Layer: db.duckdb is Layer 1, display is Layer 6 — RouteContext import OK.
+  - The existing test_check_snapshot snapshot was unaffected because the test has
+    no analytics dir seeded — market context section is silently skipped.
+---
