@@ -24,23 +24,17 @@
 # ---
 # name: TestSnapshotOutput.test_compare_snapshot
   '''
-                           Trip Comparison                          
-  ╭──────────────────────┬────────────────────┬────────────────────╮
-  │                      │  #1 BNE-SYD July   │  #1 BNE-SYD July   │
-  ├──────────────────────┼────────────────────┼────────────────────┤
-  │ Route                │      BNE→SYD       │      BNE→SYD       │
-  │ Dates                │     2026-07-20     │     2026-07-20     │
-  │                      │    →2026-07-27     │    →2026-07-27     │
-  │ True cost            │        $620        │        $620        │
-  │ 30d average          │        $620        │        $620        │
-  │ Trend                │      +$0.0/d       │      +$0.0/d       │
-  │ Recommendation       │        WAIT        │        WAIT        │
-  │ Confidence           │        70%         │        70%         │
-  │ Family score         │       88/100       │       88/100       │
-  │ Airline              │         QF         │         QF         │
-  │ Stops                │         0          │         0          │
-  │ Depart time          │       10:30        │       10:30        │
-  ╰──────────────────────┴────────────────────┴────────────────────╯
+                Trip Comparison — Cost Breakdown              
+  ╭────────────────────┬──────────────────┬──────────────────╮
+  │                    │      QF  BNE→SYD │      QF  BNE→SYD │
+  │                    │       2026-07-20 │       2026-07-20 │
+  ├────────────────────┼──────────────────┼──────────────────┤
+  │ Base fare/adult    │             $295 │             $295 │
+  │ Checked bags       │              $30 │              $30 │
+  │                    │                  │                  │
+  │ TOTAL FAMILY COST  │         $620 AUD │         $620 AUD │
+  │ Recommendation     │             WAIT │             WAIT │
+  ╰────────────────────┴──────────────────┴──────────────────╯
   
   '''
 # ---

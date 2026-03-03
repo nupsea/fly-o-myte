@@ -12,6 +12,8 @@ Decision colour coding:
 
 from __future__ import annotations
 
+import json
+
 from rich import box
 from rich.console import Console
 from rich.panel import Panel
@@ -182,52 +184,76 @@ def print_trip_detail(
 def print_compare_table(
     trips_data: list[tuple[Trip, Recommendation, PriceSnapshot]],
 ) -> None:
-    """Side-by-side comparison of up to 3 trips."""
-    table = Table(title="Trip Comparison", box=box.ROUNDED)
-    table.add_column("", style="dim", min_width=20)
+    """Side-by-side true cost breakdown comparison of up to 3 trips."""
+    totals = [rec.true_family_cost for _, rec, _ in trips_data]
+    min_total = min(totals) if totals else 0.0
 
-    for trip, _rec, _snap in trips_data:
-        table.add_column(f"#{trip.id} {trip.label}", justify="center", min_width=18)
+    table = Table(title="Trip Comparison — Cost Breakdown", box=box.ROUNDED)
+    table.add_column("", style="dim", min_width=18)
 
-    rows: list[tuple[str, ...]] = [
-        ("Route",),
-        ("Dates",),
-        ("True cost",),
-        ("30d average",),
-        ("Trend",),
-        ("Recommendation",),
-        ("Confidence",),
-        ("Family score",),
-        ("Airline",),
-        ("Stops",),
-        ("Depart time",),
-    ]
-
+    # Parse breakdowns and build column headers
+    breakdowns: list[TrueCostBreakdown | None] = []
     for trip, rec, snap in trips_data:
-        trend_str = (
-            f"+${rec.trend_slope:.1f}/d"
-            if rec.trend_slope >= 0
-            else f"-${abs(rec.trend_slope):.1f}/d"
-        )
-        values = [
-            f"{trip.origin}→{trip.destination}",
-            f"{trip.depart_date}"
-            + (f"\n→{trip.return_date}" if trip.return_date else ""),
-            f"${rec.true_family_cost:,.0f}",
-            f"${rec.rolling_avg_cost:,.0f}",
-            trend_str,
-            rec.decision.replace("_", " ").upper(),
-            f"{rec.confidence:.0%}",
-            f"{snap.family_score:.0f}/100" if snap.family_score else "—",
-            snap.airline_code or "—",
-            str(snap.stops) if snap.stops is not None else "—",
-            snap.departure_time or "—",
-        ]
-        for i, val in enumerate(values):
-            rows[i] = rows[i] + (val,)
+        airline = snap.airline_code or "?"
+        header = f"{airline}  {trip.origin}→{trip.destination}\n{trip.depart_date}"
+        table.add_column(header, justify="right", min_width=16)
 
-    for row in rows:
-        table.add_row(*row)
+        bd: TrueCostBreakdown | None = None
+        if snap.true_cost_breakdown:
+            try:
+                d = json.loads(snap.true_cost_breakdown)
+                bd = TrueCostBreakdown(
+                    base_fare_adults=d.get("base_adults", 0.0),
+                    base_fare_children=d.get("base_children", 0.0),
+                    bag_fees=d.get("bags", 0.0),
+                    seat_fees=d.get("seats", 0.0),
+                    infant_fees=d.get("infant", 0.0),
+                    total=d.get("total", rec.true_family_cost),
+                )
+            except (ValueError, KeyError):
+                pass
+        breakdowns.append(bd)
+
+    # Base fare/adult
+    base_vals = [f"${snap.base_fare_per_adult:,.0f}" for _, _, snap in trips_data]
+    table.add_row("Base fare/adult", *base_vals)
+
+    # Checked bags (show if any non-zero)
+    bag_vals = [f"${bd.bag_fees:,.0f}" if bd else "—" for bd in breakdowns]
+    if any(bd and bd.bag_fees > 0 for bd in breakdowns):
+        table.add_row("Checked bags", *bag_vals)
+
+    # Seat selection (show if any non-zero)
+    seat_vals = [f"${bd.seat_fees:,.0f}" if bd else "—" for bd in breakdowns]
+    if any(bd and bd.seat_fees > 0 for bd in breakdowns):
+        table.add_row("Seat selection", *seat_vals)
+
+    # Infant fees (show if any non-zero)
+    infant_vals = [f"${bd.infant_fees:,.0f}" if bd else "—" for bd in breakdowns]
+    if any(bd and bd.infant_fees > 0 for bd in breakdowns):
+        table.add_row("Infant fees", *infant_vals)
+
+    # Separator
+    table.add_row("", *["" for _ in trips_data])
+
+    # TOTAL FAMILY COST — cheapest highlighted in bold green
+    total_vals = []
+    for _, rec, _ in trips_data:
+        t = rec.true_family_cost
+        s = f"${t:,.0f} AUD"
+        if t == min_total:
+            total_vals.append(f"[bold green]{s}[/bold green]")
+        else:
+            total_vals.append(f"[bold]{s}[/bold]")
+    table.add_row("[bold]TOTAL FAMILY COST[/bold]", *total_vals)
+
+    # Recommendation
+    rec_vals = []
+    for _, rec, _ in trips_data:
+        style = _DECISION_STYLE.get(rec.decision, "white")
+        decision_label = rec.decision.upper().replace("_", " ")
+        rec_vals.append(f"[{style}]{decision_label}[/{style}]")
+    table.add_row("Recommendation", *rec_vals)
 
     console.print(table)
 

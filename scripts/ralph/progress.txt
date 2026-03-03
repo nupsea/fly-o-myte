@@ -199,6 +199,31 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
     imports don't require duckdb at import time (lazy imports inside functions).
 ---
 
+## 2026-03-04T03:00:00+10:00 - S22 - fom compare true cost breakdown table
+- Implemented: Redesigned print_compare_table() in display.py. New table shows
+  "Trip Comparison — Cost Breakdown" with column headers showing airline + route +
+  depart_date. Rows: Base fare/adult (from snap.base_fare_per_adult), Checked bags
+  (if any non-zero), Seat selection (if any non-zero), Infant fees (if any non-zero),
+  separator, TOTAL FAMILY COST (cheapest in bold green), Recommendation.
+  Breakdown parsed from snap.true_cost_breakdown JSON (keys: base_adults, bags,
+  seats, infant, total). Added `import json` to display.py.
+  Updated test_compare_snapshot to seed base_fare_per_adult + true_cost_breakdown.
+  Regenerated compare snapshot baseline.
+- Files changed:
+  - fly_o_myte/display.py (print_compare_table redesigned + import json)
+  - tests/test_cli.py (test_compare_snapshot: added base_fare_per_adult + breakdown)
+  - tests/__snapshots__/test_cli.ambr (compare snapshot updated)
+  - scripts/ralph/prd.json (S22 passes:true)
+- make ci: 167 passed, 0 failed. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - `json` was not imported in display.py — needed for parsing true_cost_breakdown.
+    Added top-level import, not inline, since display.py uses no inline imports.
+  - Snapshot test for compare needed base_fare_per_adult + true_cost_breakdown set
+    on the PriceSnapshot to get meaningful breakdown rows (bags row visible).
+  - When all totals are equal (same trip ID twice), all get highlighted green.
+    That's correct behavior — highlight the cheapest.
+---
+
 ## 2026-03-04T02:00:00+10:00 - S21 - Amadeus price level signal enrichment
 - Implemented: get_price_level_signal(origin, destination, depart_date, price_aud)
   in AmadeusPriceSource. Sorts priceMetrics by amount ascending; finds first band

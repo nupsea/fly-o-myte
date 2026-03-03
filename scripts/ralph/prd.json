@@ -448,7 +448,7 @@
         "Syrupy snapshot updated — compare output matches new baseline",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S23",
