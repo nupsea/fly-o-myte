@@ -299,10 +299,11 @@
       "reviewInstructions": [
         "Run: bash scripts/ralph/smoke_test.sh — 0 failures",
         "Run: fom watch BNE SYD 2026-07-20 2026-07-27 --label 'Test'",
-        "Run: uv run python scripts/ralph/insert_stub_snapshot.py 1 --count 5",
-        "Run: fom check 1 — must show decision badge, true cost AUD, confidence %, rationale (real sentence not None)",
-        "Run: fom history 1 — sparkline renders without error",
-        "Run: fom status — trip appears with decision badge",
+        "Insert older high-price snapshots: uv run python scripts/ralph/insert_stub_snapshot.py 1 --price 480 --count 5",
+        "Insert recent lower-price snapshots: uv run python scripts/ralph/insert_stub_snapshot.py 1 --price 310 --count 5",
+        "Run: fom check 1 — must show decision badge, true cost AUD, confidence %, rationale (real English sentence, not None). MONITOR is acceptable.",
+        "Run: fom history 1 — sparkline renders without error, shows 10 rows",
+        "Run: fom status --all — trip appears with its decision badge (MONITOR/WAIT/BOOK NOW)",
         "Run: fom remove 1 --yes",
         "If correct: create scripts/ralph/demo-reviews/DR-B-approved.md with APPROVED on line 1"
       ],
