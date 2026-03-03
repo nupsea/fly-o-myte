@@ -288,7 +288,7 @@
         "pytest tests/test_cli.py without --snapshot-update passes (snapshots committed)",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "DR-P1",
@@ -469,7 +469,7 @@
       "passes": false
     },
     {
-      "id": "DR-C",
+      "id": "DR-P2",
       "title": "Phase 2 demo review gate — analytics + enrichment + compare",
       "phase": 2,
       "priority": 28,
@@ -483,7 +483,7 @@
         "Run: fom compare 1 1 — must show breakdown table (base fare, bags, seats, total rows)",
         "Optional (ANTHROPIC_API_KEY set): fom insight 1 — shows 3-4 sentence contextual insight",
         "Run: fom remove 1 --yes",
-        "If correct: create scripts/ralph/demo-reviews/DR-C-approved.md with APPROVED on line 1"
+        "If correct: create scripts/ralph/demo-reviews/DR-P2-approved.md with APPROVED on line 1"
       ],
       "passes": false
     },
@@ -616,7 +616,7 @@
       "passes": false
     },
     {
-      "id": "DR-D",
+      "id": "DR-P3",
       "title": "Phase 3 demo review gate — international routes end-to-end",
       "phase": 3,
       "priority": 37,
@@ -630,7 +630,7 @@
         "Run: fom data-version — should list 16 airlines including SQ and EK",
         "Optional live test (requires SERPAPI_API_KEY in .env): fom poll — verify real SerpAPI results for BNE→SIN include Singapore Airlines, Scoot, Jetstar Asia",
         "Run: fom remove 1 --yes",
-        "If satisfied: create scripts/ralph/demo-reviews/DR-D-approved.md with APPROVED on line 1"
+        "If satisfied: create scripts/ralph/demo-reviews/DR-P3-approved.md with APPROVED on line 1"
       ],
       "passes": false
     }
