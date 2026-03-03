@@ -57,6 +57,7 @@ def isolated_travo_dir(
     os.environ["FLY_O_MYTE_ANALYTICS_DIR"] = str(Path(tmp) / "analytics")
     os.environ["FLY_O_MYTE_CONFIG_PATH"] = str(Path(tmp) / "config.yaml")
     os.environ["FLY_O_MYTE_LOG_PATH"] = str(Path(tmp) / "travo.log")
+    os.environ["SERPAPI_API_KEY"] = ""
     os.environ["TEQUILA_API_KEY"] = ""
     os.environ["ANTHROPIC_API_KEY"] = ""
 
@@ -80,6 +81,7 @@ def isolated_travo_dir(
         "FLY_O_MYTE_ANALYTICS_DIR",
         "FLY_O_MYTE_CONFIG_PATH",
         "FLY_O_MYTE_LOG_PATH",
+        "SERPAPI_API_KEY",
         "TEQUILA_API_KEY",
         "ANTHROPIC_API_KEY",
     ):

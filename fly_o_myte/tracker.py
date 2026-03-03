@@ -40,6 +40,7 @@ from fly_o_myte.price_sources.hookspecs import (
     FlightOffer,
     build_plugin_manager,
 )
+from fly_o_myte.price_sources.serpapi import SerpAPIFlightSource
 from fly_o_myte.price_sources.tequila import TequilaPriceSource
 from fly_o_myte.recommender import SnapshotPoint, compute
 from fly_o_myte.true_cost import compute_family_score, compute_true_cost
@@ -52,11 +53,14 @@ def build_plugin_manager_from_settings() -> pluggy.PluginManager:
     settings = get_settings()
     pm = build_plugin_manager()
 
-    if settings.tequila_api_key:
+    if settings.serpapi_api_key:
+        pm.register(SerpAPIFlightSource(api_key=settings.serpapi_api_key))
+        logger.debug("Registered SerpAPI (Google Flights) price source")
+    elif settings.tequila_api_key:
         pm.register(TequilaPriceSource(api_key=settings.tequila_api_key))
         logger.debug("Registered Tequila price source")
     else:
-        logger.warning("TEQUILA_API_KEY not set — no price source available")
+        logger.warning("No price source API key set — set SERPAPI_API_KEY in .env")
 
     if settings.amadeus_client_id and settings.amadeus_client_secret:
         pm.register(

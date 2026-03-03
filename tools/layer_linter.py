@@ -43,6 +43,7 @@ LAYER_MAP: dict[str, int] = {
     "recommender": 3,
     "true_cost": 3,
     # Layer 4 — external I/O (price source plugins)
+    "price_sources.serpapi": 4,
     "price_sources.tequila": 4,
     "price_sources.amadeus": 4,
     "price_sources": 4,

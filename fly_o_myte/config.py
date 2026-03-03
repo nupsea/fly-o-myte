@@ -97,7 +97,8 @@ class Settings(BaseSettings):
     )
 
     # Flight data
-    tequila_api_key: str = ""
+    serpapi_api_key: str = ""  # primary: Google Flights via SerpAPI
+    tequila_api_key: str = ""  # legacy: Kiwi.com Tequila (sign-up broken as of 2026)
     amadeus_client_id: str = ""
     amadeus_client_secret: str = ""
     amadeus_hostname: str = "test"
@@ -123,7 +124,9 @@ class Settings(BaseSettings):
     fly_o_myte_config_path: str = str(DEFAULT_CONFIG_PATH)
     fly_o_myte_log_path: str = str(DEFAULT_LOG_PATH)
 
-    @field_validator("tequila_api_key", "anthropic_api_key", mode="before")
+    @field_validator(
+        "serpapi_api_key", "tequila_api_key", "anthropic_api_key", mode="before"
+    )
     @classmethod
     def strip_whitespace(cls, v: str) -> str:
         return v.strip() if v else ""

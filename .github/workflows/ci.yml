@@ -47,6 +47,7 @@ jobs:
       - name: Run tests
         run: uv run pytest tests/ -v --cov=fly_o_myte --cov-report=xml --cov-report=term-missing
         env:
+          SERPAPI_API_KEY: ""
           TEQUILA_API_KEY: ""
           ANTHROPIC_API_KEY: ""
       - name: Run smoke tests
