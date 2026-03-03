@@ -1,0 +1,16 @@
+{
+  "input": {
+    "origin": "BNE",
+    "destination": "SYD",
+    "depart_date": "2026-12-23",
+    "current_cost": 2100.0,
+    "avg_cost": 1100.0,
+    "trend_slope": 15.0,
+    "school_holiday_label": "QLD Christmas-summer holidays"
+  },
+  "expected": {
+    "mentions_holiday": true,
+    "gives_direction": true,
+    "cites_source": true
+  }
+}

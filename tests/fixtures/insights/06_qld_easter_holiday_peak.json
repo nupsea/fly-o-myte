@@ -1,0 +1,16 @@
+{
+  "input": {
+    "origin": "BNE",
+    "destination": "CNS",
+    "depart_date": "2026-04-04",
+    "current_cost": 1420.0,
+    "avg_cost": 980.0,
+    "trend_slope": 10.5,
+    "school_holiday_label": "QLD Easter holidays"
+  },
+  "expected": {
+    "mentions_holiday": true,
+    "gives_direction": true,
+    "cites_source": true
+  }
+}

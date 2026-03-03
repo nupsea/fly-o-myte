@@ -1,0 +1,16 @@
+{
+  "input": {
+    "origin": "BNE",
+    "destination": "MEL",
+    "depart_date": "2026-02-10",
+    "current_cost": 480.0,
+    "avg_cost": 650.0,
+    "trend_slope": -3.2,
+    "school_holiday_label": null
+  },
+  "expected": {
+    "mentions_holiday": false,
+    "gives_direction": true,
+    "cites_source": true
+  }
+}

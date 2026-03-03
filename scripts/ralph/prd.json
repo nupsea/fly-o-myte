@@ -346,7 +346,7 @@
         "test_insights.py::test_golden_fixtures: marked @pytest.mark.slow, skips if ANTHROPIC_API_KEY empty, pass_rate >= 0.80",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S18",

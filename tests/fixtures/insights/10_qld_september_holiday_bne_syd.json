@@ -1,0 +1,16 @@
+{
+  "input": {
+    "origin": "BNE",
+    "destination": "SYD",
+    "depart_date": "2026-09-19",
+    "current_cost": 1350.0,
+    "avg_cost": 1050.0,
+    "trend_slope": 6.0,
+    "school_holiday_label": "QLD September holidays"
+  },
+  "expected": {
+    "mentions_holiday": true,
+    "gives_direction": true,
+    "cites_source": true
+  }
+}

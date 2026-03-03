@@ -1,0 +1,16 @@
+{
+  "input": {
+    "origin": "BNE",
+    "destination": "SYD",
+    "depart_date": "2026-07-05",
+    "current_cost": 1650.0,
+    "avg_cost": 1200.0,
+    "trend_slope": 8.5,
+    "school_holiday_label": "QLD mid-year holidays"
+  },
+  "expected": {
+    "mentions_holiday": true,
+    "gives_direction": true,
+    "cites_source": true
+  }
+}

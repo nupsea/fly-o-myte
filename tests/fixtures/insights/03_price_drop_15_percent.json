@@ -1,0 +1,16 @@
+{
+  "input": {
+    "origin": "SYD",
+    "destination": "BNE",
+    "depart_date": "2026-05-15",
+    "current_cost": 380.0,
+    "avg_cost": 460.0,
+    "trend_slope": -6.1,
+    "school_holiday_label": null
+  },
+  "expected": {
+    "mentions_holiday": false,
+    "gives_direction": true,
+    "cites_source": true
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "input": {
+    "origin": "BNE",
+    "destination": "PER",
+    "depart_date": "2026-08-10",
+    "current_cost": 1850.0,
+    "avg_cost": 1700.0,
+    "trend_slope": 2.0,
+    "school_holiday_label": null
+  },
+  "expected": {
+    "mentions_holiday": false,
+    "gives_direction": true,
+    "cites_source": true
+  }
+}
