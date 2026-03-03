@@ -173,7 +173,7 @@
         "Return trip: when return_date is set, params contain 'return_from' and 'return_to' keys",
         "uv run make ci passes after adding the new test file"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S10",

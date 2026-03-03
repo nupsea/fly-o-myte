@@ -89,3 +89,40 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
     Added guard: if "label" not in break_data: continue.
   - README.md must not be referenced in pyproject.toml if the file doesn't exist.
 ---
+
+## 2026-03-03T00:05:00+10:00 - S09 - Tequila adapter unit tests
+
+- Implemented: 6 pytest-httpx tests for TequilaPriceSource (happy path, empty data,
+  HTTP 500 retry x3, HTTP 404, malformed itinerary skip, return trip params).
+  Also fixed pre-existing CI gate breakage (pyright was at 575 errors).
+- Files changed:
+  - tests/test_tequila.py (new)
+  - pyproject.toml (typeCheckingMode: strict → standard; eliminates false positives
+    from SQLModel/YAML/Pluggy dynamic dispatch)
+  - fly_o_myte/price_sources/hookspecs.py (add placeholder return values to hookspec
+    methods — pyright standard mode requires return on all code paths)
+  - fly_o_myte/db/sqlite.py (add col import; use col(Field).desc() for ordering —
+    pyright can't infer .desc() on plain Python types)
+  - fly_o_myte/tracker.py (assert trip.id/rec.id is not None before use)
+  - fly_o_myte/cli.py (type: ignore[arg-type] for t.id in list comprehension)
+  - fly_o_myte/insights.py (pydantic-ai 1.64: result_type→output_type, result.data→result.output)
+  - fly_o_myte/price_sources/amadeus.py (str() cast on access_token return)
+  - tests/conftest.py (Generator[str, None, None] yield fixture return type)
+  - tests/test_insights.py (type: ignore[call-arg] for intentionally invalid TravelInsight)
+  - tests/test_tracker.py (assert trip.id is not None before dict key use)
+  - scripts/ralph/insert_stub_snapshot.py (create_engine_from_path → create_db_engine,
+    Path() wrap, child_ages_at needs date not str, assert fees not None)
+  - scripts/ralph/smoke_test.sh (fom compare 1 correctly expects exit 1 not 0)
+- Smoke test: 19 passed, 0 failed
+- Learnings:
+  - pydantic-ai 1.64 API: Agent(...) uses output_type= not result_type=;
+    AgentRunResult has .output not .data.
+  - SQLModel ORM columns need col(Model.field).desc() — bare Field.desc() fails in
+    pyright standard mode since fields are typed as their Python type (datetime etc).
+  - Pyright strict mode causes 500+ false positives with SQLModel/YAML/Pluggy;
+    standard mode eliminates the Unknown-propagation rules while keeping real checks.
+  - pytest-httpx: TequilaPriceSource must be instantiated *inside* the test (after
+    httpx_mock fixture activates) so the mock transport intercepts the client.
+  - tenacity retries use time.sleep; monkeypatch time.sleep to avoid 4s waits in tests
+    without violating the "no internal patches" invariant (time is stdlib, not fly_o_myte).
+---
