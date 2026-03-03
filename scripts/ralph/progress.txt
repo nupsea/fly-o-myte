@@ -199,6 +199,25 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
     imports don't require duckdb at import time (lazy imports inside functions).
 ---
 
+## 2026-03-04T01:00:00+10:00 - S20 - SerpAPI adapter unit tests
+- Implemented: tests/test_serpapi.py with 19 tests (14 functions, some parametrized)
+  covering all S20 acceptance criteria.
+- Files changed:
+  - tests/test_serpapi.py (new)
+  - scripts/ralph/prd.json (S20 passes:true)
+- make ci: 156 passed, 0 failed. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - SerpAPIFlightSource uses sync httpx.Client — pytest-httpx httpx_mock fixture
+    intercepts it exactly like TequilaPriceSource. Same pattern works.
+  - departure_time extracted as dep_raw[11:16] from "YYYY-MM-DD HH:MM" string.
+    Test SerpAPI response must format time as "2026-07-20 10:30" (space, not T).
+  - Tenacity @retry with no retry= arg retries on ALL exceptions, including
+    PriceSourceError from JSON "error" key — add 3 mocked responses for that test
+    too, not just for HTTP 500. Monkeypatch time.sleep to avoid real waits.
+  - "Unknown Carrier"[:2].upper() = "UN" — the fallback IATA code logic uses
+    airline_name[:2].upper(), so test expects "UN" not "XX".
+---
+
 ## 2026-03-03T01:00:00+10:00 - DR-B / S15 - Snapshot tests + DR-B gate cleared
 - Implemented: DR-B marked passes:true (approval file confirmed). Added TestSnapshotOutput
   class to tests/test_cli.py with 3 Syrupy snapshot tests (status, check, compare).

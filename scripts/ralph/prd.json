@@ -411,7 +411,7 @@
         "SerpAPIFlightSource registers as Pluggy plugin: pm.register(...); hook has 1 impl",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S21",
