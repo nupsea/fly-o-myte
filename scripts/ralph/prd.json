@@ -367,7 +367,7 @@
         "fom scout BNE SYD --month jul-2026 with empty SERPAPI_API_KEY exits 0 with 'No results' message",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S19",
