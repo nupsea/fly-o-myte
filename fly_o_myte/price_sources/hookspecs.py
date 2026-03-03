@@ -52,6 +52,7 @@ class PriceSourceSpec:
     @hookspec
     def source_name(self) -> str:
         """Unique identifier for this price source, e.g. 'tequila'."""
+        return ""  # hookspec — pluggy invokes implementations, never the spec
 
     @hookspec
     def supports_route(self, origin: str, destination: str) -> bool:
@@ -59,6 +60,7 @@ class PriceSourceSpec:
         Return True if this source can search flights for this route.
         Enables graceful fallback when a source doesn't cover a route.
         """
+        return False  # hookspec — pluggy invokes implementations
 
     @hookspec
     def search_flights(
@@ -79,6 +81,7 @@ class PriceSourceSpec:
         Return empty list if no results found.
         Raise PriceSourceError on connection/auth failures.
         """
+        return []  # hookspec — pluggy invokes implementations
 
 
 class PriceSourceError(Exception):

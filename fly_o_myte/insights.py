@@ -181,9 +181,9 @@ def _call_llm(prompt: str, provider: str, settings: object) -> TravelInsight | N
 
     agent: Agent[None, TravelInsight] = Agent(
         model=model_str,
-        result_type=TravelInsight,
+        output_type=TravelInsight,
         system_prompt=system_prompt,
     )
 
     result = agent.run_sync(prompt)
-    return result.data
+    return result.output

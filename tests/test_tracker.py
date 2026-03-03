@@ -144,6 +144,8 @@ class TestPollAllActive:
             ),
         )
         results = poll_all_active(db_session, profile, stub_pm, send_alerts=False)
+        assert trip1.id is not None
+        assert trip2.id is not None
         assert results[trip1.id] == "ok"
         assert results[trip2.id] == "ok"
 
@@ -210,6 +212,8 @@ class TestPollAllActive:
             ),
         )
         results = poll_all_active(db_session, profile, pm, send_alerts=False)
+        assert trip1.id is not None
+        assert trip2.id is not None
         assert results[trip1.id] == "error"
         assert results[trip2.id] == "ok"
 
@@ -228,6 +232,7 @@ class TestPollAllActive:
                 return_date="2026-07-27",
             ),
         )
+        assert trip.id is not None
         set_trip_active(db_session, trip.id, active=False)
         results = poll_all_active(db_session, profile, stub_pm, send_alerts=False)
         assert trip.id not in results

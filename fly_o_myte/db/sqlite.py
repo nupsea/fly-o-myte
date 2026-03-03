@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import event
-from sqlmodel import Field, Session, SQLModel, create_engine, select
+from sqlmodel import Field, Session, SQLModel, col, create_engine, select
 
 # ─── Table models ─────────────────────────────────────────────────────────────
 
@@ -141,7 +141,7 @@ def list_active_trips(session: Session) -> list[Trip]:
 
 
 def list_all_trips(session: Session) -> list[Trip]:
-    return list(session.exec(select(Trip).order_by(Trip.created_at.desc())))
+    return list(session.exec(select(Trip).order_by(col(Trip.created_at).desc())))
 
 
 def set_trip_active(session: Session, trip_id: int, active: bool) -> None:
@@ -190,7 +190,7 @@ def get_latest_snapshot(session: Session, trip_id: int) -> PriceSnapshot | None:
     result = session.exec(
         select(PriceSnapshot)
         .where(PriceSnapshot.trip_id == trip_id)
-        .order_by(PriceSnapshot.fetched_at.desc())
+        .order_by(col(PriceSnapshot.fetched_at).desc())
         .limit(1)
     )
     return result.first()
@@ -210,7 +210,7 @@ def get_recommendations_for_trip(
         session.exec(
             select(Recommendation)
             .where(Recommendation.trip_id == trip_id)
-            .order_by(Recommendation.generated_at.desc())
+            .order_by(col(Recommendation.generated_at).desc())
         )
     )
 
@@ -219,7 +219,7 @@ def get_latest_recommendation(session: Session, trip_id: int) -> Recommendation 
     result = session.exec(
         select(Recommendation)
         .where(Recommendation.trip_id == trip_id)
-        .order_by(Recommendation.generated_at.desc())
+        .order_by(col(Recommendation.generated_at).desc())
         .limit(1)
     )
     return result.first()

@@ -82,7 +82,7 @@ check "check trip 1 (no snapshots)" 0 "" $FOM check 1
 
 check "history trip 1 (no snapshots)" 0 "" $FOM history 1
 
-check "compare trip 1" 0 "" $FOM compare 1
+check "compare trip 1 (too few args)" 1 "" $FOM compare 1
 
 # ── Pause / resume ────────────────────────────────────────────────────────────
 check "pause trip 1"  0 "" $FOM pause 1

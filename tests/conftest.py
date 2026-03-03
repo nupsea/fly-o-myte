@@ -18,6 +18,7 @@ Test pyramid:
 from __future__ import annotations
 
 import os
+from collections.abc import Generator
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -42,7 +43,9 @@ from fly_o_myte.recommender import SnapshotPoint
 
 
 @pytest.fixture(scope="session", autouse=True)
-def isolated_travo_dir(tmp_path_factory: pytest.TempPathFactory) -> str:
+def isolated_travo_dir(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Generator[str, None, None]:
     """
     Point all singletons at a session-scoped temp directory.
     Runs once per pytest session; tears down on exit.

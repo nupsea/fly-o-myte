@@ -31,7 +31,7 @@ from datetime import date, timedelta
 from fly_o_myte.config import DepartureWindow, FamilyProfile, get_settings
 from fly_o_myte.db.sqlite import (
     PriceSnapshot,
-    create_engine_from_path,
+    create_db_engine,
     create_tables,
     get_session,
     get_trip,
@@ -59,7 +59,7 @@ def main() -> int:
     args = parser.parse_args()
 
     settings = get_settings()
-    engine = create_engine_from_path(settings.fly_o_myte_db_path)
+    engine = create_db_engine(Path(settings.fly_o_myte_db_path))
     create_tables(engine)
 
     with get_session(engine) as session:
@@ -73,6 +73,7 @@ def main() -> int:
         if fees is None:
             print(f"Warning: airline '{args.airline}' not in database, using QF fees.")
             fees = airline_db.get("QF")
+        assert fees is not None, "QF must exist in the airline database"
 
         profile = FamilyProfile(
             adults=trip.adults,
@@ -92,7 +93,7 @@ def main() -> int:
 
         depart = date.fromisoformat(trip.depart_date)
         ret = date.fromisoformat(trip.return_date) if trip.return_date else None
-        child_ages = profile.child_ages_at(trip.depart_date)
+        child_ages = profile.child_ages_at(date.fromisoformat(trip.depart_date))
 
         for i, price in enumerate(prices):
             breakdown = compute_true_cost(
@@ -107,6 +108,7 @@ def main() -> int:
 
             fetched_at = datetime.now(UTC) - timedelta(days=args.count - 1 - i)
 
+            assert trip.id is not None  # guaranteed for persisted trips
             snap = insert_snapshot(
                 session,
                 PriceSnapshot(

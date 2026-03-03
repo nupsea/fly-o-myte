@@ -34,12 +34,12 @@ class TestInsightSchema:
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
-            TravelInsight(
+            TravelInsight(  # type: ignore[call-arg]
                 price_impact="higher",
                 event_type="holiday",
                 confidence=0.8,
                 sources=[],
-            )  # missing summary
+            )  # intentionally missing summary to test validation
 
 
 class TestGracefulDegradation:

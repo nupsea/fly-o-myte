@@ -381,7 +381,10 @@ def status(
     engine = _get_engine()
     with get_session(engine) as session:
         trips = list_all_trips(session) if all_trips else list_active_trips(session)
-        pairs = [(t, get_latest_recommendation(session, t.id)) for t in trips]
+        pairs = [
+            (t, get_latest_recommendation(session, t.id))  # type: ignore[arg-type]
+            for t in trips
+        ]
 
     print_status_digest(pairs, show_all=all_trips)
 

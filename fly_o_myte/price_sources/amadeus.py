@@ -201,7 +201,7 @@ class AmadeusPriceSource:
             ) from exc
 
         token_data = response.json()
-        self._access_token = token_data["access_token"]
+        self._access_token = str(token_data["access_token"])
         self._token_expires_at = time.time() + token_data.get("expires_in", 1799)
         return self._access_token
 

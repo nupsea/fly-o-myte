@@ -129,6 +129,7 @@ def poll_trip(
     )
 
     # ─── 4. Save snapshot ──────────────────────────────────────────────────
+    assert trip.id is not None  # guaranteed for persisted trips
     snapshot = insert_snapshot(
         session,
         PriceSnapshot(
@@ -204,6 +205,7 @@ def poll_trip(
     if send_alerts and result.decision == "book_now":
         sent = send_book_now_alert(trip, rec)
         if sent:
+            assert rec.id is not None  # guaranteed after insert
             mark_email_sent(session, rec.id)
 
     return snapshot
@@ -225,6 +227,7 @@ def poll_all_active(
     results: dict[int, str] = {}
 
     for trip in trips:
+        assert trip.id is not None  # guaranteed for persisted trips
         try:
             snap = poll_trip(session, trip, profile, pm, send_alerts=send_alerts)
             results[trip.id] = "ok" if snap else "no_offers"
