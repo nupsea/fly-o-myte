@@ -43,7 +43,7 @@ class FlightOffer:
 
 class PriceSourceSpec:
     """
-    Hook specifications for Travo price source plugins.
+    Hook specifications for fly-o-myte price source plugins.
 
     Implement these methods and register your class with the plugin manager
     to add a new flight data source.

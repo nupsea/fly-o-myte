@@ -1,4 +1,4 @@
-# Travo — User Stories
+# fly-o-myte — User Stories
 ## Phase-wise development, all three phases
 
 ---
@@ -73,17 +73,17 @@ As a new user, I want a guided setup command so that I can configure my family p
 - Prompts for: number of adults, each child's name and date of birth, origin airport (default BNE), state (default QLD), school type (state/independent/catholic), bags per person, max stops, budget threshold, alert email
 - Validates IATA airport codes are 3 letters uppercase
 - Validates API key fields are non-empty strings if provided
-- Writes a valid `~/.travo/config.yaml` on completion
+- Writes a valid `~/.fly-o-myte/config.yaml` on completion
 - Prints a summary of the profile created
 - Re-running `travo setup` shows existing values as defaults (safe to re-run)
-- If `~/.travo/` does not exist, it is created automatically
+- If `~/.fly-o-myte/` does not exist, it is created automatically
 
 ---
 
 ### US-002 — View and edit family profile
 **Phase 1**
 
-As a user, I want to view my current family profile in the terminal so that I can confirm what Travo knows about my family.
+As a user, I want to view my current family profile in the terminal so that I can confirm what fly-o-myte knows about my family.
 
 **Acceptance criteria:**
 - `travo profile` prints the loaded family profile in a readable table
@@ -244,7 +244,7 @@ As a user, I want a command I can run from cron to automatically poll all active
 - Prints a one-line summary per trip: "Trip 1: $1,840 (was $1,920) — BOOK NOW"
 - On error for one trip, logs the error and continues to the next trip (does not abort)
 - Exits with code 0 even if some trips had fetch errors (errors logged only)
-- Suitable for: `0 7 * * * travo poll >> ~/.travo/travo.log 2>&1`
+- Suitable for: `0 7 * * * travo poll >> ~/.fly-o-myte/travo.log 2>&1`
 - `travo poll --dry-run` shows which trips would be polled without making API calls
 
 ---
@@ -523,7 +523,7 @@ As a user, I want to query aggregated route statistics so that I can see seasona
 **Acceptance criteria:**
 - `travo analytics` shows a summary of route stats across all tracked trips
 - Displays per route: price percentiles (p25, median, p75), school holiday premium (holiday avg / non-holiday avg), trend direction
-- Backed by Parquet files in `~/.travo/analytics/`
+- Backed by Parquet files in `~/.fly-o-myte/analytics/`
 - Query runs in < 2 seconds on a typical laptop with 1 year of data
 
 ---
@@ -606,7 +606,7 @@ As a user who cares about LLM cost and quality, I want all LLM calls traced so t
 As a user, I want to generate an HTML report of my tracked trips and analytics so that I can share a readable summary with my partner or save it for reference.
 
 **Acceptance criteria:**
-- `travo report` generates an HTML file at `~/.travo/reports/travo_report_{date}.html`
+- `travo report` generates an HTML file at `~/.fly-o-myte/reports/travo_report_{date}.html`
 - Includes: all active trips with latest recommendation, price history charts, route comparison table, school holiday calendar overlay
 - Opens in the default browser automatically after generation
 - Built with Evidence (SQL-based reporting framework querying DuckDB/Parquet)

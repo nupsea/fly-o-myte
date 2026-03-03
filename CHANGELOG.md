@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Travo are documented here.
+All notable changes to fly-o-myte are documented here.
 Format: [Semantic Versioning](https://semver.org/).
 
 ---

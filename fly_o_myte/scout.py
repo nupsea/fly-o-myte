@@ -1,7 +1,7 @@
 """
 Date scouting — find the cheapest travel windows across a month.
 
-`travo scout BNE SYD --month jul-2026`
+`fom scout BNE SYD --month jul-2026`
 
 Samples date windows across the requested month and returns true family
 costs for each, so the user can pick the best window before committing

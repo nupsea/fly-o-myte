@@ -1,10 +1,10 @@
 """
-Shared pytest fixtures for the Travo test suite.
+Shared pytest fixtures for the fly-o-myte test suite.
 
 Key pattern (adopted from learning-mate):
   session-scoped isolation fixture resets all module-level singletons
   (get_settings cache, airline DB, school calendar) before each test session,
-  pointing them at a temp directory so tests never touch ~/.travo.
+  pointing them at a temp directory so tests never touch ~/.fly-o-myte.
 
 Test pyramid:
   unit        — pure function tests (recommender, true_cost, calendar)
@@ -38,7 +38,7 @@ from fly_o_myte.recommender import SnapshotPoint
 # ─── Session-scoped isolation ──────────────────────────────────────────────────
 #
 # Resets all module-level singletons before the test session so tests run
-# in an isolated temp dir, never touching ~/.travo.
+# in an isolated temp dir, never touching ~/.fly-o-myte.
 # Pattern taken from learning-mate/backend/tests/conftest.py.
 
 
@@ -53,10 +53,10 @@ def isolated_travo_dir(
     tmp = str(tmp_path_factory.mktemp("travo_test"))
 
     # Override env before any module loads Settings
-    os.environ["FLY_O_MYTE_DB_PATH"] = str(Path(tmp) / "travo.db")
+    os.environ["FLY_O_MYTE_DB_PATH"] = str(Path(tmp) / "fly-o-myte.db")
     os.environ["FLY_O_MYTE_ANALYTICS_DIR"] = str(Path(tmp) / "analytics")
     os.environ["FLY_O_MYTE_CONFIG_PATH"] = str(Path(tmp) / "config.yaml")
-    os.environ["FLY_O_MYTE_LOG_PATH"] = str(Path(tmp) / "travo.log")
+    os.environ["FLY_O_MYTE_LOG_PATH"] = str(Path(tmp) / "fly-o-myte.log")
     os.environ["SERPAPI_API_KEY"] = ""
     os.environ["TEQUILA_API_KEY"] = ""
     os.environ["ANTHROPIC_API_KEY"] = ""

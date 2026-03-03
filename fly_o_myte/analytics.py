@@ -48,7 +48,7 @@ def rebuild_all(analytics_dir: Path, sqlite_db_path: Path) -> None:
     """
     Full rebuild of all Parquet files from SQLite source of truth.
 
-    Run `travo analytics --rebuild` to recover from corrupted Parquet files.
+    Run `fom analytics --rebuild` to recover from corrupted Parquet files.
     Reads all price_snapshots from SQLite and recomputes everything.
     """
     try:

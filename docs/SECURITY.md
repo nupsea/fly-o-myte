@@ -27,7 +27,7 @@ chmod 600 ~/.fly-o-myte/config.yaml
 - All flight search parameters (origin, destination, travel dates) are sent to Tequila API. No personal names or payment data.
 - LLM prompts contain only route and price data — no family member names, DOBs, or emails. This is enforced in `insights.py` prompt construction.
 - No telemetry or analytics are sent anywhere. All data stays in `~/.fly-o-myte/`.
-- `~/.fly-o-myte/travo.db` contains trip labels, dates, and price history. Back it up with your home directory.
+- `~/.fly-o-myte/fly-o-myte.db` contains trip labels, dates, and price history. Back it up with your home directory.
 
 ## Log Sanitisation
 

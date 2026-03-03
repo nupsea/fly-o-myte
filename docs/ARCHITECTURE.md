@@ -91,7 +91,7 @@ fom poll
 ## Data Flow: Dual Storage
 
 ```
-SQLite (travo.db)             DuckDB + Parquet (analytics/)
+SQLite (fly-o-myte.db)             DuckDB + Parquet (analytics/)
   trips                →  snapshots/*.parquet     (time-series)
   price_snapshots      →  route_stats/*.parquet   (weekly aggregates)
   recommendations      →  market_context/*.parquet (LLM insights)

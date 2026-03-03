@@ -50,7 +50,7 @@ def print_status_digest(
 
     if not actionable:
         console.print(
-            "All trips look fine. Run [bold]travo status --all[/bold] to see everything."
+            "All trips look fine. Run [bold]fom status --all[/bold] to see everything."
         )
         return
 
@@ -86,7 +86,7 @@ def print_trip_detail(
     breakdown: TrueCostBreakdown | None = None,
     insight_text: str | None = None,
 ) -> None:
-    """Print the full recommendation panel for `travo check <id>`."""
+    """Print the full recommendation panel for `fom check <id>`."""
     decision_style = _DECISION_STYLE.get(rec.decision, "white")
     decision_label = rec.decision.upper().replace("_", " ")
     risk_style = _RISK_STYLE.get(rec.regret_risk, "white")

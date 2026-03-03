@@ -1,7 +1,7 @@
 """
 School holiday calendar — Australian state term dates.
 
-Holiday data is embedded in travo/data/school_holidays.yaml and loaded once
+Holiday data is embedded in fly_o_myte/data/school_holidays.yaml and loaded once
 at import time. No network calls, no external API.
 
 Phase 1: QLD only.

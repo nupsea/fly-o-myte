@@ -1,11 +1,11 @@
 """
 Airline fee database loader.
 
-Reads travo/data/airlines.json and provides helpers for computing
+Reads fly_o_myte/data/airlines.json and provides helpers for computing
 bag fees, seat selection fees, and infant fees per airline.
 
 This is static data — updated 2-3x per year when airlines change policies.
-Run `travo data-version` to see when the database was last updated.
+Run `fom data-version` to see when the database was last updated.
 """
 
 from __future__ import annotations

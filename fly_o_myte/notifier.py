@@ -71,7 +71,7 @@ def send_book_now_alert(
 def _build_email_body(trip: Trip, rec: Recommendation) -> str:
     generated = rec.generated_at[:16].replace("T", " ")
     lines = [
-        f"Travo Booking Alert — {datetime.utcnow().strftime('%d %b %Y')}",
+        f"fly-o-myte Booking Alert — {datetime.utcnow().strftime('%d %b %Y')}",
         "=" * 50,
         "",
         f"Trip:        {trip.label}",
@@ -94,7 +94,7 @@ def _build_email_body(trip: Trip, rec: Recommendation) -> str:
         f"Generated:   {generated} UTC",
         "",
         "---",
-        "Travo — your family travel advisor",
+        "fly-o-myte — your family travel advisor",
         f"Run `fom check {trip.id}` for the full breakdown.",
     ]
     return "\n".join(lines)

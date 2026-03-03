@@ -164,7 +164,7 @@ def get_settings() -> Settings:
 def load_family_profile(config_path: Path | None = None) -> FamilyProfile:
     """
     Load family profile from ~/.fly-o-myte/config.yaml.
-    Returns defaults if the file does not exist (first run, before `travo setup`).
+    Returns defaults if the file does not exist (first run, before `fom setup`).
     """
     path = config_path or get_settings().config_path
 

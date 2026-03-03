@@ -1,5 +1,5 @@
 """
-Poll cycle orchestration — the core of `travo poll` and `travo refresh`.
+Poll cycle orchestration — the core of `fom poll` and `fom refresh`.
 
 Coordinates:
   1. Fetching prices from the active plugin (Tequila / Amadeus)

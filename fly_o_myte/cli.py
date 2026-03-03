@@ -394,7 +394,7 @@ def status(
 
 @app.command()
 def check(
-    trip_id: int = typer.Argument(..., help="Trip ID from `travo status`"),
+    trip_id: int = typer.Argument(..., help="Trip ID from `fom status`"),
 ) -> None:
     """Full recommendation detail for a single trip."""
     import json
