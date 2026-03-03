@@ -26,6 +26,8 @@ from pathlib import Path
 # Ensure the repo root is on the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from datetime import date, timedelta
+
 from fly_o_myte.config import DepartureWindow, FamilyProfile, get_settings
 from fly_o_myte.db.sqlite import (
     PriceSnapshot,
@@ -36,7 +38,6 @@ from fly_o_myte.db.sqlite import (
     insert_snapshot,
 )
 from fly_o_myte.fees import get_airline_db
-from fly_o_myte.price_sources.hookspecs import FlightOffer
 from fly_o_myte.true_cost import compute_true_cost
 
 
@@ -84,31 +85,24 @@ def main() -> int:
         )
 
         import random
-        from datetime import timedelta
 
         prices = [
             args.price * (1.0 + random.uniform(-0.05, 0.05)) for _ in range(args.count)
         ]
 
-        for i, price in enumerate(prices):
-            offer = FlightOffer(
-                source="stub",
-                airline_code=args.airline,
-                flight_number=f"{args.airline}500",
-                base_fare_per_adult=price,
-                currency="AUD",
-                stops=0,
-                departure_time="10:30",
-                arrival_time="12:10",
-                duration_minutes=100,
-                price_level_signal="TYPICAL",
-                offer_raw={},
-            )
+        depart = date.fromisoformat(trip.depart_date)
+        ret = date.fromisoformat(trip.return_date) if trip.return_date else None
+        child_ages = profile.child_ages_at(trip.depart_date)
 
-            n_sectors = 2 if trip.return_date else 1
-            child_ages = profile.child_ages_at(trip.depart_date)
+        for i, price in enumerate(prices):
             breakdown = compute_true_cost(
-                offer, fees, profile.adults, child_ages, n_sectors
+                airline=fees,
+                base_fare_per_adult=price,
+                adults=profile.adults,
+                child_ages=child_ages,
+                bags_per_person=trip.bags_per_person,
+                depart_date=depart,
+                return_date=ret,
             )
 
             fetched_at = datetime.now(UTC) - timedelta(days=args.count - 1 - i)
@@ -123,16 +117,7 @@ def main() -> int:
                     flight_number=f"{args.airline}500",
                     base_fare_per_adult=price,
                     true_family_cost=breakdown.total,
-                    true_cost_breakdown=json.dumps(
-                        {
-                            "base_adults": breakdown.base_adults,
-                            "base_children": breakdown.base_children,
-                            "bags": breakdown.bags,
-                            "seats": breakdown.seats,
-                            "infant": breakdown.infant,
-                            "total": breakdown.total,
-                        }
-                    ),
+                    true_cost_breakdown=json.dumps(breakdown.as_dict()),
                     price_level_signal="TYPICAL",
                     stops=0,
                     departure_time="10:30",

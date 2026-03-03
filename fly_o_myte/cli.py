@@ -190,9 +190,9 @@ def setup() -> None:
     console.print("  1. Add API keys to [dim].env[/dim] in your working directory:")
     console.print("     TEQUILA_API_KEY=your_key_here")
     console.print(
-        "  2. Run [bold]travo watch BNE SYD 2026-07-20 2026-07-27[/bold] to start tracking a trip"
+        "  2. Run [bold]fom watch BNE SYD 2026-07-20 2026-07-27[/bold] to start tracking a trip"
     )
-    console.print("  3. Add to crontab: [dim]0 7 * * * travo poll[/dim]\n")
+    console.print("  3. Add to crontab: [dim]0 7 * * * fom poll[/dim]\n")
 
 
 # ─── scout ─────────────────────────────────────────────────────────────────────
@@ -416,7 +416,7 @@ def check(
 
     if not rec or not snap:
         console.print(
-            f"No data yet for trip #{trip_id}. Run [bold]travo refresh {trip_id}[/bold]."
+            f"No data yet for trip #{trip_id}. Run [bold]fom refresh {trip_id}[/bold]."
         )
         return
 

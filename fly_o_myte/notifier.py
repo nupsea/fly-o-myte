@@ -47,7 +47,7 @@ def send_book_now_alert(
         )
         return False
 
-    subject = f"[Travo] Book Now — {trip.label}"
+    subject = f"[fly-o-myte] Book Now — {trip.label}"
     body = _build_email_body(trip, rec)
 
     msg = EmailMessage()
@@ -95,6 +95,6 @@ def _build_email_body(trip: Trip, rec: Recommendation) -> str:
         "",
         "---",
         "Travo — your family travel advisor",
-        f"Run `travo check {trip.id}` for the full breakdown.",
+        f"Run `fom check {trip.id}` for the full breakdown.",
     ]
     return "\n".join(lines)

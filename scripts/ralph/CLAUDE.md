@@ -18,7 +18,7 @@ Read this file as a MAP. Follow the links below for deeper context.
 3. Check you are on the branch matching `prd.branchName`. Create from main if missing.
 4. Pick the **lowest priority number** story where `passes: false`
 4a. If the story has `"type": "demo-review"`, check for `scripts/ralph/demo-reviews/[story-id]-approved.md` containing `APPROVED` on line 1. If absent: output `BLOCKED: Demo Review Gate [id] requires human approval` and stop. Do NOT implement code for demo-review stories.
-5. Implement that single story — stay focused, minimal changes
+5. Check `verifyFirst` field on the story. If present, read the named file(s) first. If the code already exists, verify it meets the acceptance criteria rather than rewriting it.
 6. Run quality checks: `make ci`
 6a. If the story touches `tracker.py`, `cli.py`, or `display.py`: also run `bash scripts/ralph/smoke_test.sh`. Paste the summary line ("X passed, Y failed") into the progress note. Fix any failures before committing.
 7. If a check fails: read the error — it contains remediation instructions. Fix, do not bypass.

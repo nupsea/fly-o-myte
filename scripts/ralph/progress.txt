@@ -18,6 +18,15 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
 - 7: cli.py
 - Run `uv run python tools/layer_linter.py` to verify. Must be clean before every commit.
 
+### Pre-built Phase 1 Code (DO NOT rewrite — verify and test only)
+- `fly_o_myte/price_sources/tequila.py` — complete: httpx client, _build_params, _parse_itinerary, tenacity retry
+- `fly_o_myte/notifier.py` — complete: send_book_now_alert(), _build_email_body(), smtplib integration
+- `fly_o_myte/tracker.py` — complete: poll_trip() calls notifier, compute_true_cost, recommender, analytics
+- `fly_o_myte/analytics.py` — scaffolded: update_after_snapshot() and rebuild_all() partial implementations
+- `fly_o_myte/db/duckdb.py` — scaffolded: query helpers for Phase 2 analytics
+- `fly_o_myte/scout.py` — complete: scout_month(), scout_flex() implemented
+- Missing test files: test_tequila.py, test_notifier.py (these are what S09, S14 must create)
+
 ### Key Gotchas
 - Jetstar infant fee is PER SECTOR ($35 × n_sectors), NOT per journey.
 - Child ages computed at travel date (not today): use `FamilyProfile.child_ages_at(depart_date)`.
