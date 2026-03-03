@@ -301,6 +301,7 @@
         "Run: fom watch BNE SYD 2026-07-20 2026-07-27 --label 'Test'",
         "Insert older high-price snapshots: uv run python scripts/ralph/insert_stub_snapshot.py 1 --price 480 --count 5",
         "Insert recent lower-price snapshots: uv run python scripts/ralph/insert_stub_snapshot.py 1 --price 310 --count 5",
+        "Run: fom refresh 1 — regenerates the recommendation from all 10 stored snapshots (insert script does not call the recommender)",
         "Run: fom check 1 — must show decision badge, true cost AUD, confidence %, rationale (real English sentence, not None). MONITOR is acceptable.",
         "Run: fom history 1 — sparkline renders without error, shows 10 rows",
         "Run: fom status --all — trip appears with its decision badge (MONITOR/WAIT/BOOK NOW)",

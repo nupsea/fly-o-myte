@@ -132,7 +132,8 @@ def main() -> int:
                 f"base=${price:.2f} true_cost=${breakdown.total:.2f}"
             )
 
-    print(f"\nDone. Run: fom check {args.trip_id}")
+    print(f"\nDone. Run: fom refresh {args.trip_id} && fom check {args.trip_id}")
+    print("(fom refresh regenerates the recommendation from all stored snapshots)")
     return 0
 
 
