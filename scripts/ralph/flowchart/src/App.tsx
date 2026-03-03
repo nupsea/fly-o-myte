@@ -32,6 +32,7 @@ type StoryStatus = 'done' | 'active' | 'gate' | 'pending'
 const PHASE_NAMES: Record<number, string> = {
   1: 'Phase 1 — Domestic Core (QLD)',
   2: 'Phase 2 — Analytics & LLM',
+  3: 'Phase 3 — International Routes',
 }
 
 const PHASE_COLORS: Record<number, { bg: string; border: string; label: string }> = {
