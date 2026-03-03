@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    name: Lint & type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: Lint (ruff)
+        run: uv run ruff check .
+      - name: Format check (ruff)
+        run: uv run ruff format --check .
+      - name: Type check (pyright)
+        run: uv run pyright .
+
+  test:
+    name: Tests (${{ matrix.python }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - name: Set up Python ${{ matrix.python }}
+        run: uv python install ${{ matrix.python }}
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: Run tests
+        run: uv run pytest tests/ -v --cov=travo --cov-report=xml --cov-report=term-missing
+        env:
+          # No real API keys in CI — all external calls are mocked
+          TEQUILA_API_KEY: ""
+          ANTHROPIC_API_KEY: ""
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: matrix.python == '3.12' && matrix.os == 'ubuntu-latest'
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  data-validation:
+    name: Validate embedded data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - name: Install dependencies
+        run: uv sync
+      - name: Validate airlines.json schema
+        run: |
+          uv run python -c "
+          from travo.fees import get_airline_db
+          db = get_airline_db()
+          codes = db.all_codes()
+          assert 'QF' in codes, 'Qantas missing from airline DB'
+          assert 'JQ' in codes, 'Jetstar missing from airline DB'
+          assert 'VA' in codes, 'Virgin Australia missing from airline DB'
+          print(f'Airline DB OK: {len(codes)} airlines loaded')
+          "
+      - name: Validate school_holidays.yaml schema
+        run: |
+          uv run python -c "
+          from travo.calendar import get_calendar
+          from datetime import date
+          cal = get_calendar()
+          assert 'QLD' in cal.supported_states(), 'QLD missing from calendar'
+          periods = cal.list_periods('QLD', 2026)
+          assert len(periods) == 4, f'Expected 4 QLD 2026 periods, got {len(periods)}'
+          ctx = cal.check_overlap('QLD', date(2026, 7, 1), date(2026, 7, 10))
+          assert ctx is not None, 'Mid-year holiday overlap check failed'
+          print(f'Calendar OK: {len(cal.supported_states())} state(s) loaded')
+          "
