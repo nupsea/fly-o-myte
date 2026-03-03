@@ -14,9 +14,23 @@ from __future__ import annotations
 import logging
 from collections.abc import Generator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RouteContext:
+    """Price percentile context for an origin/destination route."""
+
+    p25: float
+    p50: float
+    p75: float
+    min_price: float
+    max_price: float
+    sample_count: int
+    school_holiday_premium_pct: float | None
 
 
 @contextmanager
@@ -137,3 +151,81 @@ def query_price_percentiles(
             "max": round(row[5], 2),
             "sample_count": row[6],
         }
+
+
+def query_route_context(
+    analytics_dir: Path,
+    origin: str,
+    destination: str,
+) -> RouteContext | None:
+    """
+    Return price percentile context for an origin/destination route.
+
+    Queries snapshot Parquet files for percentiles and route_stats for
+    school holiday premium. Returns None when insufficient data exists.
+    """
+    route_stats_dir = analytics_dir / "route_stats"
+    stat_file = route_stats_dir / f"route_{origin}_{destination}.parquet"
+
+    if not stat_file.exists():
+        return None
+
+    snapshots_dir = analytics_dir / "snapshots"
+    parquet_files = list(snapshots_dir.glob("*.parquet"))
+    if not parquet_files:
+        return None
+
+    try:
+        import duckdb
+    except ImportError:
+        return None
+
+    parquet_glob = str(snapshots_dir / "*.parquet")
+
+    try:
+        with duckdb.connect() as conn:
+            row = conn.execute(f"""
+                SELECT
+                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY true_family_cost) AS p25,
+                    PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY true_family_cost) AS p50,
+                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY true_family_cost) AS p75,
+                    MIN(true_family_cost) AS min_price,
+                    MAX(true_family_cost) AS max_price,
+                    COUNT(*) AS sample_count
+                FROM read_parquet('{parquet_glob}')
+                WHERE origin = '{origin}' AND destination = '{destination}'
+            """).fetchone()
+
+            if not row or row[5] < 5:
+                return None
+
+            holiday_row = conn.execute(f"""
+                SELECT
+                    AVG(CASE WHEN school_holiday_week THEN avg_cost END) AS holiday_avg,
+                    AVG(CASE WHEN NOT school_holiday_week THEN avg_cost END) AS non_holiday_avg
+                FROM read_parquet('{stat_file}')
+            """).fetchone()
+
+            premium_pct = None
+            if (
+                holiday_row
+                and holiday_row[0] is not None
+                and holiday_row[1] is not None
+                and holiday_row[1] > 0
+            ):
+                premium_pct = round(
+                    (holiday_row[0] - holiday_row[1]) / holiday_row[1] * 100, 1
+                )
+
+            return RouteContext(
+                p25=round(row[0], 2),
+                p50=round(row[1], 2),
+                p75=round(row[2], 2),
+                min_price=round(row[3], 2),
+                max_price=round(row[4], 2),
+                sample_count=row[5],
+                school_holiday_premium_pct=premium_pct,
+            )
+    except Exception as exc:
+        logger.warning("query_route_context failed: %s", exc)
+        return None

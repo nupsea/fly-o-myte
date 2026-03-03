@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from fly_o_myte.config import DepartureWindow, FamilyProfile
-from fly_o_myte.db.duckdb import query_price_percentiles
+from fly_o_myte.db.duckdb import query_price_percentiles, query_route_context
 from fly_o_myte.db.sqlite import (
     Trip,
     create_db_engine,
@@ -321,5 +321,67 @@ class TestRebuildAll:
             result = runner.invoke(app, ["analytics", "--rebuild"])
             assert result.exit_code == 0
             assert "Rebuild complete" in result.output
+        finally:
+            get_settings.cache_clear()
+
+
+@pytest.mark.integration
+class TestQueryRouteContext:
+    """Tests for query_route_context() — DuckDB percentile queries."""
+
+    def test_returns_none_when_no_route_stats(self, tmp_path: Path) -> None:
+        """Returns None when route_stats Parquet does not exist."""
+        analytics_dir = tmp_path / "analytics"
+        result = query_route_context(analytics_dir, "BNE", "SYD")
+        assert result is None
+
+    def test_percentiles_correct_after_20_snapshots(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """query_route_context returns correct percentiles after seeding 20 snapshots.
+
+        Seeds 4 trips × 5 polls each = 20 snapshots with prices 150/200/250/300.
+        Verifies p25 <= p50 <= p75, sample_count == 20, and bounds are correct.
+        """
+        db_path = tmp_path / "test.db"
+        analytics_dir = tmp_path / "analytics"
+
+        monkeypatch.setenv("FLY_O_MYTE_DB_PATH", str(db_path))
+        monkeypatch.setenv("FLY_O_MYTE_ANALYTICS_DIR", str(analytics_dir))
+        from fly_o_myte.config import get_settings
+
+        get_settings.cache_clear()
+        try:
+            engine = _make_file_engine(db_path)
+            profile = _make_profile()
+
+            # Seed 4 trips with different prices, 5 polls each = 20 snapshots
+            for price in (150.0, 200.0, 250.0, 300.0):
+                pm = _make_stub_pm(price=price)
+                with get_session(engine) as session:
+                    trip = insert_trip(
+                        session,
+                        Trip(
+                            label=f"Route Ctx {price}",
+                            origin="BNE",
+                            destination="SYD",
+                            depart_date="2026-07-20",
+                            return_date="2026-07-27",
+                            adults=2,
+                            children_json="[]",
+                            bags_per_person=1,
+                            max_stops=1,
+                        ),
+                    )
+                    for _ in range(5):
+                        poll_trip(session, trip, profile, pm, send_alerts=False)
+
+            ctx = query_route_context(analytics_dir, "BNE", "SYD")
+            assert ctx is not None
+            assert ctx.p25 <= ctx.p50 <= ctx.p75
+            assert ctx.sample_count == 20
+            assert ctx.min_price <= ctx.p25
+            assert ctx.p75 <= ctx.max_price
+            assert ctx.min_price > 0
         finally:
             get_settings.cache_clear()

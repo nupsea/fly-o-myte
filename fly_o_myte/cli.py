@@ -440,6 +440,17 @@ def check(
 
         print_trip_detail(trip, rec, snap, breakdown)
 
+        # Market context — Phase 2 analytics (skip gracefully when no data)
+        from fly_o_myte.db.duckdb import query_route_context
+        from fly_o_myte.display import print_route_context
+
+        settings = _get_settings()
+        route_ctx = query_route_context(
+            settings.analytics_dir, trip.origin, trip.destination
+        )
+        if route_ctx:
+            print_route_context(route_ctx)
+
 
 # ─── compare ───────────────────────────────────────────────────────────────────
 

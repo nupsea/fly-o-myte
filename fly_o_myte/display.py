@@ -20,6 +20,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from fly_o_myte.db.duckdb import RouteContext
 from fly_o_myte.db.sqlite import PriceSnapshot, Recommendation, Trip
 from fly_o_myte.true_cost import TrueCostBreakdown
 
@@ -336,3 +337,21 @@ def print_data_version(version: str, last_updated: str, airlines: list[str]) -> 
     table.add_row("Last updated", last_updated)
     table.add_row("Airlines in DB", ", ".join(sorted(airlines)))
     console.print(table)
+
+
+# ─── Route market context ────────────────────────────────────────────────────────
+
+
+def print_route_context(ctx: RouteContext) -> None:
+    """Print one-line market context summary for fom check."""
+    line = (
+        f"  Market context: p25=${ctx.p25:,.0f}"
+        f" / median=${ctx.p50:,.0f}"
+        f" / p75=${ctx.p75:,.0f}"
+        f" ({ctx.sample_count} samples)"
+    )
+    if ctx.school_holiday_premium_pct is not None:
+        sign = "+" if ctx.school_holiday_premium_pct >= 0 else ""
+        line += f"  |  Holiday premium: {sign}{ctx.school_holiday_premium_pct:.1f}%"
+    console.print(line, style="dim")
+    console.print()
