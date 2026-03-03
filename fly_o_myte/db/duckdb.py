@@ -99,7 +99,7 @@ def query_price_percentiles(
                         MIN(ps.true_family_cost) AS min_cost,
                         MAX(ps.true_family_cost) AS max_cost,
                         COUNT(*) AS sample_count
-                    FROM sqlite_scan('{sqlite_db_path}', 'price_snapshot') ps
+                    FROM sqlite_scan('{sqlite_db_path}', 'pricesnapshot') ps
                     JOIN sqlite_scan('{sqlite_db_path}', 'trip') t ON t.id = ps.trip_id
                     WHERE t.origin = '{origin}' AND t.destination = '{destination}'
                 """).fetchone()

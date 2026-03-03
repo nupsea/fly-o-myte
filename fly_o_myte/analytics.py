@@ -81,7 +81,8 @@ def _run_incremental_update(
     with duckdb.connect(str(analytics_dir / "fly_o_myte_analytics.duckdb")) as conn:
         conn.execute("INSTALL sqlite; LOAD sqlite;")
 
-        # Determine quarter for partition
+        # Write all snapshots for this trip — overwrite with full history on each call
+        # so row count equals the total number of polls for this trip.
         conn.execute(f"""
             COPY (
                 SELECT
@@ -94,20 +95,16 @@ def _run_incremental_update(
                     ps.true_family_cost,
                     ps.price_level_signal,
                     ps.stops,
-                    (date_part('day', t.depart_date::DATE) -
-                     date_part('day', ps.fetched_at::DATE)) AS days_to_departure,
+                    datediff('day', ps.fetched_at::DATE, t.depart_date::DATE)
+                        AS days_to_departure,
                     date_part('month', t.depart_date::DATE) AS departure_month,
                     ps.price_level_signal IS NOT NULL AS school_holiday,
                     ps.family_score
-                FROM sqlite_scan('{sqlite_db_path}', 'price_snapshot') ps
+                FROM sqlite_scan('{sqlite_db_path}', 'pricesnapshot') ps
                 JOIN sqlite_scan('{sqlite_db_path}', 'trip') t ON t.id = ps.trip_id
                 WHERE ps.trip_id = {trip_id}
-                  AND ps.fetched_at = (
-                      SELECT MAX(fetched_at) FROM sqlite_scan('{sqlite_db_path}', 'price_snapshot')
-                      WHERE trip_id = {trip_id}
-                  )
             )
-            TO '{snapshots_dir}/latest_{trip_id}.parquet'
+            TO '{snapshots_dir}/trip_{trip_id}.parquet'
             (FORMAT PARQUET)
         """)
 
@@ -184,7 +181,7 @@ def _run_full_rebuild(analytics_dir: Path, sqlite_db_path: Path) -> None:
                     ps.stops,
                     ps.family_score,
                     date_part('month', t.depart_date::DATE) AS departure_month
-                FROM sqlite_scan('{sqlite_db_path}', 'price_snapshot') ps
+                FROM sqlite_scan('{sqlite_db_path}', 'pricesnapshot') ps
                 JOIN sqlite_scan('{sqlite_db_path}', 'trip') t ON t.id = ps.trip_id
             )
             TO '{snapshots_dir}/all_snapshots.parquet'

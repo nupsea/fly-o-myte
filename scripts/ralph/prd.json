@@ -330,7 +330,7 @@
         "DuckDB tests use pytest.importorskip('duckdb') — skip if not installed",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S17",

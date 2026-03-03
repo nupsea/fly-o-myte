@@ -20,6 +20,7 @@ from datetime import date, datetime
 
 import pluggy
 
+from fly_o_myte.analytics import update_after_snapshot
 from fly_o_myte.calendar import get_calendar
 from fly_o_myte.config import FamilyProfile, get_settings
 from fly_o_myte.db.sqlite import (
@@ -151,6 +152,16 @@ def poll_trip(
             family_score=family_score,
             offer_raw=json.dumps(offer.offer_raw),
         ),
+    )
+
+    # ─── 4a. Analytics update (Phase 2) ───────────────────────────────────
+    _settings = get_settings()
+    update_after_snapshot(
+        analytics_dir=_settings.analytics_dir,
+        trip_id=trip.id,
+        origin=trip.origin,
+        destination=trip.destination,
+        sqlite_db_path=_settings.db_path,
     )
 
     # ─── 5. Build recommendation ───────────────────────────────────────────
