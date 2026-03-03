@@ -94,3 +94,82 @@ class TestSupportedStates:
     def test_qld_is_supported(self):
         cal = get_calendar()
         assert "QLD" in cal.supported_states()
+
+    def test_all_eight_states_supported(self):
+        """All 8 AU states/territories must be present after Phase 2 data entry."""
+        cal = get_calendar()
+        states = cal.supported_states()
+        for code in ("QLD", "NSW", "VIC", "WA", "SA", "TAS", "NT", "ACT"):
+            assert code in states, f"Expected {code} in supported_states()"
+
+    def test_unknown_state_not_in_supported(self):
+        cal = get_calendar()
+        assert "XX" not in cal.supported_states()
+
+
+class TestMultiStateCalendar:
+    """Holiday overlap tests for the 7 new AU states/territories added in S19."""
+
+    def test_nsw_winter_break_detected(self):
+        """NSW winter break 2026 (Jul 4-19) — trip Jul 7-14 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("NSW", date(2026, 7, 7), date(2026, 7, 14))
+        assert ctx is not None
+        assert "winter" in ctx.label.lower() or "holiday" in ctx.label.lower()
+
+    def test_vic_winter_break_detected(self):
+        """VIC winter break 2026 (Jun 27 - Jul 12) — trip Jul 1-8 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("VIC", date(2026, 7, 1), date(2026, 7, 8))
+        assert ctx is not None
+        assert ctx.overlap_days >= 1
+
+    def test_wa_mid_year_break_detected(self):
+        """WA mid-year break 2026 (Jun 27 - Jul 12) — trip Jul 1-8 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("WA", date(2026, 7, 1), date(2026, 7, 8))
+        assert ctx is not None
+        assert ctx.overlap_days >= 1
+
+    def test_sa_mid_year_break_detected(self):
+        """SA mid-year break 2026 (Jul 4-19) — trip Jul 7-14 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("SA", date(2026, 7, 7), date(2026, 7, 14))
+        assert ctx is not None
+        assert ctx.overlap_days >= 1
+
+    def test_tas_winter_break_detected(self):
+        """TAS winter break 2026 (Jul 4-19) — trip Jul 7-14 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("TAS", date(2026, 7, 7), date(2026, 7, 14))
+        assert ctx is not None
+        assert ctx.overlap_days >= 1
+
+    def test_nt_mid_year_break_detected(self):
+        """NT mid-year break 2026 (Jun 27 - Jul 12) — trip Jul 1-8 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("NT", date(2026, 7, 1), date(2026, 7, 8))
+        assert ctx is not None
+        assert ctx.overlap_days >= 1
+
+    def test_act_winter_break_detected(self):
+        """ACT winter break 2026 (Jul 4-19) — trip Jul 7-14 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("ACT", date(2026, 7, 7), date(2026, 7, 14))
+        assert ctx is not None
+        assert ctx.overlap_days >= 1
+
+    def test_unknown_state_returns_none(self):
+        """State code not in YAML always returns None."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("ZZ", date(2026, 7, 7), date(2026, 7, 14))
+        assert ctx is None
+
+    def test_each_state_has_four_breaks_2026(self):
+        """Each of the 8 AU states has exactly 4 break periods in 2026."""
+        cal = get_calendar()
+        for state in ("QLD", "NSW", "VIC", "WA", "SA", "TAS", "NT", "ACT"):
+            periods = cal.list_periods(state, 2026)
+            assert len(periods) == 4, (
+                f"{state} 2026 has {len(periods)} breaks, expected 4"
+            )

@@ -385,7 +385,7 @@
         "test_calendar.py: unknown state code returns None",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S20",

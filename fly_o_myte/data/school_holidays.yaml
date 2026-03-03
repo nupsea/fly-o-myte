@@ -126,43 +126,673 @@ NSW:
   state_name: New South Wales
   timezone: Australia/Sydney
   department_url: https://education.nsw.gov.au/schooling/school-term-dates
-  # TODO: Phase 2
+  2025:
+    term_1:
+      start: "2025-01-28"
+      end: "2025-04-11"
+    autumn_break:
+      start: "2025-04-12"
+      end: "2025-04-27"
+      label: Autumn holidays
+    term_2:
+      start: "2025-04-28"
+      end: "2025-06-27"
+    winter_break:
+      start: "2025-06-28"
+      end: "2025-07-13"
+      label: Winter holidays
+    term_3:
+      start: "2025-07-14"
+      end: "2025-09-19"
+    spring_break:
+      start: "2025-09-20"
+      end: "2025-10-05"
+      label: Spring holidays
+    term_4:
+      start: "2025-10-06"
+      end: "2025-12-19"
+    summer_break:
+      start: "2025-12-20"
+      end: "2026-01-29"
+      label: Summer holidays
+  2026:
+    term_1:
+      start: "2026-01-27"
+      end: "2026-04-03"
+    autumn_break:
+      start: "2026-04-04"
+      end: "2026-04-19"
+      label: Autumn holidays
+    term_2:
+      start: "2026-04-20"
+      end: "2026-07-03"
+    winter_break:
+      start: "2026-07-04"
+      end: "2026-07-19"
+      label: Winter holidays
+    term_3:
+      start: "2026-07-20"
+      end: "2026-09-18"
+    spring_break:
+      start: "2026-09-19"
+      end: "2026-10-04"
+      label: Spring holidays
+    term_4:
+      start: "2026-10-05"
+      end: "2026-12-18"
+    summer_break:
+      start: "2026-12-19"
+      end: "2027-01-28"
+      label: Summer holidays
+  2027:
+    term_1:
+      start: "2027-01-26"
+      end: "2027-04-01"
+    autumn_break:
+      start: "2027-04-03"
+      end: "2027-04-18"
+      label: Autumn holidays
+      approximate: true
+    term_2:
+      start: "2027-04-19"
+      end: "2027-07-02"
+    winter_break:
+      start: "2027-07-03"
+      end: "2027-07-18"
+      label: Winter holidays
+      approximate: true
+    term_3:
+      start: "2027-07-19"
+      end: "2027-09-17"
+    spring_break:
+      start: "2027-09-18"
+      end: "2027-10-03"
+      label: Spring holidays
+      approximate: true
+    term_4:
+      start: "2027-10-04"
+      end: "2027-12-17"
+    summer_break:
+      start: "2027-12-18"
+      end: "2028-01-27"
+      label: Summer holidays
+      approximate: true
 
 VIC:
   state_name: Victoria
   timezone: Australia/Melbourne
   department_url: https://www.education.vic.gov.au/school/parents/primary/Pages/year.aspx
-  # TODO: Phase 2
+  2025:
+    term_1:
+      start: "2025-01-28"
+      end: "2025-04-04"
+    easter_break:
+      start: "2025-04-05"
+      end: "2025-04-22"
+      label: Easter holidays
+    term_2:
+      start: "2025-04-23"
+      end: "2025-06-27"
+    winter_break:
+      start: "2025-06-28"
+      end: "2025-07-13"
+      label: Winter holidays
+    term_3:
+      start: "2025-07-14"
+      end: "2025-09-19"
+    september_break:
+      start: "2025-09-20"
+      end: "2025-10-05"
+      label: September holidays
+    term_4:
+      start: "2025-10-06"
+      end: "2025-12-19"
+    summer_break:
+      start: "2025-12-20"
+      end: "2026-01-26"
+      label: Summer holidays
+  2026:
+    term_1:
+      start: "2026-01-27"
+      end: "2026-04-03"
+    easter_break:
+      start: "2026-04-04"
+      end: "2026-04-19"
+      label: Easter holidays
+    term_2:
+      start: "2026-04-20"
+      end: "2026-06-26"
+    winter_break:
+      start: "2026-06-27"
+      end: "2026-07-12"
+      label: Winter holidays
+    term_3:
+      start: "2026-07-13"
+      end: "2026-09-18"
+    september_break:
+      start: "2026-09-19"
+      end: "2026-10-04"
+      label: September holidays
+    term_4:
+      start: "2026-10-05"
+      end: "2026-12-18"
+    summer_break:
+      start: "2026-12-19"
+      end: "2027-01-25"
+      label: Summer holidays
+  2027:
+    term_1:
+      start: "2027-01-26"
+      end: "2027-04-01"
+    easter_break:
+      start: "2027-04-03"
+      end: "2027-04-18"
+      label: Easter holidays
+      approximate: true
+    term_2:
+      start: "2027-04-19"
+      end: "2027-06-25"
+    winter_break:
+      start: "2027-06-26"
+      end: "2027-07-11"
+      label: Winter holidays
+      approximate: true
+    term_3:
+      start: "2027-07-12"
+      end: "2027-09-17"
+    september_break:
+      start: "2027-09-18"
+      end: "2027-10-03"
+      label: September holidays
+      approximate: true
+    term_4:
+      start: "2027-10-04"
+      end: "2027-12-17"
+    summer_break:
+      start: "2027-12-18"
+      end: "2028-01-24"
+      label: Summer holidays
+      approximate: true
 
 WA:
   state_name: Western Australia
   timezone: Australia/Perth
   department_url: https://www.education.wa.edu.au/term-dates
-  # TODO: Phase 2
+  2025:
+    term_1:
+      start: "2025-02-03"
+      end: "2025-04-11"
+    easter_break:
+      start: "2025-04-12"
+      end: "2025-04-25"
+      label: Easter holidays
+    term_2:
+      start: "2025-04-28"
+      end: "2025-06-27"
+    mid_year_break:
+      start: "2025-06-28"
+      end: "2025-07-13"
+      label: Mid-year holidays
+    term_3:
+      start: "2025-07-14"
+      end: "2025-09-19"
+    september_break:
+      start: "2025-09-20"
+      end: "2025-10-03"
+      label: September holidays
+    term_4:
+      start: "2025-10-06"
+      end: "2025-12-12"
+    summer_break:
+      start: "2025-12-13"
+      end: "2026-01-29"
+      label: Summer holidays
+  2026:
+    term_1:
+      start: "2026-02-02"
+      end: "2026-04-03"
+    easter_break:
+      start: "2026-04-04"
+      end: "2026-04-19"
+      label: Easter holidays
+    term_2:
+      start: "2026-04-20"
+      end: "2026-06-26"
+    mid_year_break:
+      start: "2026-06-27"
+      end: "2026-07-12"
+      label: Mid-year holidays
+    term_3:
+      start: "2026-07-13"
+      end: "2026-09-18"
+    september_break:
+      start: "2026-09-19"
+      end: "2026-10-02"
+      label: September holidays
+    term_4:
+      start: "2026-10-05"
+      end: "2026-12-11"
+    summer_break:
+      start: "2026-12-12"
+      end: "2027-01-28"
+      label: Summer holidays
+  2027:
+    term_1:
+      start: "2027-02-01"
+      end: "2027-04-01"
+    easter_break:
+      start: "2027-04-03"
+      end: "2027-04-18"
+      label: Easter holidays
+      approximate: true
+    term_2:
+      start: "2027-04-19"
+      end: "2027-06-25"
+    mid_year_break:
+      start: "2027-06-26"
+      end: "2027-07-11"
+      label: Mid-year holidays
+      approximate: true
+    term_3:
+      start: "2027-07-12"
+      end: "2027-09-17"
+    september_break:
+      start: "2027-09-18"
+      end: "2027-10-01"
+      label: September holidays
+      approximate: true
+    term_4:
+      start: "2027-10-04"
+      end: "2027-12-10"
+    summer_break:
+      start: "2027-12-11"
+      end: "2028-01-27"
+      label: Summer holidays
+      approximate: true
 
 SA:
   state_name: South Australia
   timezone: Australia/Adelaide
   department_url: https://www.education.sa.gov.au/parents-and-families/term-dates-and-public-holidays
-  # TODO: Phase 2
+  2025:
+    term_1:
+      start: "2025-01-28"
+      end: "2025-04-11"
+    autumn_break:
+      start: "2025-04-12"
+      end: "2025-04-27"
+      label: Autumn holidays
+    term_2:
+      start: "2025-04-28"
+      end: "2025-07-04"
+    mid_year_break:
+      start: "2025-07-05"
+      end: "2025-07-20"
+      label: Mid-year holidays
+    term_3:
+      start: "2025-07-21"
+      end: "2025-09-26"
+    spring_break:
+      start: "2025-09-27"
+      end: "2025-10-12"
+      label: Spring holidays
+    term_4:
+      start: "2025-10-13"
+      end: "2025-12-12"
+    summer_break:
+      start: "2025-12-13"
+      end: "2026-01-26"
+      label: Summer holidays
+  2026:
+    term_1:
+      start: "2026-01-27"
+      end: "2026-04-03"
+    autumn_break:
+      start: "2026-04-04"
+      end: "2026-04-19"
+      label: Autumn holidays
+    term_2:
+      start: "2026-04-20"
+      end: "2026-07-03"
+    mid_year_break:
+      start: "2026-07-04"
+      end: "2026-07-19"
+      label: Mid-year holidays
+    term_3:
+      start: "2026-07-20"
+      end: "2026-09-25"
+    spring_break:
+      start: "2026-09-26"
+      end: "2026-10-11"
+      label: Spring holidays
+    term_4:
+      start: "2026-10-12"
+      end: "2026-12-11"
+    summer_break:
+      start: "2026-12-12"
+      end: "2027-01-25"
+      label: Summer holidays
+  2027:
+    term_1:
+      start: "2027-01-26"
+      end: "2027-04-01"
+    autumn_break:
+      start: "2027-04-03"
+      end: "2027-04-18"
+      label: Autumn holidays
+      approximate: true
+    term_2:
+      start: "2027-04-19"
+      end: "2027-07-02"
+    mid_year_break:
+      start: "2027-07-03"
+      end: "2027-07-18"
+      label: Mid-year holidays
+      approximate: true
+    term_3:
+      start: "2027-07-19"
+      end: "2027-09-24"
+    spring_break:
+      start: "2027-09-25"
+      end: "2027-10-10"
+      label: Spring holidays
+      approximate: true
+    term_4:
+      start: "2027-10-11"
+      end: "2027-12-10"
+    summer_break:
+      start: "2027-12-11"
+      end: "2028-01-24"
+      label: Summer holidays
+      approximate: true
 
 TAS:
   state_name: Tasmania
   timezone: Australia/Hobart
   department_url: https://www.education.tas.gov.au/parents-carers/term-dates/
-  # TODO: Phase 2
+  2025:
+    term_1:
+      start: "2025-01-28"
+      end: "2025-04-11"
+    easter_break:
+      start: "2025-04-12"
+      end: "2025-04-27"
+      label: Easter holidays
+    term_2:
+      start: "2025-04-28"
+      end: "2025-07-04"
+    winter_break:
+      start: "2025-07-05"
+      end: "2025-07-20"
+      label: Winter holidays
+    term_3:
+      start: "2025-07-21"
+      end: "2025-09-19"
+    spring_break:
+      start: "2025-09-20"
+      end: "2025-10-05"
+      label: Spring holidays
+    term_4:
+      start: "2025-10-06"
+      end: "2025-12-18"
+    summer_break:
+      start: "2025-12-19"
+      end: "2026-01-29"
+      label: Summer holidays
+  2026:
+    term_1:
+      start: "2026-01-27"
+      end: "2026-04-03"
+    easter_break:
+      start: "2026-04-04"
+      end: "2026-04-19"
+      label: Easter holidays
+    term_2:
+      start: "2026-04-20"
+      end: "2026-07-03"
+    winter_break:
+      start: "2026-07-04"
+      end: "2026-07-19"
+      label: Winter holidays
+    term_3:
+      start: "2026-07-20"
+      end: "2026-09-18"
+    spring_break:
+      start: "2026-09-19"
+      end: "2026-10-04"
+      label: Spring holidays
+    term_4:
+      start: "2026-10-05"
+      end: "2026-12-18"
+    summer_break:
+      start: "2026-12-19"
+      end: "2027-01-28"
+      label: Summer holidays
+  2027:
+    term_1:
+      start: "2027-01-26"
+      end: "2027-04-01"
+    easter_break:
+      start: "2027-04-03"
+      end: "2027-04-18"
+      label: Easter holidays
+      approximate: true
+    term_2:
+      start: "2027-04-19"
+      end: "2027-07-02"
+    winter_break:
+      start: "2027-07-03"
+      end: "2027-07-18"
+      label: Winter holidays
+      approximate: true
+    term_3:
+      start: "2027-07-19"
+      end: "2027-09-17"
+    spring_break:
+      start: "2027-09-18"
+      end: "2027-10-03"
+      label: Spring holidays
+      approximate: true
+    term_4:
+      start: "2027-10-04"
+      end: "2027-12-17"
+    summer_break:
+      start: "2027-12-18"
+      end: "2028-01-27"
+      label: Summer holidays
+      approximate: true
 
 NT:
   state_name: Northern Territory
   timezone: Australia/Darwin
   department_url: https://education.nt.gov.au/term-dates
-  # TODO: Phase 2
+  2025:
+    term_1:
+      start: "2025-01-28"
+      end: "2025-04-04"
+    easter_break:
+      start: "2025-04-05"
+      end: "2025-04-22"
+      label: Easter holidays
+    term_2:
+      start: "2025-04-23"
+      end: "2025-06-27"
+    mid_year_break:
+      start: "2025-06-28"
+      end: "2025-07-13"
+      label: Mid-year holidays
+    term_3:
+      start: "2025-07-14"
+      end: "2025-09-19"
+    september_break:
+      start: "2025-09-20"
+      end: "2025-10-05"
+      label: September holidays
+    term_4:
+      start: "2025-10-06"
+      end: "2025-12-05"
+    summer_break:
+      start: "2025-12-06"
+      end: "2026-01-27"
+      label: Summer holidays
+  2026:
+    term_1:
+      start: "2026-01-27"
+      end: "2026-04-03"
+    easter_break:
+      start: "2026-04-04"
+      end: "2026-04-19"
+      label: Easter holidays
+    term_2:
+      start: "2026-04-20"
+      end: "2026-06-26"
+    mid_year_break:
+      start: "2026-06-27"
+      end: "2026-07-12"
+      label: Mid-year holidays
+    term_3:
+      start: "2026-07-13"
+      end: "2026-09-18"
+    september_break:
+      start: "2026-09-19"
+      end: "2026-10-04"
+      label: September holidays
+    term_4:
+      start: "2026-10-05"
+      end: "2026-12-04"
+    summer_break:
+      start: "2026-12-05"
+      end: "2027-01-26"
+      label: Summer holidays
+  2027:
+    term_1:
+      start: "2027-01-26"
+      end: "2027-04-01"
+    easter_break:
+      start: "2027-04-03"
+      end: "2027-04-18"
+      label: Easter holidays
+      approximate: true
+    term_2:
+      start: "2027-04-19"
+      end: "2027-06-25"
+    mid_year_break:
+      start: "2027-06-26"
+      end: "2027-07-11"
+      label: Mid-year holidays
+      approximate: true
+    term_3:
+      start: "2027-07-12"
+      end: "2027-09-17"
+    september_break:
+      start: "2027-09-18"
+      end: "2027-10-03"
+      label: September holidays
+      approximate: true
+    term_4:
+      start: "2027-10-04"
+      end: "2027-12-03"
+    summer_break:
+      start: "2027-12-04"
+      end: "2028-01-25"
+      label: Summer holidays
+      approximate: true
 
 ACT:
   state_name: Australian Capital Territory
   timezone: Australia/Sydney
   department_url: https://www.education.act.gov.au/school-education/term-dates
-  # TODO: Phase 2
+  2025:
+    term_1:
+      start: "2025-01-28"
+      end: "2025-04-11"
+    autumn_break:
+      start: "2025-04-12"
+      end: "2025-04-27"
+      label: Autumn holidays
+    term_2:
+      start: "2025-04-28"
+      end: "2025-06-27"
+    winter_break:
+      start: "2025-06-28"
+      end: "2025-07-13"
+      label: Winter holidays
+    term_3:
+      start: "2025-07-14"
+      end: "2025-09-19"
+    spring_break:
+      start: "2025-09-20"
+      end: "2025-10-05"
+      label: Spring holidays
+    term_4:
+      start: "2025-10-06"
+      end: "2025-12-18"
+    summer_break:
+      start: "2025-12-19"
+      end: "2026-01-28"
+      label: Summer holidays
+  2026:
+    term_1:
+      start: "2026-01-27"
+      end: "2026-04-03"
+    autumn_break:
+      start: "2026-04-04"
+      end: "2026-04-19"
+      label: Autumn holidays
+    term_2:
+      start: "2026-04-20"
+      end: "2026-07-03"
+    winter_break:
+      start: "2026-07-04"
+      end: "2026-07-19"
+      label: Winter holidays
+    term_3:
+      start: "2026-07-20"
+      end: "2026-09-18"
+    spring_break:
+      start: "2026-09-19"
+      end: "2026-10-04"
+      label: Spring holidays
+    term_4:
+      start: "2026-10-05"
+      end: "2026-12-18"
+    summer_break:
+      start: "2026-12-19"
+      end: "2027-01-27"
+      label: Summer holidays
+  2027:
+    term_1:
+      start: "2027-01-26"
+      end: "2027-04-01"
+    autumn_break:
+      start: "2027-04-03"
+      end: "2027-04-18"
+      label: Autumn holidays
+      approximate: true
+    term_2:
+      start: "2027-04-19"
+      end: "2027-07-02"
+    winter_break:
+      start: "2027-07-03"
+      end: "2027-07-18"
+      label: Winter holidays
+      approximate: true
+    term_3:
+      start: "2027-07-19"
+      end: "2027-09-17"
+    spring_break:
+      start: "2027-09-18"
+      end: "2027-10-03"
+      label: Spring holidays
+      approximate: true
+    term_4:
+      start: "2027-10-04"
+      end: "2027-12-17"
+    summer_break:
+      start: "2027-12-18"
+      end: "2028-01-27"
+      label: Summer holidays
+      approximate: true
 
 # ─── Phase 3: International ───────────────────────────────────────────────────
 # Key destination countries for Australian families
