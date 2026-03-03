@@ -199,6 +199,32 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
     imports don't require duckdb at import time (lazy imports inside functions).
 ---
 
+## 2026-03-04T02:00:00+10:00 - S21 - Amadeus price level signal enrichment
+- Implemented: get_price_level_signal(origin, destination, depart_date, price_aud)
+  in AmadeusPriceSource. Sorts priceMetrics by amount ascending; finds first band
+  where price_aud <= band amount and maps quartileRanking → LOW/TYPICAL/HIGH.
+  Wired in tracker.py (poll_trip step 1b): iterates pm.get_plugins() for
+  AmadeusPriceSource, enriches offer.price_level_signal when it is None.
+  Created tests/test_amadeus.py with 11 tests.
+- Files changed:
+  - fly_o_myte/price_sources/amadeus.py (_PRICE_METRIC_MAP + get_price_level_signal)
+  - fly_o_myte/tracker.py (step 1b enrichment via pm.get_plugins())
+  - tests/test_amadeus.py (new — 11 tests)
+  - scripts/ralph/prd.json (S21 passes:true)
+- make ci: 167 passed, 0 failed. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - _get_token() has no @retry — an auth failure (401) raises PriceSourceError
+    immediately (1 request). get_price_level_signal's except Exception catches it
+    and returns None. Only need to queue 1 mock response for auth failure tests.
+  - For analysis endpoint, code checks response.status_code != 200 and returns
+    None directly (no raise_for_status call) — non-200 analysis is graceful, not
+    an exception.
+  - pm.get_plugins() returns all registered plugins — isinstance check finds
+    AmadeusPriceSource without needing a separate registry or config check.
+  - Token expiry check: `time.time() < self._token_expires_at - 30` — the 30s
+    buffer means token is "cached" for up to expires_in - 30 seconds.
+---
+
 ## 2026-03-04T01:00:00+10:00 - S20 - SerpAPI adapter unit tests
 - Implemented: tests/test_serpapi.py with 19 tests (14 functions, some parametrized)
   covering all S20 acceptance criteria.

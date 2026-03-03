@@ -430,7 +430,7 @@
         "tests/test_amadeus.py: token not re-fetched if cached and not expired",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S22",

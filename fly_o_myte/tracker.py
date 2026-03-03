@@ -107,6 +107,17 @@ def poll_trip(
         logger.warning("No offers found for trip %s (%s)", trip.id, trip.label)
         return None
 
+    # ─── 1b. Enrich price signal via Amadeus when SerpAPI returns None ─────
+    if offer.price_level_signal is None:
+        for plugin in pm.get_plugins():
+            if isinstance(plugin, AmadeusPriceSource):
+                signal = plugin.get_price_level_signal(
+                    trip.origin, trip.destination, depart, offer.base_fare_per_adult
+                )
+                if signal:
+                    offer = FlightOffer(**{**vars(offer), "price_level_signal": signal})
+                break
+
     # ─── 2. Compute true family cost ───────────────────────────────────────
     airline_db = get_airline_db()
     airline = airline_db.get_or_default(offer.airline_code)

@@ -31,6 +31,15 @@ _AUTH_URL = "https://{host}.api.amadeus.com/v1/security/oauth2/token"
 _SEARCH_URL = "https://{host}.api.amadeus.com/v2/shopping/flight-offers"
 _ANALYSIS_URL = "https://{host}.api.amadeus.com/v1/analytics/itinerary-price-metrics"
 
+# Amadeus quartileRanking values mapped to our 3-tier price level signal
+_PRICE_METRIC_MAP: dict[str, str] = {
+    "LOW": "LOW",
+    "MEDIUM_LOW": "LOW",
+    "MEDIUM": "TYPICAL",
+    "MEDIUM_HIGH": "TYPICAL",
+    "HIGH": "HIGH",
+}
+
 # Domestic Australian routes — let Tequila handle these
 _AUSTRALIAN_AIRPORTS = {
     "ADL",
@@ -285,6 +294,54 @@ class AmadeusPriceSource:
             return price_metrics.get("priceMetrics", [{}])[0].get("amount")
         except Exception as exc:
             logger.debug("Price signal fetch failed (non-critical): %s", exc)
+            return None
+
+    def get_price_level_signal(
+        self,
+        origin: str,
+        destination: str,
+        depart_date: date,
+        price_aud: float,
+    ) -> str | None:
+        """
+        Compare price_aud against Amadeus itinerary price metrics.
+
+        Returns 'LOW', 'TYPICAL', 'HIGH', or None on any failure.
+        priceMetrics quartileRanking: LOW/MEDIUM_LOW→LOW, MEDIUM/MEDIUM_HIGH→TYPICAL, HIGH→HIGH.
+        """
+        try:
+            token = self._get_token()
+            url = _ANALYSIS_URL.format(host=self._hostname)
+            response = self._http.get(
+                url,
+                headers={"Authorization": f"Bearer {token}"},
+                params={
+                    "originIataCode": origin.upper(),
+                    "destinationIataCode": destination.upper(),
+                    "departureDate": depart_date.isoformat(),
+                    "currencyCode": "AUD",
+                    "oneWay": "false",
+                },
+                timeout=10.0,
+            )
+            if response.status_code != 200:
+                return None
+            data = response.json()
+            data_list = data.get("data", [])
+            if not data_list:
+                return None
+            metrics = data_list[0].get("priceMetrics", [])
+            if not metrics:
+                return None
+            # Sort ascending by amount; return signal for first band where price_aud ≤ amount
+            sorted_metrics = sorted(metrics, key=lambda m: float(m.get("amount", 0)))
+            for metric in sorted_metrics:
+                if price_aud <= float(metric.get("amount", 0)):
+                    ranking = metric.get("quartileRanking", "")
+                    return _PRICE_METRIC_MAP.get(ranking)
+            return "HIGH"  # price exceeds all bands
+        except Exception as exc:
+            logger.debug("get_price_level_signal failed (non-critical): %s", exc)
             return None
 
     def close(self) -> None:
