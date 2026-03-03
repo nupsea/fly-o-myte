@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ScoutResult:
     """One sampled date window from a scouting run."""
+
     depart_date: date
     return_date: date
     trip_length_days: int

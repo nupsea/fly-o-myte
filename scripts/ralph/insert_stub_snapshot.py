@@ -20,16 +20,15 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Ensure the repo root is on the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from fly_o_myte.config import get_settings
+from fly_o_myte.config import DepartureWindow, FamilyProfile, get_settings
 from fly_o_myte.db.sqlite import (
     PriceSnapshot,
-    Trip,
     create_engine_from_path,
     create_tables,
     get_session,
@@ -39,15 +38,23 @@ from fly_o_myte.db.sqlite import (
 from fly_o_myte.fees import get_airline_db
 from fly_o_myte.price_sources.hookspecs import FlightOffer
 from fly_o_myte.true_cost import compute_true_cost
-from fly_o_myte.config import FamilyProfile, DepartureWindow
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Insert a stub price snapshot for testing.")
+    parser = argparse.ArgumentParser(
+        description="Insert a stub price snapshot for testing."
+    )
     parser.add_argument("trip_id", type=int, help="Trip ID to insert snapshot for")
-    parser.add_argument("--price", type=float, default=299.0, help="Base fare per adult (AUD)")
+    parser.add_argument(
+        "--price", type=float, default=299.0, help="Base fare per adult (AUD)"
+    )
     parser.add_argument("--airline", default="QF", help="Airline IATA code")
-    parser.add_argument("--count", type=int, default=1, help="Number of snapshots to insert (spread over recent days)")
+    parser.add_argument(
+        "--count",
+        type=int,
+        default=1,
+        help="Number of snapshots to insert (spread over recent days)",
+    )
     args = parser.parse_args()
 
     settings = get_settings()
@@ -79,7 +86,9 @@ def main() -> int:
         import random
         from datetime import timedelta
 
-        prices = [args.price * (1.0 + random.uniform(-0.05, 0.05)) for _ in range(args.count)]
+        prices = [
+            args.price * (1.0 + random.uniform(-0.05, 0.05)) for _ in range(args.count)
+        ]
 
         for i, price in enumerate(prices):
             offer = FlightOffer(
@@ -98,9 +107,11 @@ def main() -> int:
 
             n_sectors = 2 if trip.return_date else 1
             child_ages = profile.child_ages_at(trip.depart_date)
-            breakdown = compute_true_cost(offer, fees, profile.adults, child_ages, n_sectors)
+            breakdown = compute_true_cost(
+                offer, fees, profile.adults, child_ages, n_sectors
+            )
 
-            fetched_at = datetime.now(timezone.utc) - timedelta(days=args.count - 1 - i)
+            fetched_at = datetime.now(UTC) - timedelta(days=args.count - 1 - i)
 
             snap = insert_snapshot(
                 session,
@@ -112,14 +123,16 @@ def main() -> int:
                     flight_number=f"{args.airline}500",
                     base_fare_per_adult=price,
                     true_family_cost=breakdown.total,
-                    true_cost_breakdown=json.dumps({
-                        "base_adults": breakdown.base_adults,
-                        "base_children": breakdown.base_children,
-                        "bags": breakdown.bags,
-                        "seats": breakdown.seats,
-                        "infant": breakdown.infant,
-                        "total": breakdown.total,
-                    }),
+                    true_cost_breakdown=json.dumps(
+                        {
+                            "base_adults": breakdown.base_adults,
+                            "base_children": breakdown.base_children,
+                            "bags": breakdown.bags,
+                            "seats": breakdown.seats,
+                            "infant": breakdown.infant,
+                            "total": breakdown.total,
+                        }
+                    ),
                     price_level_signal="TYPICAL",
                     stops=0,
                     departure_time="10:30",
@@ -127,8 +140,10 @@ def main() -> int:
                     offer_raw="{}",
                 ),
             )
-            print(f"Inserted snapshot {snap.id}: trip={trip.id} airline={args.airline} "
-                  f"base=${price:.2f} true_cost=${breakdown.total:.2f}")
+            print(
+                f"Inserted snapshot {snap.id}: trip={trip.id} airline={args.airline} "
+                f"base=${price:.2f} true_cost=${breakdown.total:.2f}"
+            )
 
     print(f"\nDone. Run: fom check {args.trip_id}")
     return 0

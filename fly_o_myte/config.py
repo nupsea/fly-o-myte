@@ -41,8 +41,8 @@ class Child:
 
 @dataclass
 class DepartureWindow:
-    earliest_hour: int = 8   # earliest acceptable departure (families prefer 8am+)
-    latest_hour: int = 18    # latest acceptable departure
+    earliest_hour: int = 8  # earliest acceptable departure (families prefer 8am+)
+    latest_hour: int = 18  # latest acceptable departure
 
 
 @dataclass
@@ -66,8 +66,13 @@ class FamilyProfile:
         """Return each child's age in full years at the given travel date."""
         ages = []
         for child in self.children:
-            age = travel_date.year - child.dob.year - (
-                (travel_date.month, travel_date.day) < (child.dob.month, child.dob.day)
+            age = (
+                travel_date.year
+                - child.dob.year
+                - (
+                    (travel_date.month, travel_date.day)
+                    < (child.dob.month, child.dob.day)
+                )
             )
             ages.append(age)
         return ages

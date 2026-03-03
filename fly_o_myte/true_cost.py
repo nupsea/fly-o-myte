@@ -31,12 +31,12 @@ from fly_o_myte.fees import AirlineFees
 class TrueCostBreakdown:
     """Itemised cost breakdown for a family trip."""
 
-    base_fare_adults: float       # AUD — adults × base fare per adult
-    base_fare_children: float     # AUD — seated children × estimated child fare
-    bag_fees: float               # AUD — all bags for all pax
-    seat_fees: float              # AUD — seat selection for all pax
-    infant_fees: float            # AUD — lap infant fees (may be 0)
-    total: float                  # AUD — sum of all above
+    base_fare_adults: float  # AUD — adults × base fare per adult
+    base_fare_children: float  # AUD — seated children × estimated child fare
+    bag_fees: float  # AUD — all bags for all pax
+    seat_fees: float  # AUD — seat selection for all pax
+    infant_fees: float  # AUD — lap infant fees (may be 0)
+    total: float  # AUD — sum of all above
 
     def as_dict(self) -> dict:
         return {

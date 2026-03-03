@@ -54,8 +54,12 @@
 | US-045 | Async / batched polling for scaling | Trip Tracking | 2 |
 | US-046 | Dynamic iCal school holiday fetching | Holiday Awareness | 2 |
 | US-047 | Recommender robustness to intra-day refreshes | Recommendations | 1 |
+| US-048 | Automated Performance Regression Testing | Quality Assurance | 2 |
+| US-049 | LLM Evaluation "Judge" Harness | Quality Assurance | 2 |
+| US-050 | Automated Dependency Security Scan | Quality Assurance | 1 |
 
 ---
+
 
 ## Epic: Setup & Configuration
 
@@ -697,6 +701,45 @@ As an admin, I want school holidays to be fetched dynamically from public iCal f
 - `travo` can fetch and cache standard `.ics` format calendars.
 - State calendars are auto-updated once every 30 days.
 - User can override the default feed with a custom school calendar URL.
+
+---
+
+### Epic: Quality Assurance & Performance
+
+### US-048 — Automated Performance Regression Testing
+**Phase 2**
+
+As a power user, I want the CLI to remain fast even when I have 100+ trips in my database so that my morning status check is always nearly instantaneous.
+
+**Acceptance criteria:**
+- A performance test suite (benchmarking) runs as part of the CI pipeline.
+- `fom status` with a local database containing 100 trips and 3,000 snapshots must execute in < 500ms.
+- Any regression above 1 second causes the benchmark gate to fail.
+
+---
+
+### US-049 — LLM Evaluation "Judge" Harness
+**Phase 2**
+
+As an engineer, I want a deterministic way to evaluate the quality of LLM-generated insights so that model changes (e.g., Haiku 3.5 to 4.0) don't silently degrade the product's advice.
+
+**Acceptance criteria:**
+- Implementation of Story `S17` in `prd.json`.
+- A set of "golden fixtures" with expected insight criteria.
+- An "eval" command that uses a larger LLM (e.g., Sonnet or Opus) to grade the generated insights on accuracy, conciseness, and tone.
+- Aggregate pass rate >= 80% required for Phase 2 stability.
+
+---
+
+### US-050 — Automated Dependency Security Scan
+**Phase 1**
+
+As a privacy-conscious user, I want the tool I run locally to be free of known vulnerable dependencies so that my system is never compromised by an outdated third-party library.
+
+**Acceptance criteria:**
+- `osv-scanner` (or `safety`) is integrated into `make ci`.
+- Any known vulnerability with a CVSS score > 7.0 blocks the build.
+- The scan checks all transitive dependencies from `uv.lock`.
 
 ---
 

@@ -55,7 +55,10 @@ print('Data OK:', db.version, '|', len(db.all_codes()), 'airlines |', len(cal.su
 
 # ─── CI (all gates — run before pushing) ──────────────────────────────────────
 
-ci: install lint typecheck layer-lint data-check test
+smoke-test:
+	bash scripts/ralph/smoke_test.sh
+
+ci: install lint typecheck layer-lint data-check test smoke-test
 	@echo "CI passed."
 
 # ─── Cleanup ──────────────────────────────────────────────────────────────────

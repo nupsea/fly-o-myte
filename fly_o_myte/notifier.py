@@ -36,11 +36,15 @@ def send_book_now_alert(
 
     recipient = trip.alert_email or cfg.default_alert_email
     if not recipient:
-        logger.debug("No alert email configured for trip %s — skipping notification", trip.id)
+        logger.debug(
+            "No alert email configured for trip %s — skipping notification", trip.id
+        )
         return False
 
     if not cfg.smtp_user or not cfg.smtp_pass:
-        logger.warning("SMTP credentials not configured — cannot send alert for trip %s", trip.id)
+        logger.warning(
+            "SMTP credentials not configured — cannot send alert for trip %s", trip.id
+        )
         return False
 
     subject = f"[Travo] Book Now — {trip.label}"
@@ -79,7 +83,7 @@ def _build_email_body(trip: Trip, rec: Recommendation) -> str:
 
     lines += [
         "",
-        f"Decision:    BOOK NOW",
+        "Decision:    BOOK NOW",
         f"Confidence:  {rec.confidence:.0%}",
         f"True cost:   ${rec.true_family_cost:,.0f} AUD (family total)",
         f"Regret risk: {rec.regret_risk.upper()}",
@@ -91,6 +95,6 @@ def _build_email_body(trip: Trip, rec: Recommendation) -> str:
         "",
         "---",
         "Travo — your family travel advisor",
-        "Run `travo check {id}` for the full breakdown.".format(id=trip.id),
+        f"Run `travo check {trip.id}` for the full breakdown.",
     ]
     return "\n".join(lines)

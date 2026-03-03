@@ -12,9 +12,9 @@ All writes go through SQLite first; DuckDB reads via sqlite_scan extension.
 from __future__ import annotations
 
 import logging
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def get_analytics_connection(analytics_dir: Path) -> Generator:
     except ImportError:
         raise ImportError(
             "duckdb is required for analytics. Install with: uv add duckdb"
-        )
+        ) from None
 
     db_path = analytics_dir / "fly_o_myte_analytics.duckdb"
     analytics_dir.mkdir(parents=True, exist_ok=True)
@@ -71,7 +71,7 @@ def query_route_stats(
         """).fetchall()
 
         columns = [desc[0] for desc in conn.description]
-        return [dict(zip(columns, row)) for row in rows]
+        return [dict(zip(columns, row, strict=True)) for row in rows]
 
 
 def query_price_percentiles(

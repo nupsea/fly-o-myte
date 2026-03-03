@@ -10,7 +10,7 @@ Three-layer strategy:
 from __future__ import annotations
 
 from datetime import date
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -32,6 +32,7 @@ class TestInsightSchema:
 
     def test_travel_insight_requires_summary(self):
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             TravelInsight(
                 price_impact="higher",
@@ -60,7 +61,9 @@ class TestGracefulDegradation:
 
     def test_llm_error_returns_none(self):
         """LLM API error → graceful None, not exception."""
-        with patch("fly_o_myte.insights._call_llm", side_effect=Exception("API timeout")):
+        with patch(
+            "fly_o_myte.insights._call_llm", side_effect=Exception("API timeout")
+        ):
             with patch("fly_o_myte.insights._select_provider", return_value="claude"):
                 result = generate_insight(
                     origin="BNE",

@@ -11,7 +11,7 @@ from datetime import date
 
 import pytest
 
-from fly_o_myte.true_cost import compute_true_cost, compute_family_score
+from fly_o_myte.true_cost import compute_family_score, compute_true_cost
 
 
 class TestQantasCost:
@@ -150,11 +150,20 @@ class TestJetstarCost:
         Classic comparison: Jetstar $99 vs Qantas $149 for family of 4 (2A+2C+1 infant).
         Jetstar must be MORE expensive once fees are included.
         """
-        family = dict(adults=2, child_ages=[5, 8, 1], bags_per_person=1,
-                      depart_date=date(2026, 7, 20), return_date=date(2026, 7, 27))
+        family = {
+            "adults": 2,
+            "child_ages": [5, 8, 1],
+            "bags_per_person": 1,
+            "depart_date": date(2026, 7, 20),
+            "return_date": date(2026, 7, 27),
+        }
 
-        qantas = compute_true_cost(airline=qantas_fees, base_fare_per_adult=149.0, **family)
-        jetstar = compute_true_cost(airline=jetstar_fees, base_fare_per_adult=99.0, **family)
+        qantas = compute_true_cost(
+            airline=qantas_fees, base_fare_per_adult=149.0, **family
+        )
+        jetstar = compute_true_cost(
+            airline=jetstar_fees, base_fare_per_adult=99.0, **family
+        )
 
         assert jetstar.total > qantas.total, (
             f"Jetstar ${jetstar.total:.0f} should be > Qantas ${qantas.total:.0f} "
@@ -205,29 +214,44 @@ class TestFamilyScore:
 
     def test_one_stop_scores_lower_than_nonstop(self, qantas_fees):
         nonstop = compute_family_score(
-            airline=qantas_fees, true_cost=1400.0, avg_cost_on_route=1400.0,
-            stops=0, departure_hour=10,
+            airline=qantas_fees,
+            true_cost=1400.0,
+            avg_cost_on_route=1400.0,
+            stops=0,
+            departure_hour=10,
         )
         one_stop = compute_family_score(
-            airline=qantas_fees, true_cost=1400.0, avg_cost_on_route=1400.0,
-            stops=1, departure_hour=10,
+            airline=qantas_fees,
+            true_cost=1400.0,
+            avg_cost_on_route=1400.0,
+            stops=1,
+            departure_hour=10,
         )
         assert nonstop > one_stop
 
     def test_early_morning_departure_penalised(self, qantas_fees):
         preferred = compute_family_score(
-            airline=qantas_fees, true_cost=1400.0, avg_cost_on_route=1400.0,
-            stops=0, departure_hour=10,
+            airline=qantas_fees,
+            true_cost=1400.0,
+            avg_cost_on_route=1400.0,
+            stops=0,
+            departure_hour=10,
         )
         early = compute_family_score(
-            airline=qantas_fees, true_cost=1400.0, avg_cost_on_route=1400.0,
-            stops=0, departure_hour=5,
+            airline=qantas_fees,
+            true_cost=1400.0,
+            avg_cost_on_route=1400.0,
+            stops=0,
+            departure_hour=5,
         )
         assert preferred > early
 
     def test_score_in_range(self, jetstar_fees):
         score = compute_family_score(
-            airline=jetstar_fees, true_cost=1600.0, avg_cost_on_route=1400.0,
-            stops=1, departure_hour=7,
+            airline=jetstar_fees,
+            true_cost=1600.0,
+            avg_cost_on_route=1400.0,
+            stops=1,
+            departure_hour=7,
         )
         assert 0 <= score <= 100

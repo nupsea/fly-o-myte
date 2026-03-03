@@ -79,8 +79,14 @@ class TequilaPriceSource:
         Raises PriceSourceError on HTTP or API errors.
         """
         params = self._build_params(
-            origin, destination, depart_date, return_date,
-            adults, children_ages, max_stops, currency,
+            origin,
+            destination,
+            depart_date,
+            return_date,
+            adults,
+            children_ages,
+            max_stops,
+            currency,
         )
 
         try:
@@ -107,7 +113,10 @@ class TequilaPriceSource:
 
         logger.debug(
             "Tequila: %s → %s on %s — %d offer(s) found",
-            origin, destination, depart_date, len(offers),
+            origin,
+            destination,
+            depart_date,
+            len(offers),
         )
         return offers
 
@@ -206,7 +215,9 @@ class TequilaPriceSource:
                 offer_raw=raw,
             )
         except (KeyError, ValueError, TypeError) as exc:
-            logger.warning("Failed to parse Tequila itinerary: %s — %s", exc, raw.get("id"))
+            logger.warning(
+                "Failed to parse Tequila itinerary: %s — %s", exc, raw.get("id")
+            )
             return None
 
     def close(self) -> None:

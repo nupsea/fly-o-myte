@@ -23,6 +23,8 @@ jobs:
         run: uv run ruff format --check .
       - name: Type check (pyright)
         run: uv run pyright .
+      - name: Layer lint
+        run: uv run python tools/layer_linter.py
 
   test:
     name: Tests (${{ matrix.python }}, ${{ matrix.os }})
@@ -43,11 +45,12 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
       - name: Run tests
-        run: uv run pytest tests/ -v --cov=travo --cov-report=xml --cov-report=term-missing
+        run: uv run pytest tests/ -v --cov=fly_o_myte --cov-report=xml --cov-report=term-missing
         env:
-          # No real API keys in CI — all external calls are mocked
           TEQUILA_API_KEY: ""
           ANTHROPIC_API_KEY: ""
+      - name: Run smoke tests
+        run: bash scripts/ralph/smoke_test.sh
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         if: matrix.python == '3.12' && matrix.os == 'ubuntu-latest'
@@ -68,7 +71,7 @@ jobs:
       - name: Validate airlines.json schema
         run: |
           uv run python -c "
-          from travo.fees import get_airline_db
+          from fly_o_myte.fees import get_airline_db
           db = get_airline_db()
           codes = db.all_codes()
           assert 'QF' in codes, 'Qantas missing from airline DB'
@@ -79,7 +82,7 @@ jobs:
       - name: Validate school_holidays.yaml schema
         run: |
           uv run python -c "
-          from travo.calendar import get_calendar
+          from fly_o_myte.calendar import get_calendar
           from datetime import date
           cal = get_calendar()
           assert 'QLD' in cal.supported_states(), 'QLD missing from calendar'

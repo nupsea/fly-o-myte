@@ -355,6 +355,32 @@
         "test_calendar.py extended with tests for each state"
       ],
       "passes": false
+    },
+    {
+      "id": "S20",
+      "title": "Automated Performance Regression Testing",
+      "phase": 2,
+      "priority": 24,
+      "description": "Implementation of US-048: Benchmark gate in CI ensuring status/poll stay fast at scale.",
+      "acceptanceCriteria": [
+        "Benchmark script using 100 trips / 3000 snapshots in a test DB exists",
+        "fom status runs in < 500ms on this data",
+        "Gate fails if execution exceeds 1 second"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S21",
+      "title": "Automated Dependency Security Scan",
+      "phase": 1,
+      "priority": 25,
+      "description": "Implementation of US-050: osv-scanner or safety integrated into make ci.",
+      "acceptanceCriteria": [
+        "make ci runs osv-scan or equivalent",
+        "Any high-severity vulnerability (CVSS > 7) blocks the build",
+        "uv.lock is used as the source of truth for dependencies"
+      ],
+      "passes": false
     }
   ]
 }

@@ -13,31 +13,30 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from importlib.resources import files
-from pathlib import Path
 
 
 @dataclass(frozen=True)
 class AirlineFees:
     iata: str
     name: str
-    family_score: int            # 0–100
+    family_score: int  # 0–100
 
     # Domestic bag fees (AUD)
-    bag1_fee: float              # first checked bag — standard fare
-    bag1_fee_lite: float         # first bag on budget/lite fares (if different)
+    bag1_fee: float  # first checked bag — standard fare
+    bag1_fee_lite: float  # first bag on budget/lite fares (if different)
     bag1_weight_kg: int
     bag2_fee: float
 
     # Seat selection
-    seat_selection_fee: float    # per seat, 0 = free
+    seat_selection_fee: float  # per seat, 0 = free
     seat_selection_fee_lite: float  # on lite fares, if different
 
     # Family seating
     family_seating_guaranteed: bool
 
     # Infant fees
-    infant_lap_fee_domestic: float     # AUD per sector (0 if free)
-    infant_lap_fee_intl: float         # AUD per sector international
+    infant_lap_fee_domestic: float  # AUD per sector (0 if free)
+    infant_lap_fee_intl: float  # AUD per sector international
 
     # On-time performance (0–100)
     on_time_pct: int
@@ -58,7 +57,11 @@ class AirlineFees:
 
     def seat_fee(self, n_seats: int, fare_type: str = "standard") -> float:
         """Compute seat selection fees."""
-        fee = self.seat_selection_fee_lite if fare_type == "lite" else self.seat_selection_fee
+        fee = (
+            self.seat_selection_fee_lite
+            if fare_type == "lite"
+            else self.seat_selection_fee
+        )
         return fee * n_seats
 
     def infant_domestic_fee(self, n_infants: int, n_sectors: int = 2) -> float:
@@ -86,7 +89,10 @@ def _parse_airline(raw: dict, iata: str) -> AirlineFees:
         bag1_fee=dom.get("bag1_fee", dom.get("bag1_fee_economy_choice", 45)),
         bag1_fee_lite=dom.get(
             "bag1_fee_lite",
-            dom.get("bag1_fee_starter", dom.get("bag1_fee_economy_lite", dom.get("bag1_fee", 45))),
+            dom.get(
+                "bag1_fee_starter",
+                dom.get("bag1_fee_economy_lite", dom.get("bag1_fee", 45)),
+            ),
         ),
         bag1_weight_kg=dom.get("bag1_weight_kg", 23),
         bag2_fee=dom.get("bag2_fee", 60),

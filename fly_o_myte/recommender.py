@@ -25,6 +25,7 @@ PriceSignal = Literal["LOW", "TYPICAL", "HIGH"]
 @dataclass(frozen=True)
 class SnapshotPoint:
     """Minimal snapshot data needed by the recommender."""
+
     fetched_at: datetime
     true_family_cost: float
 
@@ -32,12 +33,12 @@ class SnapshotPoint:
 @dataclass(frozen=True)
 class RecommendationResult:
     decision: Decision
-    confidence: float           # 0.0–1.0 after data richness adjustment
+    confidence: float  # 0.0–1.0 after data richness adjustment
     regret_risk: RegretRisk
-    regret_book_aud: float      # expected family regret (AUD) if book now
-    regret_wait_aud: float      # expected family regret (AUD) if wait
+    regret_book_aud: float  # expected family regret (AUD) if book now
+    regret_wait_aud: float  # expected family regret (AUD) if wait
     rolling_avg_cost: float
-    trend_slope: float          # AUD/day — negative = prices falling
+    trend_slope: float  # AUD/day — negative = prices falling
     rationale: str
 
 
@@ -90,7 +91,9 @@ def compute(
     deviation_pct = price_deviation_pct(current_true_cost, avg)
     signal = (price_level_signal or "TYPICAL").upper()
     is_holiday = school_holiday_context is not None
-    has_flexibility = not (school_holiday_context and school_holiday_context.is_fully_within)
+    has_flexibility = not (
+        school_holiday_context and school_holiday_context.is_fully_within
+    )
 
     # ─ Decision matrix (evaluated top to bottom, first match wins) ─────────
     decision: Decision
@@ -133,8 +136,15 @@ def compute(
     regret_book, regret_wait = _compute_regret(confidence, slope, price_volatility)
     risk = _classify_regret_risk(regret_book, regret_wait)
     rationale = _build_rationale(
-        decision, current_true_cost, avg, deviation_pct,
-        slope, days_to_departure, signal, school_holiday_context, n,
+        decision,
+        current_true_cost,
+        avg,
+        deviation_pct,
+        slope,
+        days_to_departure,
+        signal,
+        school_holiday_context,
+        n,
     )
 
     return RecommendationResult(
@@ -182,7 +192,7 @@ def trend_slope(snapshots: list[SnapshotPoint]) -> float:
     sum_x = sum(days)
     sum_y = sum(prices)
     sum_xx = sum(x * x for x in days)
-    sum_xy = sum(x * y for x, y in zip(days, prices))
+    sum_xy = sum(x * y for x, y in zip(days, prices, strict=True))
 
     denom = n * sum_xx - sum_x * sum_x
     if abs(denom) < 1e-9:
@@ -259,14 +269,19 @@ def _build_rationale(
         parts.append(f"Trend: {direction} at ${abs(slope):.1f}/day.")
 
     if signal in ("LOW", "HIGH"):
-        signal_desc = "below market average" if signal == "LOW" else "above market average"
+        signal_desc = (
+            "below market average" if signal == "LOW" else "above market average"
+        )
         parts.append(f"Market signal: {signal} ({signal_desc}).")
 
     if holiday:
         parts.append(
             f"School holiday overlap: {holiday.label} ({holiday.overlap_days} days). "
-            + ("Dates are fixed — holiday pricing rarely improves." if holiday.is_fully_within
-               else "Consider shifting dates by 1–2 days to avoid peak pricing.")
+            + (
+                "Dates are fixed — holiday pricing rarely improves."
+                if holiday.is_fully_within
+                else "Consider shifting dates by 1–2 days to avoid peak pricing."
+            )
         )
 
     if days <= 14:

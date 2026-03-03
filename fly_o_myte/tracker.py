@@ -28,7 +28,6 @@ from fly_o_myte.db.sqlite import (
     Session,
     Trip,
     get_snapshots_for_trip,
-    get_unsent_book_now_recs,
     insert_recommendation,
     insert_snapshot,
     list_active_trips,
@@ -39,7 +38,6 @@ from fly_o_myte.notifier import send_book_now_alert
 from fly_o_myte.price_sources.amadeus import AmadeusPriceSource
 from fly_o_myte.price_sources.hookspecs import (
     FlightOffer,
-    PriceSourceError,
     build_plugin_manager,
 )
 from fly_o_myte.price_sources.tequila import TequilaPriceSource
@@ -195,7 +193,11 @@ def poll_trip(
 
     logger.info(
         "Trip %s — %s: $%,.0f — %s (%.0f%% confident)",
-        trip.id, trip.label, breakdown.total, result.decision.upper(), result.confidence * 100,
+        trip.id,
+        trip.label,
+        breakdown.total,
+        result.decision.upper(),
+        result.confidence * 100,
     )
 
     # ─── 6. Send alerts ────────────────────────────────────────────────────
@@ -249,7 +251,6 @@ def _fetch_best_offer(
     """
     Call all registered price sources in order and return the cheapest offer found.
     """
-    settings = get_settings()
     all_offers: list[FlightOffer] = []
 
     results: list[list[FlightOffer]] = pm.hook.search_flights(

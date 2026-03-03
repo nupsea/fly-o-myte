@@ -33,8 +33,19 @@ _ANALYSIS_URL = "https://{host}.api.amadeus.com/v1/analytics/itinerary-price-met
 
 # Domestic Australian routes — let Tequila handle these
 _AUSTRALIAN_AIRPORTS = {
-    "ADL", "BNE", "CBR", "CNS", "DRW", "HBA", "MEL", "MKY",
-    "OOL", "PER", "SYD", "TSV", "WOL",
+    "ADL",
+    "BNE",
+    "CBR",
+    "CNS",
+    "DRW",
+    "HBA",
+    "MEL",
+    "MKY",
+    "OOL",
+    "PER",
+    "SYD",
+    "TSV",
+    "WOL",
 }
 
 
@@ -146,7 +157,9 @@ class AmadeusPriceSource:
 
         # Attempt to enrich with price level signal
         if offers:
-            signal = self._fetch_price_signal(origin, destination, depart_date, currency)
+            signal = self._fetch_price_signal(
+                origin, destination, depart_date, currency
+            )
             if signal:
                 offers = [
                     FlightOffer(**{**vars(o), "price_level_signal": signal})
@@ -154,7 +167,11 @@ class AmadeusPriceSource:
                 ]
 
         logger.debug(
-            "Amadeus: %s → %s on %s — %d offer(s)", origin, destination, depart_date, len(offers)
+            "Amadeus: %s → %s on %s — %d offer(s)",
+            origin,
+            destination,
+            depart_date,
+            len(offers),
         )
         return offers
 
@@ -190,7 +207,9 @@ class AmadeusPriceSource:
 
     def _parse_offer(self, raw: dict, currency: str) -> FlightOffer | None:
         try:
-            price_str = raw.get("price", {}).get("grandTotal") or raw.get("price", {}).get("total")
+            price_str = raw.get("price", {}).get("grandTotal") or raw.get(
+                "price", {}
+            ).get("total")
             if not price_str:
                 return None
             price = float(price_str)

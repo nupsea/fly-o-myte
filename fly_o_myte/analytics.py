@@ -34,7 +34,10 @@ def update_after_snapshot(
     """
     try:
         import duckdb  # noqa: F401 — imported lazily so Phase 1 works without
-        _run_incremental_update(analytics_dir, trip_id, origin, destination, sqlite_db_path)
+
+        _run_incremental_update(
+            analytics_dir, trip_id, origin, destination, sqlite_db_path
+        )
     except ImportError:
         logger.debug("DuckDB not available — skipping analytics update")
     except Exception as exc:
@@ -50,6 +53,7 @@ def rebuild_all(analytics_dir: Path, sqlite_db_path: Path) -> None:
     """
     try:
         import duckdb  # noqa: F401
+
         _run_full_rebuild(analytics_dir, sqlite_db_path)
     except ImportError:
         logger.error("DuckDB not available — install duckdb to use analytics")
@@ -108,9 +112,13 @@ def _run_incremental_update(
         """)
 
         # Recompute route stats for this origin/destination pair
-        _recompute_route_stats(conn, snapshots_dir, route_stats_dir, origin, destination)
+        _recompute_route_stats(
+            conn, snapshots_dir, route_stats_dir, origin, destination
+        )
 
-    logger.debug("Analytics updated for trip %s (%s → %s)", trip_id, origin, destination)
+    logger.debug(
+        "Analytics updated for trip %s (%s → %s)", trip_id, origin, destination
+    )
 
 
 def _recompute_route_stats(
@@ -190,6 +198,8 @@ def _run_full_rebuild(analytics_dir: Path, sqlite_db_path: Path) -> None:
         """).fetchall()
 
         for origin, destination in routes:
-            _recompute_route_stats(conn, snapshots_dir, route_stats_dir, origin, destination)
+            _recompute_route_stats(
+                conn, snapshots_dir, route_stats_dir, origin, destination
+            )
 
     logger.info("Full analytics rebuild complete")

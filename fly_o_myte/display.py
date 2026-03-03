@@ -12,16 +12,13 @@ Decision colour coding:
 
 from __future__ import annotations
 
-from datetime import date
-
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich import box
 from rich.text import Text
 
 from fly_o_myte.db.sqlite import PriceSnapshot, Recommendation, Trip
-from fly_o_myte.recommender import RecommendationResult
 from fly_o_myte.true_cost import TrueCostBreakdown
 
 console = Console()
@@ -48,8 +45,7 @@ def print_status_digest(
 ) -> None:
     """Print the morning digest — actionable trips only (or all if show_all)."""
     actionable = [
-        (t, r) for t, r in trips
-        if r and r.decision in ("book_now", "wait") or show_all
+        (t, r) for t, r in trips if r and r.decision in ("book_now", "wait") or show_all
     ]
 
     if not actionable:
@@ -67,7 +63,7 @@ def print_status_digest(
 
 def _print_digest_row(trip: Trip, rec: Recommendation | None) -> None:
     style = _DECISION_STYLE.get(rec.decision if rec else "monitor", "white")
-    decision_label = (rec.decision.upper().replace("_", " ") if rec else "NO DATA")
+    decision_label = rec.decision.upper().replace("_", " ") if rec else "NO DATA"
 
     line = Text()
     line.append(f"#{trip.id} ", style="bold")
@@ -103,7 +99,9 @@ def print_trip_detail(
     dates = trip.depart_date
     if trip.return_date:
         dates += f" → {trip.return_date}"
-    console.print(f"  Dates: {dates}   Adults: {trip.adults}   Last updated: {rec.generated_at[:16]}")
+    console.print(
+        f"  Dates: {dates}   Adults: {trip.adults}   Last updated: {rec.generated_at[:16]}"
+    )
     console.print()
 
     # Cost breakdown table
@@ -114,7 +112,9 @@ def print_trip_detail(
     if breakdown:
         cost_table.add_row("Base fare (adults)", f"${breakdown.base_fare_adults:,.0f}")
         if breakdown.base_fare_children:
-            cost_table.add_row("Base fare (children)", f"${breakdown.base_fare_children:,.0f}")
+            cost_table.add_row(
+                "Base fare (children)", f"${breakdown.base_fare_children:,.0f}"
+            )
         if breakdown.bag_fees:
             cost_table.add_row("Checked bags", f"${breakdown.bag_fees:,.0f}")
         if breakdown.seat_fees:
@@ -122,7 +122,10 @@ def print_trip_detail(
         if breakdown.infant_fees:
             cost_table.add_row("Infant fees", f"${breakdown.infant_fees:,.0f}")
         cost_table.add_row("", "")
-    cost_table.add_row("[bold]True family cost[/bold]", f"[bold]${rec.true_family_cost:,.0f} AUD[/bold]")
+    cost_table.add_row(
+        "[bold]True family cost[/bold]",
+        f"[bold]${rec.true_family_cost:,.0f} AUD[/bold]",
+    )
     cost_table.add_row("30-day average", f"${rec.rolling_avg_cost:,.0f}")
 
     trend_sign = "+" if rec.trend_slope > 0 else ""
@@ -138,7 +141,7 @@ def print_trip_detail(
     rec_text = Text()
     rec_text.append(f"  {decision_label}", style=f"bold {decision_style}")
     rec_text.append(f"  {rec.confidence:.0%} confident")
-    rec_text.append(f"   Regret risk: ")
+    rec_text.append("   Regret risk: ")
     rec_text.append(rec.regret_risk.upper(), style=f"bold {risk_style}")
     rec_text.append(f"\n\n  {rec.rationale}")
 
@@ -149,22 +152,26 @@ def print_trip_detail(
         )
 
     if rec.school_holiday_flag:
-        rec_text.append(f"\n\n  School holiday: {rec.school_holiday_flag}", style="yellow")
+        rec_text.append(
+            f"\n\n  School holiday: {rec.school_holiday_flag}", style="yellow"
+        )
 
     if rec.price_level_signal:
-        signal_style = "green" if rec.price_level_signal == "LOW" else (
-            "red" if rec.price_level_signal == "HIGH" else "white"
+        signal_style = (
+            "green"
+            if rec.price_level_signal == "LOW"
+            else ("red" if rec.price_level_signal == "HIGH" else "white")
         )
-        rec_text.append(
-            f"\n  Market signal: ", style="dim"
-        )
+        rec_text.append("\n  Market signal: ", style="dim")
         rec_text.append(rec.price_level_signal, style=signal_style)
 
     console.print(Panel(rec_text, border_style=decision_style))
 
     # LLM insight
     if insight_text:
-        console.print(Panel(insight_text, title="[dim]AI Insight[/dim]", border_style="dim"))
+        console.print(
+            Panel(insight_text, title="[dim]AI Insight[/dim]", border_style="dim")
+        )
 
     console.print()
 
@@ -197,10 +204,15 @@ def print_compare_table(
     ]
 
     for trip, rec, snap in trips_data:
-        trend_str = f"+${rec.trend_slope:.1f}/d" if rec.trend_slope >= 0 else f"-${abs(rec.trend_slope):.1f}/d"
+        trend_str = (
+            f"+${rec.trend_slope:.1f}/d"
+            if rec.trend_slope >= 0
+            else f"-${abs(rec.trend_slope):.1f}/d"
+        )
         values = [
             f"{trip.origin}→{trip.destination}",
-            f"{trip.depart_date}" + (f"\n→{trip.return_date}" if trip.return_date else ""),
+            f"{trip.depart_date}"
+            + (f"\n→{trip.return_date}" if trip.return_date else ""),
             f"${rec.true_family_cost:,.0f}",
             f"${rec.rolling_avg_cost:,.0f}",
             trend_str,
@@ -253,7 +265,9 @@ def print_price_history(trip: Trip, snapshots: list[PriceSnapshot]) -> None:
             change = f"[{color}]{sign}${diff:,.0f}[/{color}]"
 
         signal = snap.price_level_signal or "—"
-        signal_color = "green" if signal == "LOW" else ("red" if signal == "HIGH" else "white")
+        signal_color = (
+            "green" if signal == "LOW" else ("red" if signal == "HIGH" else "white")
+        )
 
         table.add_row(
             snap.fetched_at[:10],

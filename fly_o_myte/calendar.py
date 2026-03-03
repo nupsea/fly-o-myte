@@ -19,15 +19,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from functools import lru_cache
 from importlib.resources import files
 
 import yaml
 
+
 @dataclass(frozen=True)
 class HolidayContext:
-    label: str           # e.g. "Mid-year holidays"
-    overlap_days: int    # days of trip that fall within the holiday
+    label: str  # e.g. "Mid-year holidays"
+    overlap_days: int  # days of trip that fall within the holiday
     is_fully_within: bool
 
 
@@ -97,9 +97,7 @@ class SchoolCalendar:
             overlap_end = min(trip_end, period.end)
             overlap_days = (overlap_end - overlap_start).days + 1
 
-            is_fully_within = (
-                trip_start >= period.start and trip_end <= period.end
-            )
+            is_fully_within = trip_start >= period.start and trip_end <= period.end
 
             return HolidayContext(
                 label=period.label,

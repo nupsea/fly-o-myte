@@ -8,9 +8,7 @@ from __future__ import annotations
 
 from datetime import date
 
-import pytest
-
-from fly_o_myte.calendar import get_calendar, SchoolCalendar
+from fly_o_myte.calendar import get_calendar
 
 
 class TestHolidayOverlap:

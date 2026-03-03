@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import pytest
 
-duckdb = pytest.importorskip("duckdb", reason="DuckDB not installed — skipping analytics tests")
+duckdb = pytest.importorskip(
+    "duckdb", reason="DuckDB not installed — skipping analytics tests"
+)
 
 
 class TestAnalytics:

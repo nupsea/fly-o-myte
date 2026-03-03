@@ -19,7 +19,6 @@ from datetime import date
 
 import pluggy
 
-
 APP_NAME = "fly_o_myte"
 hookspec = pluggy.HookspecMarker(APP_NAME)
 hookimpl = pluggy.HookimplMarker(APP_NAME)
@@ -28,17 +27,18 @@ hookimpl = pluggy.HookimplMarker(APP_NAME)
 @dataclass
 class FlightOffer:
     """Normalised flight offer returned by any price source."""
-    source: str                    # "tequila" | "amadeus" | ...
-    airline_code: str              # IATA carrier code
-    flight_number: str | None      # e.g. "QF500"
-    base_fare_per_adult: float     # AUD (base fare only, no ancillary fees)
-    currency: str                  # "AUD"
+
+    source: str  # "tequila" | "amadeus" | ...
+    airline_code: str  # IATA carrier code
+    flight_number: str | None  # e.g. "QF500"
+    base_fare_per_adult: float  # AUD (base fare only, no ancillary fees)
+    currency: str  # "AUD"
     stops: int
-    departure_time: str            # "HH:MM"
-    arrival_time: str              # "HH:MM"
+    departure_time: str  # "HH:MM"
+    arrival_time: str  # "HH:MM"
     duration_minutes: int
     price_level_signal: str | None  # "LOW" | "TYPICAL" | "HIGH" if API provides it
-    offer_raw: dict                # full API response for debugging
+    offer_raw: dict  # full API response for debugging
 
 
 class PriceSourceSpec:
@@ -83,7 +83,10 @@ class PriceSourceSpec:
 
 class PriceSourceError(Exception):
     """Raised when a price source call fails."""
-    def __init__(self, source: str, message: str, status_code: int | None = None) -> None:
+
+    def __init__(
+        self, source: str, message: str, status_code: int | None = None
+    ) -> None:
         self.source = source
         self.status_code = status_code
         super().__init__(f"[{source}] {message}")

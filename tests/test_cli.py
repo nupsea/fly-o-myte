@@ -12,7 +12,6 @@ No real API calls — Tequila plugin is not registered in these tests.
 
 from __future__ import annotations
 
-import pytest
 from typer.testing import CliRunner
 
 from fly_o_myte.cli import app

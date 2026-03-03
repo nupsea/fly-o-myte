@@ -31,36 +31,29 @@ from pathlib import Path
 LAYER_MAP: dict[str, int] = {
     # Layer 0 — domain types embedded in hookspecs and recommender
     "price_sources.hookspecs": 0,
-
     # Layer 1 — config and storage
     "config": 1,
     "db.sqlite": 1,
     "db.duckdb": 1,
     "db": 1,
-
     # Layer 2 — static data loaders
     "fees": 2,
     "calendar": 2,
-
     # Layer 3 — pure logic (no I/O)
     "recommender": 3,
     "true_cost": 3,
-
     # Layer 4 — external I/O (price source plugins)
     "price_sources.tequila": 4,
     "price_sources.amadeus": 4,
     "price_sources": 4,
-
     # Layer 5 — orchestration
     "tracker": 5,
     "scout": 5,
     "analytics": 5,
     "insights": 5,
     "notifier": 5,
-
     # Layer 6 — presentation
     "display": 6,
-
     # Layer 7 — CLI entry point (imports anything)
     "cli": 7,
 }
@@ -101,11 +94,11 @@ def _imported_travo_fragments(source: str) -> list[str]:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name.startswith(f"{APP_PKG}."):
-                    fragments.append(alias.name[len(APP_PKG) + 1:])
+                    fragments.append(alias.name[len(APP_PKG) + 1 :])
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
             if module.startswith(f"{APP_PKG}."):
-                fragments.append(module[len(APP_PKG) + 1:])
+                fragments.append(module[len(APP_PKG) + 1 :])
             elif module == APP_PKG:
                 # from travo import X — treat X as a top-level module
                 for alias in node.names:
@@ -120,10 +113,7 @@ def lint() -> list[str]:
     """
     violations: list[str] = []
 
-    py_files = [
-        p for p in APP_DIR.rglob("*.py")
-        if "__pycache__" not in str(p)
-    ]
+    py_files = [p for p in APP_DIR.rglob("*.py") if "__pycache__" not in str(p)]
 
     for path in sorted(py_files):
         fragment = _module_fragment(path)

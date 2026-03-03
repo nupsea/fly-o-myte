@@ -28,11 +28,12 @@ _PRICE_CHANGE_THRESHOLD = 0.10  # 10%
 
 class TravelInsight(BaseModel):
     """Structured LLM output for a flight price insight."""
-    summary: str            # 3–4 sentences explaining the price level
-    price_impact: str       # "higher" | "lower" | "uncertain" | "none"
-    event_type: str         # "holiday" | "disruption" | "capacity" | "seasonal" | "none"
-    confidence: float       # 0.0–1.0
-    sources: list[str]      # cited sources or "price history", "school calendar", etc.
+
+    summary: str  # 3–4 sentences explaining the price level
+    price_impact: str  # "higher" | "lower" | "uncertain" | "none"
+    event_type: str  # "holiday" | "disruption" | "capacity" | "seasonal" | "none"
+    confidence: float  # 0.0–1.0
+    sources: list[str]  # cited sources or "price history", "school calendar", etc.
 
 
 def generate_insight(
@@ -67,6 +68,7 @@ def generate_insight(
     """
     try:
         from fly_o_myte.config import get_settings
+
         settings = get_settings()
         selected = _select_provider(provider, settings)
         if selected is None:
@@ -95,6 +97,7 @@ def generate_insight(
 def _select_provider(provider: str, settings: object) -> str | None:
     """Return the LLM provider to use, or None if none available."""
     from fly_o_myte.config import Settings
+
     assert isinstance(settings, Settings)
 
     if provider == "claude":
@@ -122,8 +125,10 @@ def _build_prompt(
 ) -> str:
     deviation_pct = (current_cost - avg_cost) / avg_cost * 100 if avg_cost else 0
     trend_desc = (
-        f"rising at ${abs(trend_slope):.1f}/day" if trend_slope > 0
-        else f"falling at ${abs(trend_slope):.1f}/day" if trend_slope < 0
+        f"rising at ${abs(trend_slope):.1f}/day"
+        if trend_slope > 0
+        else f"falling at ${abs(trend_slope):.1f}/day"
+        if trend_slope < 0
         else "flat"
     )
     holiday_note = (
@@ -159,7 +164,9 @@ Be specific about whether prices are likely to improve or worsen before departur
 def _call_llm(prompt: str, provider: str, settings: object) -> TravelInsight | None:
     """Call the selected LLM provider and return a validated TravelInsight."""
     from pydantic_ai import Agent
+
     from fly_o_myte.config import Settings
+
     assert isinstance(settings, Settings)
 
     system_prompt = (

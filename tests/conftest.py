@@ -18,7 +18,7 @@ Test pyramid:
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -26,8 +26,6 @@ from sqlmodel import create_engine
 
 from fly_o_myte.db.sqlite import (
     Trip,
-    PriceSnapshot,
-    Recommendation,
     create_tables,
     get_session,
     insert_trip,
@@ -35,7 +33,6 @@ from fly_o_myte.db.sqlite import (
 from fly_o_myte.fees import AirlineFees
 from fly_o_myte.price_sources.hookspecs import FlightOffer, hookimpl
 from fly_o_myte.recommender import SnapshotPoint
-
 
 # ─── Session-scoped isolation ──────────────────────────────────────────────────
 #
@@ -62,11 +59,12 @@ def isolated_travo_dir(tmp_path_factory: pytest.TempPathFactory) -> str:
 
     # Clear lru_cache on get_settings so it re-reads the env vars
     from fly_o_myte.config import get_settings
+
     get_settings.cache_clear()
 
     # Reset module-level singletons
-    import fly_o_myte.fees as fees_module
     import fly_o_myte.calendar as calendar_module
+    import fly_o_myte.fees as fees_module
 
     fees_module._db = None
     calendar_module._calendar = None
@@ -75,12 +73,17 @@ def isolated_travo_dir(tmp_path_factory: pytest.TempPathFactory) -> str:
 
     # Teardown — restore env and caches
     for key in (
-        "FLY_O_MYTE_DB_PATH", "FLY_O_MYTE_ANALYTICS_DIR", "FLY_O_MYTE_CONFIG_PATH",
-        "FLY_O_MYTE_LOG_PATH", "TEQUILA_API_KEY", "ANTHROPIC_API_KEY",
+        "FLY_O_MYTE_DB_PATH",
+        "FLY_O_MYTE_ANALYTICS_DIR",
+        "FLY_O_MYTE_CONFIG_PATH",
+        "FLY_O_MYTE_LOG_PATH",
+        "TEQUILA_API_KEY",
+        "ANTHROPIC_API_KEY",
     ):
         os.environ.pop(key, None)
 
     from fly_o_myte.config import get_settings as _gs
+
     _gs.cache_clear()
     fees_module._db = None
     calendar_module._calendar = None
