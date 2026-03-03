@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import smtplib
-from datetime import datetime
+from datetime import UTC, datetime
 from email.message import EmailMessage
 
 from fly_o_myte.config import Settings, get_settings
@@ -71,7 +71,7 @@ def send_book_now_alert(
 def _build_email_body(trip: Trip, rec: Recommendation) -> str:
     generated = rec.generated_at[:16].replace("T", " ")
     lines = [
-        f"fly-o-myte Booking Alert — {datetime.utcnow().strftime('%d %b %Y')}",
+        f"fly-o-myte Booking Alert — {datetime.now(UTC).strftime('%d %b %Y')}",
         "=" * 50,
         "",
         f"Trip:        {trip.label}",

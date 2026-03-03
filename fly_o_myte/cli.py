@@ -386,7 +386,7 @@ def status(
             for t in trips
         ]
 
-    print_status_digest(pairs, show_all=all_trips)
+        print_status_digest(pairs, show_all=all_trips)
 
 
 # ─── check ─────────────────────────────────────────────────────────────────────
@@ -417,28 +417,28 @@ def check(
         rec = get_latest_recommendation(session, trip_id)
         snap = get_latest_snapshot(session, trip_id)
 
-    if not rec or not snap:
-        console.print(
-            f"No data yet for trip #{trip_id}. Run [bold]fom refresh {trip_id}[/bold]."
-        )
-        return
-
-    breakdown = None
-    if snap.true_cost_breakdown:
-        try:
-            bd = json.loads(snap.true_cost_breakdown)
-            breakdown = TrueCostBreakdown(
-                base_fare_adults=bd.get("base_adults", 0),
-                base_fare_children=bd.get("base_children", 0),
-                bag_fees=bd.get("bags", 0),
-                seat_fees=bd.get("seats", 0),
-                infant_fees=bd.get("infant", 0),
-                total=bd.get("total", rec.true_family_cost),
+        if not rec or not snap:
+            console.print(
+                f"No data yet for trip #{trip_id}. Run [bold]fom refresh {trip_id}[/bold]."
             )
-        except (ValueError, KeyError):
-            pass
+            return
 
-    print_trip_detail(trip, rec, snap, breakdown)
+        breakdown = None
+        if snap.true_cost_breakdown:
+            try:
+                bd = json.loads(snap.true_cost_breakdown)
+                breakdown = TrueCostBreakdown(
+                    base_fare_adults=bd.get("base_adults", 0),
+                    base_fare_children=bd.get("base_children", 0),
+                    bag_fees=bd.get("bags", 0),
+                    seat_fees=bd.get("seats", 0),
+                    infant_fees=bd.get("infant", 0),
+                    total=bd.get("total", rec.true_family_cost),
+                )
+            except (ValueError, KeyError):
+                pass
+
+        print_trip_detail(trip, rec, snap, breakdown)
 
 
 # ─── compare ───────────────────────────────────────────────────────────────────
@@ -462,8 +462,8 @@ def compare(
         raise typer.Exit(1)
 
     engine = _get_engine()
-    data = []
     with get_session(engine) as session:
+        data = []
         for tid in trip_ids:
             trip = get_trip(session, tid)
             rec = get_latest_recommendation(session, tid)
@@ -473,7 +473,7 @@ def compare(
                 raise typer.Exit(1)
             data.append((trip, rec, snap))
 
-    print_compare_table(data)
+        print_compare_table(data)
 
 
 # ─── history ───────────────────────────────────────────────────────────────────
@@ -496,7 +496,7 @@ def history(
             raise typer.Exit(1)
         snaps = get_snapshots_for_trip(session, trip_id, limit=limit)
 
-    print_price_history(trip, snaps)
+        print_price_history(trip, snaps)
 
 
 # ─── refresh ───────────────────────────────────────────────────────────────────
@@ -523,10 +523,10 @@ def refresh(
         console.print(f"Refreshing trip #{trip_id}: {trip.label}...")
         snap = poll_trip(session, trip, profile, pm, send_alerts=not no_email)
 
-    if snap:
-        console.print(f"[green]Updated: ${snap.true_family_cost:,.0f} AUD[/green]")
-    else:
-        console.print("[yellow]No offers found.[/yellow]")
+        if snap:
+            console.print(f"[green]Updated: ${snap.true_family_cost:,.0f} AUD[/green]")
+        else:
+            console.print("[yellow]No offers found.[/yellow]")
 
 
 # ─── poll ──────────────────────────────────────────────────────────────────────
@@ -585,34 +585,36 @@ def insight(
         rec = get_latest_recommendation(session, trip_id)
         snap = get_latest_snapshot(session, trip_id)
 
-    if not trip or not rec or not snap:
-        err_console.print(f"[red]No data for trip {trip_id}.[/red]")
-        raise typer.Exit(1)
+        if not trip or not rec or not snap:
+            err_console.print(f"[red]No data for trip {trip_id}.[/red]")
+            raise typer.Exit(1)
 
-    console.print(f"Generating insight for trip #{trip_id}...")
-    depart = date.fromisoformat(trip.depart_date)
-    result = generate_insight(
-        origin=trip.origin,
-        destination=trip.destination,
-        depart_date=depart,
-        current_cost=rec.true_family_cost,
-        avg_cost=rec.rolling_avg_cost,
-        trend_slope=rec.trend_slope,
-        school_holiday_label=rec.school_holiday_flag,
-        price_level_signal=rec.price_level_signal,
-        n_snapshots=0,
-        provider=provider,
-    )
-
-    if result:
-        from rich.panel import Panel
-
-        console.print(Panel(result.summary, title="AI Insight"))
-        console.print(
-            f"Price impact: {result.price_impact}  |  Event type: {result.event_type}  |  Confidence: {result.confidence:.0%}"
+        console.print(f"Generating insight for trip #{trip_id}...")
+        depart = date.fromisoformat(trip.depart_date)
+        result = generate_insight(
+            origin=trip.origin,
+            destination=trip.destination,
+            depart_date=depart,
+            current_cost=rec.true_family_cost,
+            avg_cost=rec.rolling_avg_cost,
+            trend_slope=rec.trend_slope,
+            school_holiday_label=rec.school_holiday_flag,
+            price_level_signal=rec.price_level_signal,
+            n_snapshots=0,
+            provider=provider,
         )
-    else:
-        console.print("[yellow]Insight unavailable — check LLM credentials.[/yellow]")
+
+        if result:
+            from rich.panel import Panel
+
+            console.print(Panel(result.summary, title="AI Insight"))
+            console.print(
+                f"Price impact: {result.price_impact}  |  Event type: {result.event_type}  |  Confidence: {result.confidence:.0%}"
+            )
+        else:
+            console.print(
+                "[yellow]Insight unavailable — check LLM credentials.[/yellow]"
+            )
 
 
 # ─── analytics ─────────────────────────────────────────────────────────────────

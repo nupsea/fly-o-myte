@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import event
@@ -38,7 +38,7 @@ class Trip(SQLModel, table=True):
     bags_per_person: int = 1
     max_stops: int = 1
     is_active: int = 1  # 1 = tracking, 0 = paused
-    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     alert_threshold_aud: float | None = None
     alert_email: str | None = None
 
@@ -52,7 +52,7 @@ class PriceSnapshot(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     trip_id: int = Field(index=True, foreign_key="trip.id")
-    fetched_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    fetched_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     source: str = "tequila"  # "tequila" | "amadeus"
     airline_code: str | None = None  # IATA carrier code
     flight_number: str | None = None
@@ -72,7 +72,7 @@ class Recommendation(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     trip_id: int = Field(index=True, foreign_key="trip.id")
-    generated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    generated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     decision: str = "monitor"  # "book_now" | "wait" | "monitor"
     confidence: float = 0.5  # 0.0–1.0
     regret_risk: str = "medium"  # "low" | "medium" | "high"

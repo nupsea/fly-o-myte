@@ -15,7 +15,7 @@ Mock boundary:
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -72,7 +72,7 @@ def _make_rec(trip: Trip) -> Recommendation:
         regret_risk="low",
         true_family_cost=298.0,
         rationale="Price is below the 5-snapshot average. Book this week.",
-        generated_at=datetime.utcnow().isoformat(),
+        generated_at=datetime.now(UTC).isoformat(),
     )
 
 
@@ -98,7 +98,7 @@ def _seed_prior_snapshots(session, trip: Trip) -> None:
     """
     assert trip.id is not None
     for days_ago in (3, 2, 1):
-        ts = (datetime.utcnow() - timedelta(days=days_ago)).isoformat()
+        ts = (datetime.now(UTC) - timedelta(days=days_ago)).isoformat()
         insert_snapshot(
             session,
             PriceSnapshot(
