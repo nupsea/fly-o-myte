@@ -201,24 +201,6 @@
       "passes": true
     },
     {
-      "id": "DR-A",
-      "title": "Smoke test gate — basic CLI flow",
-      "phase": 1,
-      "priority": 11,
-      "type": "demo-review",
-      "description": "Human runs smoke_test.sh and manually verifies all CLI commands work against a real SQLite DB without mocking.",
-      "reviewInstructions": [
-        "Run: bash scripts/ralph/smoke_test.sh — all PASS, 0 FAIL",
-        "Run: fom watch BNE SYD 2026-07-20 2026-07-27 --label 'Easter trip'",
-        "Run: fom status — trip listed",
-        "Run: fom check 1 — no crash, shows no price history gracefully",
-        "Run: fom data-version — lists all 4 airlines",
-        "Run: fom remove 1 --yes — confirmed removal",
-        "If satisfied: create scripts/ralph/demo-reviews/DR-A-approved.md with APPROVED on line 1"
-      ],
-      "passes": true
-    },
-    {
       "id": "S11",
       "title": "LLM insights — Pydantic AI + graceful degradation",
       "phase": 1,
@@ -290,27 +272,6 @@
       "passes": true
     },
     {
-      "id": "DR-B",
-      "title": "Smoke test gate — poll cycle + recommendation output",
-      "phase": 1,
-      "priority": 16,
-      "type": "demo-review",
-      "description": "Human verifies the full poll → snapshot → recommend → display cycle produces a sensible recommendation with real English rationale text.",
-      "reviewInstructions": [
-        "Run: bash scripts/ralph/smoke_test.sh — 0 failures",
-        "Run: fom watch BNE SYD 2026-07-20 2026-07-27 --label 'Test'",
-        "Insert older high-price snapshots: uv run python scripts/ralph/insert_stub_snapshot.py 1 --price 480 --count 5",
-        "Insert recent lower-price snapshots: uv run python scripts/ralph/insert_stub_snapshot.py 1 --price 310 --count 5",
-        "Run: fom refresh 1 — regenerates the recommendation from all 10 stored snapshots (insert script does not call the recommender)",
-        "Run: fom check 1 — must show decision badge, true cost AUD, confidence %, rationale (real English sentence, not None). MONITOR is acceptable.",
-        "Run: fom history 1 — sparkline renders without error, shows 10 rows",
-        "Run: fom status --all — trip appears with its decision badge (MONITOR/WAIT/BOOK NOW)",
-        "Run: fom remove 1 --yes",
-        "If correct: create scripts/ralph/demo-reviews/DR-B-approved.md with APPROVED on line 1"
-      ],
-      "passes": false
-    },
-    {
       "id": "S15",
       "title": "Syrupy snapshot tests for Rich output",
       "phase": 1,
@@ -325,24 +286,30 @@
         "Snapshots generated: uv run pytest tests/test_cli.py --snapshot-update -v",
         "tests/__snapshots__/ directory exists and contains snapshot file(s)",
         "pytest tests/test_cli.py without --snapshot-update passes (snapshots committed)",
-        "uv run make ci passes",
-        "HUMAN STEP: inspect tests/__snapshots__/ — status table, check panel, compare table must look correct. If satisfied: create scripts/ralph/demo-reviews/S15-approved.md with APPROVED on line 1"
+        "uv run make ci passes"
       ],
       "passes": false
     },
     {
-      "id": "DR-S15",
-      "title": "Visual approval gate — Syrupy snapshot output",
+      "id": "DR-P1",
+      "title": "Phase 1 complete — end-of-phase human review",
       "phase": 1,
       "priority": 18,
       "type": "demo-review",
-      "description": "Human visually inspects the Syrupy snapshot files committed by S15 and approves the Rich output for status, check, and compare commands.",
+      "description": "Single end-of-phase gate for Phase 1. Human verifies the full domestic CLI feature set: smoke tests, poll cycle, recommendation output, Rich display, and Syrupy snapshot correctness.",
       "reviewInstructions": [
-        "Run: cat tests/__snapshots__/test_cli.ambr (or open in editor)",
-        "Verify: status table shows trip label, route, cost, recommendation badge",
-        "Verify: check panel shows cost breakdown, recommendation, confidence, rationale",
-        "Verify: compare table shows side-by-side trip comparison",
-        "If output looks correct: create scripts/ralph/demo-reviews/DR-S15-approved.md with APPROVED on line 1"
+        "Run: bash scripts/ralph/smoke_test.sh — all PASS, 0 FAIL",
+        "Run: fom data-version — lists all 4 airlines (QF, VA, JQ, ZL)",
+        "Run: fom watch BNE SYD 2026-07-20 2026-07-27 --label 'Phase 1 review'",
+        "Run: uv run python scripts/ralph/insert_stub_snapshot.py 1 --price 480 --count 5",
+        "Run: uv run python scripts/ralph/insert_stub_snapshot.py 1 --price 310 --count 5",
+        "Run: fom refresh 1",
+        "Run: fom check 1 — decision badge, AUD cost, confidence %, real English rationale",
+        "Run: fom history 1 — sparkline renders, 10 rows visible",
+        "Run: fom status --all — trip appears with decision badge",
+        "Inspect: cat tests/__snapshots__/test_cli.ambr — status table, check panel, compare table must look correct",
+        "Run: fom remove 1 --yes",
+        "If all correct: create scripts/ralph/demo-reviews/DR-P1-approved.md with APPROVED on line 1"
       ],
       "passes": false
     },
