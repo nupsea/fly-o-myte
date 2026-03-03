@@ -78,6 +78,12 @@ def _run_incremental_update(
     snapshots_dir.mkdir(exist_ok=True)
     route_stats_dir.mkdir(exist_ok=True)
 
+    # Remove stale aggregate file if it exists to avoid schema conflicts
+    # and double-counting during incremental updates.
+    all_snaps_file = snapshots_dir / "all_snapshots.parquet"
+    if all_snaps_file.exists():
+        all_snaps_file.unlink()
+
     with duckdb.connect(str(analytics_dir / "fly_o_myte_analytics.duckdb")) as conn:
         conn.execute("INSTALL sqlite; LOAD sqlite;")
 
@@ -156,13 +162,19 @@ def _recompute_route_stats(
 
 def _run_full_rebuild(analytics_dir: Path, sqlite_db_path: Path) -> None:
     """Full analytics rebuild from SQLite — Phase 2 implementation."""
+    import shutil
+
     import duckdb
 
     analytics_dir.mkdir(parents=True, exist_ok=True)
     snapshots_dir = analytics_dir / "snapshots"
     route_stats_dir = analytics_dir / "route_stats"
-    snapshots_dir.mkdir(exist_ok=True)
-    route_stats_dir.mkdir(exist_ok=True)
+
+    # Wipe existing Parquet files to ensure a clean slate and consistent schema
+    if snapshots_dir.exists():
+        shutil.rmtree(snapshots_dir)
+    snapshots_dir.mkdir(parents=True, exist_ok=True)
+    route_stats_dir.mkdir(parents=True, exist_ok=True)
 
     with duckdb.connect(str(analytics_dir / "fly_o_myte_analytics.duckdb")) as conn:
         conn.execute("INSTALL sqlite; LOAD sqlite;")
@@ -179,8 +191,11 @@ def _run_full_rebuild(analytics_dir: Path, sqlite_db_path: Path) -> None:
                     ps.true_family_cost,
                     ps.price_level_signal,
                     ps.stops,
-                    ps.family_score,
-                    date_part('month', t.depart_date::DATE) AS departure_month
+                    datediff('day', ps.fetched_at::DATE, t.depart_date::DATE)
+                        AS days_to_departure,
+                    date_part('month', t.depart_date::DATE) AS departure_month,
+                    ps.price_level_signal IS NOT NULL AS school_holiday,
+                    ps.family_score
                 FROM sqlite_scan('{sqlite_db_path}', 'pricesnapshot') ps
                 JOIN sqlite_scan('{sqlite_db_path}', 'trip') t ON t.id = ps.trip_id
             )
