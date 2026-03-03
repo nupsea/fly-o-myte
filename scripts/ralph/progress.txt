@@ -126,3 +126,21 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
   - tenacity retries use time.sleep; monkeypatch time.sleep to avoid 4s waits in tests
     without violating the "no internal patches" invariant (time is stdlib, not fly_o_myte).
 ---
+
+## 2026-03-03T00:00:00 - S13 - Tequila adapter — edge case and integration tests
+- Implemented: Extended tests/test_tequila.py with 7 new tests covering S13 acceptance criteria.
+- Files changed: tests/test_tequila.py, scripts/ralph/prd.json
+- Tests added:
+  - test_children_ages_split_into_seated_and_infants
+  - test_no_children_omits_children_and_infants_params
+  - test_oneway_trip_params
+  - test_currency_forwarded_to_curr_param
+  - test_max_stops_none_omits_max_stopovers
+  - test_max_stops_zero_sets_max_stopovers
+  - test_tequila_registers_correctly_via_pluggy
+- make ci: 93 passed, 0 failed. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - httpx_mock (pytest-httpx) captures params as strings in request.url.params —
+    assert params["children"] == "2" not == 2 (integer).
+  - Pluggy get_hookimpls() confirms registration without needing to call the hook.
+---

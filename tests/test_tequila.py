@@ -157,3 +157,92 @@ def test_return_trip_params_include_return_keys(httpx_mock):
     assert params["return_to"] == "27/07/2026"
     # flight_type should NOT be present for return trips
     assert "flight_type" not in params
+
+
+# ─── S13: children / infant params ───────────────────────────────────────────
+
+
+def test_children_ages_split_into_seated_and_infants(httpx_mock):
+    """ages >= 2 → 'children' count; ages < 2 → 'infants' count."""
+    httpx_mock.add_response(json={"data": [], "currency": "AUD"})
+    src = TequilaPriceSource(api_key="test-key")
+    # 3 children: ages 4, 7 are seated; age 0 is infant
+    _search(src, children_ages=[4, 7, 0])
+
+    params = dict(httpx_mock.get_requests()[0].url.params)
+    assert params["children"] == "2"
+    assert params["infants"] == "1"
+
+
+def test_no_children_omits_children_and_infants_params(httpx_mock):
+    """When children_ages=[], 'children' and 'infants' keys must not appear."""
+    httpx_mock.add_response(json={"data": [], "currency": "AUD"})
+    src = TequilaPriceSource(api_key="test-key")
+    _search(src, children_ages=[])
+
+    params = dict(httpx_mock.get_requests()[0].url.params)
+    assert "children" not in params
+    assert "infants" not in params
+
+
+# ─── S13: one-way trip params ─────────────────────────────────────────────────
+
+
+def test_oneway_trip_params(httpx_mock):
+    """One-way: flight_type=oneway present; return_from/return_to absent."""
+    httpx_mock.add_response(json={"data": [], "currency": "AUD"})
+    src = TequilaPriceSource(api_key="test-key")
+    _search(src, return_date=None)
+
+    params = dict(httpx_mock.get_requests()[0].url.params)
+    assert params.get("flight_type") == "oneway"
+    assert "return_from" not in params
+    assert "return_to" not in params
+
+
+# ─── S13: currency forwarding ────────────────────────────────────────────────
+
+
+def test_currency_forwarded_to_curr_param(httpx_mock):
+    """currency='AUD' is passed as 'curr' in every request."""
+    httpx_mock.add_response(json={"data": [], "currency": "AUD"})
+    src = TequilaPriceSource(api_key="test-key")
+    _search(src, currency="AUD")
+
+    params = dict(httpx_mock.get_requests()[0].url.params)
+    assert params["curr"] == "AUD"
+
+
+# ─── S13: max_stops param ────────────────────────────────────────────────────
+
+
+def test_max_stops_none_omits_max_stopovers(httpx_mock):
+    """max_stops=None must not add max_stopovers to the request."""
+    httpx_mock.add_response(json={"data": [], "currency": "AUD"})
+    src = TequilaPriceSource(api_key="test-key")
+    _search(src, max_stops=None)
+
+    params = dict(httpx_mock.get_requests()[0].url.params)
+    assert "max_stopovers" not in params
+
+
+def test_max_stops_zero_sets_max_stopovers(httpx_mock):
+    """max_stops=0 sets max_stopovers=0 (direct flights only)."""
+    httpx_mock.add_response(json={"data": [], "currency": "AUD"})
+    src = TequilaPriceSource(api_key="test-key")
+    _search(src, max_stops=0)
+
+    params = dict(httpx_mock.get_requests()[0].url.params)
+    assert params["max_stopovers"] == "0"
+
+
+# ─── S13: Pluggy registration ────────────────────────────────────────────────
+
+
+def test_tequila_registers_correctly_via_pluggy():
+    """TequilaPriceSource registers one search_flights hookimpl with Pluggy."""
+    from fly_o_myte.price_sources.hookspecs import build_plugin_manager
+
+    pm = build_plugin_manager()
+    pm.register(TequilaPriceSource("k"))
+    assert len(pm.hook.search_flights.get_hookimpls()) == 1

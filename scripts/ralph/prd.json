@@ -253,7 +253,7 @@
         "TequilaPriceSource registers correctly via Pluggy: build_plugin_manager(); pm.register(TequilaPriceSource('k')); assert len(pm.hook.search_flights.get_hookimpls()) == 1",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S14",
