@@ -5,7 +5,6 @@
   "tagline": "Family flight advisor — Book Now, Wait, or Monitor.",
   "cliCommand": "fom",
   "pythonPackage": "fly_o_myte",
-
   "harnessEngineering": {
     "principle": "Humans steer; agents execute.",
     "systemOfRecord": "All decisions in docs/. Repository is the only shared memory.",
@@ -13,7 +12,6 @@
     "agentInstructions": "scripts/ralph/CLAUDE.md",
     "qualityScore": "docs/QUALITY_SCORE.md"
   },
-
   "techStack": {
     "language": "Python 3.11+",
     "packageManager": "uv",
@@ -28,7 +26,6 @@
     "testing": "pytest + pytest-httpx + syrupy + ruff + pyright",
     "ciCommand": "make ci"
   },
-
   "layerRule": {
     "description": "Forward-only imports enforced by tools/layer_linter.py",
     "layers": {
@@ -42,7 +39,6 @@
       "7": "cli — Typer entry-point"
     }
   },
-
   "stories": [
     {
       "id": "S01",
@@ -208,7 +204,7 @@
         "Run: fom remove 1 --yes — should confirm removal",
         "If all good, create scripts/ralph/demo-reviews/DR-A-approved.md"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S11",
