@@ -1,5 +1,7 @@
 # Fly-O-Myte Architecture
 
+Last reviewed: 2026-03-03 — Phase 1 complete; test layer now includes Syrupy snapshot tests.
+
 ## Top-Level Domain Map
 
 The package is organised into 5 functional domains:

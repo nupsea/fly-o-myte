@@ -172,3 +172,23 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
     distinct past-day fetched_at values, use depart_date = today+5 days.
     days_to_departure<=7 fires as the first rule regardless of price signal.
 ---
+
+## 2026-03-03T01:00:00+10:00 - DR-B / S15 - Snapshot tests + DR-B gate cleared
+- Implemented: DR-B marked passes:true (approval file confirmed). Added TestSnapshotOutput
+  class to tests/test_cli.py with 3 Syrupy snapshot tests (status, check, compare).
+  Generated baselines in tests/__snapshots__/test_cli.ambr.
+- Files changed:
+  - tests/test_cli.py (TestSnapshotOutput class added)
+  - tests/__snapshots__/test_cli.ambr (new — 3 snapshots)
+  - scripts/ralph/prd.json (DR-B passes:true, S15 passes:true)
+- make ci: 104 passed, 0 failed. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - Snapshot tests need function-scoped fresh DB (monkeypatch.setenv + get_settings.cache_clear)
+    because session-scoped DB has non-deterministic trip IDs from prior test runs.
+  - Must call get_settings.cache_clear() BOTH before (so CLI uses new DB) and after
+    (so subsequent tests re-read session env var) — yield fixture handles teardown.
+  - assert trip.id is not None after insert_trip() — pyright standard mode requires this
+    because Trip.id is typed as int | None (SQLModel primary key pattern).
+  - Rich Console renders markup-free in CliRunner (non-TTY context) so snapshots are
+    plain text — deterministic and human-readable in test_cli.ambr.
+---

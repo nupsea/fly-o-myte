@@ -1,0 +1,52 @@
+# serializer version: 1
+# name: TestSnapshotOutput.test_check_snapshot
+  '''
+  
+  ─────────────────────────── BNE-SYD July  BNE → SYD ────────────────────────────
+    Dates: 2026-07-20 → 2026-07-27   Adults: 2   Last updated: 2026-03-03T10:00
+  
+                                        
+     Base fare (adults)          $298   
+                                        
+     True family cost        $575 AUD   
+     30-day average              $598   
+     Trend                  $-5.0/day   
+                                        
+  ╭──────────────────────────────────────────────────────────────────────────────╮
+  │   WAIT  70% confident   Regret risk: MEDIUM                                  │
+  │                                                                              │
+  │   Prices are falling steadily. Wait for a better deal before booking.        │
+  │   Market signal: TYPICAL                                                     │
+  ╰──────────────────────────────────────────────────────────────────────────────╯
+  
+  
+  '''
+# ---
+# name: TestSnapshotOutput.test_compare_snapshot
+  '''
+                           Trip Comparison                          
+  ╭──────────────────────┬────────────────────┬────────────────────╮
+  │                      │  #1 BNE-SYD July   │  #1 BNE-SYD July   │
+  ├──────────────────────┼────────────────────┼────────────────────┤
+  │ Route                │      BNE→SYD       │      BNE→SYD       │
+  │ Dates                │     2026-07-20     │     2026-07-20     │
+  │                      │    →2026-07-27     │    →2026-07-27     │
+  │ True cost            │        $620        │        $620        │
+  │ 30d average          │        $620        │        $620        │
+  │ Trend                │      +$0.0/d       │      +$0.0/d       │
+  │ Recommendation       │        WAIT        │        WAIT        │
+  │ Confidence           │        70%         │        70%         │
+  │ Family score         │       88/100       │       88/100       │
+  │ Airline              │         QF         │         QF         │
+  │ Stops                │         0          │         0          │
+  │ Depart time          │       10:30        │       10:30        │
+  ╰──────────────────────┴────────────────────┴────────────────────╯
+  
+  '''
+# ---
+# name: TestSnapshotOutput.test_status_snapshot
+  '''
+  #1 BNE-SYD July  BNE→SYD  $620  WAIT  (70%)  138d to departure
+  
+  '''
+# ---

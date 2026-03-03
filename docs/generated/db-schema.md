@@ -1,5 +1,7 @@
 # Database Schema — Fly-O-Myte
 
+Last reviewed: 2026-03-03 — schema stable, no changes since Phase 1 baseline.
+
 Auto-generated from `fly_o_myte/db/sqlite.py`. Regenerate after schema changes with:
 ```bash
 uv run python -c "from fly_o_myte.db.sqlite import *; import inspect; print(inspect.getsource(__import__('fly_o_myte.db.sqlite', fromlist=['Trip'])))"
