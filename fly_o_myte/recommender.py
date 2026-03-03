@@ -228,10 +228,14 @@ def _compute_regret(
     Estimate expected regret (AUD) for each decision.
     Based on Random Regret Minimisation model.
     """
-    p_drop = 1.0 - confidence
-    regret_book = p_drop * price_volatility * 1.5
+    if slope > 0:
+        p_rise = confidence
+        p_drop = 1.0 - confidence
+    else:
+        p_drop = confidence
+        p_rise = 1.0 - confidence
 
-    p_rise = confidence if slope > 0 else (1.0 - confidence)
+    regret_book = p_drop * price_volatility * 1.5
     regret_wait = p_rise * price_volatility * 1.5
 
     return regret_book, regret_wait

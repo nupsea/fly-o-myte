@@ -311,7 +311,7 @@
         "Run: fom remove 1 --yes",
         "If all correct: create scripts/ralph/demo-reviews/DR-P1-approved.md with APPROVED on line 1"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S16",

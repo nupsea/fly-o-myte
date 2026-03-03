@@ -222,6 +222,20 @@ class TestRegretRisk:
         assert result.regret_book_aud >= 0
         assert result.regret_wait_aud >= 0
 
+    def test_regret_differentiates_correctly_on_falling_trend(self):
+        """On a falling trend, regret for booking should be higher than regret for waiting."""
+        snaps = make_snapshots([640, 630, 615, 600, 596])
+        result = compute(
+            snaps,
+            current_true_cost=596,
+            days_to_departure=139,
+            price_level_signal="TYPICAL",
+        )
+        # Decision should be WAIT
+        assert result.decision == "wait"
+        # Book regret should be higher than wait regret
+        assert result.regret_book_aud > result.regret_wait_aud
+
 
 # ─── Supporting math ──────────────────────────────────────────────────────────
 
