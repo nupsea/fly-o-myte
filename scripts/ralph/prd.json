@@ -504,7 +504,7 @@
         "test_true_cost.py: add 2 international airline cost calculations (SQ and EK) verifying correct bag/infant fees",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S25",

@@ -81,7 +81,7 @@ def _load_raw() -> dict:
 
 
 def _parse_airline(raw: dict, iata: str) -> AirlineFees:
-    dom = raw.get("domestic", {})
+    dom = raw.get("domestic", raw.get("international", {}))
     return AirlineFees(
         iata=iata,
         name=raw["name"],

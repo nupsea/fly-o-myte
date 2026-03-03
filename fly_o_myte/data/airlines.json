@@ -1,12 +1,24 @@
 {
-  "_version": "2026-01",
-  "_last_updated": "2026-01-15",
-  "_notes": "Australian domestic airline policies. All fees in AUD. Review and update 2-3x per year.",
+  "_version": "2026-02",
+  "_last_updated": "2026-03-04",
+  "_notes": "Australian domestic + international airline policies. Domestic fees in AUD. International fees in AUD (approximate conversion as of 2026-03). Review and update 2-3x per year.",
   "_update_sources": {
     "QF": "https://www.qantas.com/au/en/travel-info/baggage/checked-baggage.html",
     "VA": "https://www.virginaustralia.com/au/en/travel-info/baggage/checked-baggage/",
     "JQ": "https://www.jetstar.com/au/en/help/fees-and-charges",
-    "ZL": "https://www.rex.com.au/flightinfo/BaggageAllowance.aspx"
+    "ZL": "https://www.rex.com.au/flightinfo/BaggageAllowance.aspx",
+    "SQ": "https://www.singaporeair.com/en_UK/au/travel-info/baggage/checked-baggage/",
+    "EK": "https://www.emirates.com/au/english/before-you-fly/baggage/",
+    "CX": "https://www.cathaypacific.com/cx/en_AU/travel-information/baggage/free-baggage-allowance.html",
+    "NZ": "https://www.airnewzealand.com.au/baggage",
+    "QR": "https://www.qatarairways.com/en-au/baggage.html",
+    "TG": "https://www.thaiairways.com/en_AU/travel_information/baggage/",
+    "NH": "https://www.ana.co.jp/en/au/travel-information/baggage/",
+    "JL": "https://www.jal.com/en/baggage/",
+    "BA": "https://www.britishairways.com/en-au/information/baggage-essentials",
+    "MH": "https://www.malaysiaairlines.com/au/en/travel-info/baggage.html",
+    "GA": "https://www.garuda-indonesia.com/au/en/travel-info/before-you-fly/baggage",
+    "AI": "https://www.airindia.com/baggage-allowance.htm"
   },
 
   "QF": {
@@ -121,6 +133,258 @@
     },
     "on_time_pct": 60,
     "on_time_source": "estimated"
+  },
+
+  "SQ": {
+    "name": "Singapore Airlines",
+    "iata": "SQ",
+    "country": "SG",
+    "family_score": 82,
+    "family_score_notes": "Excellent family airline. Free 30kg bag, free seat selection, family seating available. Infant fee charged per sector on international routes.",
+    "international": {
+      "bag1_fee": 0,
+      "bag1_fee_lite": 75,
+      "bag1_weight_kg": 30,
+      "bag2_fee": 120,
+      "seat_selection_fee": 0,
+      "family_seating_guaranteed": true,
+      "infant_lap_fee_domestic_aud": 55,
+      "infant_lap_fee_intl_shorthaul_aud": 55,
+      "notes": "30kg bag free on economy (except saver lite fares). Free seat selection. Strong family programme. Infant fee approx $55 AUD per sector on international routes from AU."
+    },
+    "on_time_pct": 87,
+    "on_time_source": "Flightradar24 2025"
+  },
+
+  "EK": {
+    "name": "Emirates",
+    "iata": "EK",
+    "country": "AE",
+    "family_score": 78,
+    "family_score_notes": "Free 23kg bag on economy, seat selection fee applies. Good family facilities on widebody aircraft.",
+    "international": {
+      "bag1_fee": 0,
+      "bag1_fee_lite": 80,
+      "bag1_weight_kg": 23,
+      "bag2_fee": 130,
+      "seat_selection_fee": 25,
+      "family_seating_guaranteed": false,
+      "infant_lap_fee_domestic_aud": 60,
+      "infant_lap_fee_intl_shorthaul_aud": 60,
+      "notes": "23kg bag free on standard economy fares. Seat selection charged. Infant fee approx $60 AUD per sector. Economy Saver/Lite fares have no bag inclusion."
+    },
+    "on_time_pct": 80,
+    "on_time_source": "Flightradar24 2025"
+  },
+
+  "CX": {
+    "name": "Cathay Pacific",
+    "iata": "CX",
+    "country": "HK",
+    "family_score": 76,
+    "family_score_notes": "Free 23kg bag on economy, seat selection fee on standard. Family-friendly widebody fleet.",
+    "international": {
+      "bag1_fee": 0,
+      "bag1_fee_lite": 70,
+      "bag1_weight_kg": 23,
+      "bag2_fee": 120,
+      "seat_selection_fee": 20,
+      "family_seating_guaranteed": false,
+      "infant_lap_fee_domestic_aud": 60,
+      "infant_lap_fee_intl_shorthaul_aud": 60,
+      "notes": "23kg bag free on economy standard. Seat selection charged on most fares. Infant fee approx $60 AUD per sector."
+    },
+    "on_time_pct": 78,
+    "on_time_source": "Flightradar24 2025"
+  },
+
+  "NZ": {
+    "name": "Air New Zealand",
+    "iata": "NZ",
+    "country": "NZ",
+    "family_score": 80,
+    "family_score_notes": "Excellent for AU-NZ routes. Free bags on Choice/Flexi. Budget fares have no bag.",
+    "international": {
+      "bag1_fee": 0,
+      "bag1_fee_lite": 55,
+      "bag1_weight_kg": 23,
+      "bag2_fee": 100,
+      "seat_selection_fee": 0,
+      "family_seating_guaranteed": false,
+      "infant_lap_fee_domestic_aud": 35,
+      "infant_lap_fee_intl_shorthaul_aud": 35,
+      "notes": "23kg bag on Choice/Flexi fares. Economy Seat/Value = no bag (bag1_fee_lite). Infant fee approx $35 AUD per sector AU-NZ."
+    },
+    "on_time_pct": 84,
+    "on_time_source": "Flightradar24 2025"
+  },
+
+  "QR": {
+    "name": "Qatar Airways",
+    "iata": "QR",
+    "country": "QA",
+    "family_score": 75,
+    "family_score_notes": "Free 23kg bag. Seat selection fee. Long-haul hub via Doha. Good family service.",
+    "international": {
+      "bag1_fee": 0,
+      "bag1_fee_lite": 90,
+      "bag1_weight_kg": 23,
+      "bag2_fee": 140,
+      "seat_selection_fee": 30,
+      "family_seating_guaranteed": false,
+      "infant_lap_fee_domestic_aud": 65,
+      "infant_lap_fee_intl_shorthaul_aud": 65,
+      "notes": "23kg bag free on economy (except lite). Seat selection fee applies. Infant fee approx $65 AUD per sector. Long haul via Doha adds transit time for families."
+    },
+    "on_time_pct": 76,
+    "on_time_source": "Flightradar24 2025"
+  },
+
+  "TG": {
+    "name": "Thai Airways",
+    "iata": "TG",
+    "country": "TH",
+    "family_score": 65,
+    "family_score_notes": "Free 20kg bag. Reasonable infant fee. Older fleet on some routes.",
+    "international": {
+      "bag1_fee": 0,
+      "bag1_fee_lite": 60,
+      "bag1_weight_kg": 20,
+      "bag2_fee": 110,
+      "seat_selection_fee": 15,
+      "family_seating_guaranteed": false,
+      "infant_lap_fee_domestic_aud": 55,
+      "infant_lap_fee_intl_shorthaul_aud": 55,
+      "notes": "20kg bag free on economy. Seat selection charged. Infant fee approx $55 AUD per sector. Check operational status — Thai Airways restructuring ongoing."
+    },
+    "on_time_pct": 72,
+    "on_time_source": "Flightradar24 2025"
+  },
+
+  "NH": {
+    "name": "ANA All Nippon Airways",
+    "iata": "NH",
+    "country": "JP",
+    "family_score": 78,
+    "family_score_notes": "Free 23kg bag. Free seat selection. Excellent punctuality. Strong family service on Japan routes.",
+    "international": {
+      "bag1_fee": 0,
+      "bag1_fee_lite": 80,
+      "bag1_weight_kg": 23,
+      "bag2_fee": 130,
+      "seat_selection_fee": 0,
+      "family_seating_guaranteed": false,
+      "infant_lap_fee_domestic_aud": 50,
+      "infant_lap_fee_intl_shorthaul_aud": 50,
+      "notes": "23kg bag free. Free seat selection on ANA.co.jp. Infant fee approx $50 AUD per sector. Exceptional punctuality — top performer for Japan routes."
+    },
+    "on_time_pct": 91,
+    "on_time_source": "Flightradar24 2025"
+  },
+
+  "JL": {
+    "name": "Japan Airlines",
+    "iata": "JL",
+    "country": "JP",
+    "family_score": 76,
+    "family_score_notes": "Free 23kg bag. Free seat selection. High punctuality. Good family service.",
+    "international": {
+      "bag1_fee": 0,
+      "bag1_fee_lite": 80,
+      "bag1_weight_kg": 23,
+      "bag2_fee": 130,
+      "seat_selection_fee": 0,
+      "family_seating_guaranteed": false,
+      "infant_lap_fee_domestic_aud": 50,
+      "infant_lap_fee_intl_shorthaul_aud": 50,
+      "notes": "23kg bag free. Seat selection free on jal.com. Infant fee approx $50 AUD per sector. One of the most punctual carriers globally."
+    },
+    "on_time_pct": 89,
+    "on_time_source": "Flightradar24 2025"
+  },
+
+  "BA": {
+    "name": "British Airways",
+    "iata": "BA",
+    "country": "GB",
+    "family_score": 62,
+    "family_score_notes": "Basic fares include no bag. Seat selection fee applies. Long haul to UK adds fatigue for families.",
+    "international": {
+      "bag1_fee": 0,
+      "bag1_fee_lite": 90,
+      "bag1_weight_kg": 23,
+      "bag2_fee": 140,
+      "seat_selection_fee": 35,
+      "family_seating_guaranteed": false,
+      "infant_lap_fee_domestic_aud": 70,
+      "infant_lap_fee_intl_shorthaul_aud": 70,
+      "notes": "Economy standard includes 23kg bag. Economy Basic = no bag (bag1_fee_lite=$90). Seat selection charged. Infant fee approx $70 AUD per sector AU-UK."
+    },
+    "on_time_pct": 71,
+    "on_time_source": "Flightradar24 2025"
+  },
+
+  "MH": {
+    "name": "Malaysia Airlines",
+    "iata": "MH",
+    "country": "MY",
+    "family_score": 68,
+    "family_score_notes": "Free 20kg bag. Reasonable fees. Good for BNE-KUL routes.",
+    "international": {
+      "bag1_fee": 0,
+      "bag1_fee_lite": 65,
+      "bag1_weight_kg": 20,
+      "bag2_fee": 110,
+      "seat_selection_fee": 15,
+      "family_seating_guaranteed": false,
+      "infant_lap_fee_domestic_aud": 50,
+      "infant_lap_fee_intl_shorthaul_aud": 50,
+      "notes": "20kg bag free on economy. Seat selection charged. Infant fee approx $50 AUD per sector. Good connectivity via KUL hub for SEA destinations."
+    },
+    "on_time_pct": 73,
+    "on_time_source": "Flightradar24 2025"
+  },
+
+  "GA": {
+    "name": "Garuda Indonesia",
+    "iata": "GA",
+    "country": "ID",
+    "family_score": 65,
+    "family_score_notes": "Free 23kg bag. Reasonable infant fee. Good for Bali/Indonesia routes.",
+    "international": {
+      "bag1_fee": 0,
+      "bag1_fee_lite": 60,
+      "bag1_weight_kg": 23,
+      "bag2_fee": 100,
+      "seat_selection_fee": 10,
+      "family_seating_guaranteed": false,
+      "infant_lap_fee_domestic_aud": 45,
+      "infant_lap_fee_intl_shorthaul_aud": 45,
+      "notes": "23kg bag free. Modest seat selection fee. Infant fee approx $45 AUD per sector. Primary carrier for Bali routes from AU."
+    },
+    "on_time_pct": 69,
+    "on_time_source": "Flightradar24 2025"
+  },
+
+  "AI": {
+    "name": "Air India",
+    "iata": "AI",
+    "country": "IN",
+    "family_score": 55,
+    "family_score_notes": "Free 23kg bag. Improving service post-Tata acquisition. Long haul to India routes.",
+    "international": {
+      "bag1_fee": 0,
+      "bag1_fee_lite": 70,
+      "bag1_weight_kg": 23,
+      "bag2_fee": 110,
+      "seat_selection_fee": 20,
+      "family_seating_guaranteed": false,
+      "infant_lap_fee_domestic_aud": 55,
+      "infant_lap_fee_intl_shorthaul_aud": 55,
+      "notes": "23kg bag free on economy. Seat selection charged. Infant fee approx $55 AUD per sector. Tata-owned since 2022 — service quality improving."
+    },
+    "on_time_pct": 68,
+    "on_time_source": "Flightradar24 2025"
   },
 
   "_family_score_methodology": {

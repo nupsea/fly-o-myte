@@ -201,6 +201,103 @@ class TestChildAgeClassification:
         assert result.infant_fees == 0.0  # Qantas free domestic
 
 
+class TestInternationalCost:
+    """International airlines: verify bag and infant fees load and compute correctly."""
+
+    def test_sq_bags_included_no_bag_fee(self):
+        """Singapore Airlines: 30kg bag included, bag_fees must be zero."""
+        from fly_o_myte.fees import get_airline_db
+
+        sq = get_airline_db().get("SQ")
+        assert sq is not None, "SQ must be present in airline DB"
+        result = compute_true_cost(
+            airline=sq,
+            base_fare_per_adult=680.0,
+            adults=2,
+            child_ages=[],
+            bags_per_person=1,
+            depart_date=date(2026, 9, 18),
+            return_date=date(2026, 9, 28),
+        )
+        assert result.bag_fees == 0.0
+
+    def test_sq_infant_fee_per_sector_return_trip(self):
+        """SQ infant fee ($55/sector) × 1 infant × 2 sectors = $110 for a return trip."""
+        from fly_o_myte.fees import get_airline_db
+
+        sq = get_airline_db().get("SQ")
+        assert sq is not None
+        result = compute_true_cost(
+            airline=sq,
+            base_fare_per_adult=680.0,
+            adults=2,
+            child_ages=[1],  # one lap infant
+            bags_per_person=1,
+            depart_date=date(2026, 9, 18),
+            return_date=date(2026, 9, 28),
+        )
+        assert result.infant_fees == pytest.approx(55.0 * 1 * 2)
+
+    def test_ek_bags_included_no_bag_fee(self):
+        """Emirates: 23kg bag included on standard economy, bag_fees must be zero."""
+        from fly_o_myte.fees import get_airline_db
+
+        ek = get_airline_db().get("EK")
+        assert ek is not None, "EK must be present in airline DB"
+        result = compute_true_cost(
+            airline=ek,
+            base_fare_per_adult=950.0,
+            adults=2,
+            child_ages=[],
+            bags_per_person=1,
+            depart_date=date(2026, 11, 20),
+            return_date=date(2026, 12, 4),
+        )
+        assert result.bag_fees == 0.0
+
+    def test_ek_seat_selection_fee_applied(self):
+        """Emirates: $25 seat fee per seat per leg — 2 adults return = $100 total."""
+        from fly_o_myte.fees import get_airline_db
+
+        ek = get_airline_db().get("EK")
+        assert ek is not None
+        result = compute_true_cost(
+            airline=ek,
+            base_fare_per_adult=950.0,
+            adults=2,
+            child_ages=[],
+            bags_per_person=1,
+            depart_date=date(2026, 11, 20),
+            return_date=date(2026, 12, 4),
+        )
+        # 2 adults × $25/seat × 2 legs
+        assert result.seat_fees == pytest.approx(2 * 25.0 * 2)
+
+    def test_all_twelve_international_carriers_load(self):
+        """All 12 required international carriers must be present in the DB."""
+        from fly_o_myte.fees import get_airline_db
+
+        db = get_airline_db()
+        for iata in (
+            "SQ",
+            "EK",
+            "CX",
+            "NZ",
+            "QR",
+            "TG",
+            "NH",
+            "JL",
+            "BA",
+            "MH",
+            "GA",
+            "AI",
+        ):
+            airline = db.get(iata)
+            assert airline is not None, f"{iata} missing from airline DB"
+            assert airline.bag1_fee >= 0, f"{iata} bag1_fee invalid"
+            assert 0 <= airline.family_score <= 100, f"{iata} family_score out of range"
+
+
 class TestFamilyScore:
     def test_nonstop_qantas_scores_high(self, qantas_fees):
         score = compute_family_score(
