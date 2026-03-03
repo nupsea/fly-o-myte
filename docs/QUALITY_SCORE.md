@@ -1,6 +1,6 @@
 # Quality Score — Fly-O-Myte
 
-Last Updated: 2026-03-03 — S14 complete (Phase 1 stories S01–S14 all pass)
+Last Updated: 2026-03-04 — S16 complete (S01–S15 Phase 1 + S16 Phase 2 analytics)
 
 Updated by ralph after each phase. Grades: A (complete), B (mostly done), C (partial), D (minimal), F (not started).
 
@@ -12,7 +12,7 @@ Updated by ralph after each phase. Grades: A (complete), B (mostly done), C (par
 | Recommender     | yes         | yes    | yes        | A             |
 | Tracker         | yes         | yes    | partial    | B             |
 | Scout           | yes         | no     | partial    | C             |
-| Analytics       | stub        | stub   | partial    | D             |
+| Analytics       | yes         | yes    | partial    | B             |
 | Insights (LLM)  | yes         | yes    | partial    | B             |
 | Notifier        | yes         | yes    | partial    | B             |
 | Display         | yes         | no     | no         | C             |
@@ -29,13 +29,13 @@ Updated by ralph after each phase. Grades: A (complete), B (mostly done), C (par
 
 **Recommender (A)**: 10-rule decision matrix, confidence scaling by data richness, regret risk via Random Regret Minimisation, trend slope via pure-Python least-squares. 35+ passing unit tests — no mocking required.
 
-**Tracker (B)**: `poll_trip()` and `poll_all_active()` fully wired — fetch → true cost → family score → snapshot → recommendation → alert. Deterministic `_StubTequilaSource` integration tests with exact cost assertions. Missing: analytics integration after poll.
+**Tracker (B)**: `poll_trip()` and `poll_all_active()` fully wired — fetch → true cost → family score → snapshot → recommendation → alert → analytics update. Deterministic `_StubTequilaSource` integration tests with exact cost assertions.
 
 **CLI (B)**: All 15 commands implemented: setup, scout, watch, status, check, compare, history, refresh, insight, poll, analytics, pause, resume, remove, profile, data-version. Basic integration tests pass. Missing: Syrupy snapshot tests for Rich output.
 
 **Price Sources (B)**: Tequila adapter implemented with tenacity retry. S09/S13: 13 pytest-httpx unit tests covering happy path, HTTP errors, retry behaviour, param construction (children/infants, one-way/return, currency, max_stopovers), and Pluggy registration. `_StubTequilaSource` in conftest serves integration tests. SerpAPI adapter implemented — tests in S20 (Phase 2). Amadeus adapter is a stub.
 
-**Analytics (D)**: `analytics.py` is a scaffold — incremental DuckDB/Parquet aggregation not yet implemented. Phase 2 work.
+**Analytics (B)**: `analytics.py` and `db/duckdb.py` fully wired. S16: `update_after_snapshot()` called after each poll — writes all snapshots for the trip to `trip_{id}.parquet` and recomputes route_stats. `query_price_percentiles()` returns p25/median/p75 from Parquet or SQLite fallback. `fom analytics --rebuild` rebuilds all Parquet from SQLite. 6 integration tests covering Parquet creation, row count, route stats, percentile ordering, and CLI rebuild. Missing: route market context in fom check (S23).
 
 **Insights (B)**: `TravelInsight` Pydantic model, `generate_insight()` with graceful degradation (returns None when LLM unavailable). Schema validation passes. Missing: golden fixture evaluation with LLM-as-judge.
 
@@ -45,4 +45,4 @@ Updated by ralph after each phase. Grades: A (complete), B (mostly done), C (par
 
 **Display (C)**: Rich rendering helpers implemented. Not yet tested with Syrupy snapshots.
 
-**Dev Tooling (A)**: `make ci` runs lint → typecheck → layer-lint → data-check → test → smoke-test. Layer linter covers 21 files. `make test` runs 101 tests in <0.6s.
+**Dev Tooling (A)**: `make ci` runs lint → typecheck → layer-lint → data-check → test → smoke-test. Layer linter covers 21 files. `make test` runs 110 tests in <2s.

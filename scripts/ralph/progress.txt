@@ -173,6 +173,32 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
     days_to_departure<=7 fires as the first rule regardless of price signal.
 ---
 
+## 2026-03-04T00:00:00+10:00 - S16 - DuckDB analytics layer — incremental Parquet aggregation
+- Implemented: Wired update_after_snapshot() into poll_trip() (tracker.py step 4a).
+  Fixed _run_incremental_update in analytics.py to write ALL snapshots per trip
+  (not just the latest) to trip_{id}.parquet. Fixed days_to_departure using datediff().
+  Fixed SQLite table name bug: SQLModel names PriceSnapshot → 'pricesnapshot' not
+  'price_snapshot' — corrected in analytics.py (2 places) and db/duckdb.py.
+  Replaced placeholder test in test_analytics.py with 6 real assertions.
+- Files changed:
+  - fly_o_myte/analytics.py (fix incremental update + table name)
+  - fly_o_myte/db/duckdb.py (fix table name)
+  - fly_o_myte/tracker.py (wire update_after_snapshot, import)
+  - tests/test_analytics.py (6 real integration tests)
+  - scripts/ralph/prd.json (S16 passes:true)
+- make ci: 110 passed, 0 failed. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - SQLModel table name for PriceSnapshot is 'pricesnapshot' (lowercase, no separator)
+    NOT 'price_snapshot'. Use sqlite3 + sqlite_master to verify actual table names.
+  - DuckDB sqlite_scan requires a real file path — in-memory SQLite not supported.
+    Analytics tests need file-based SQLite (create_db_engine + create_tables).
+  - Per-test monkeypatch.setenv + get_settings.cache_clear() IS valid for analytics
+    tests (not CLI tests) when wrapped in try/finally: get_settings.cache_clear().
+  - Analytics tests put imports BEFORE pytest.importorskip() call — the importorskip
+    skips the whole module (including test execution) if duckdb absent. The fly_o_myte
+    imports don't require duckdb at import time (lazy imports inside functions).
+---
+
 ## 2026-03-03T01:00:00+10:00 - DR-B / S15 - Snapshot tests + DR-B gate cleared
 - Implemented: DR-B marked passes:true (approval file confirmed). Added TestSnapshotOutput
   class to tests/test_cli.py with 3 Syrupy snapshot tests (status, check, compare).
