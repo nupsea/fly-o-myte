@@ -1,28 +1,24 @@
 """
 Tests for the poll cycle orchestration (tracker.py).
 
-External API calls are mocked via pytest-httpx.
-Database operations use in-memory SQLite.
+Uses the deterministic _StubTequilaSource from conftest (not MagicMock)
+so that cost calculations are predictable and assertion values don't drift.
 """
 
 from __future__ import annotations
 
-from datetime import date
-from unittest.mock import MagicMock, patch
-
 import pytest
 
-from travo.config import FamilyProfile, DepartureWindow
-from travo.db.sqlite import (
+from fly_o_myte.config import DepartureWindow, FamilyProfile
+from fly_o_myte.db.sqlite import (
     get_latest_recommendation,
-    get_latest_snapshot,
     get_snapshots_for_trip,
     insert_trip,
     Trip,
 )
-from travo.fees import AirlineFees
-from travo.price_sources.hookspecs import FlightOffer, build_plugin_manager
-from travo.tracker import poll_trip, poll_all_active
+from fly_o_myte.price_sources.hookspecs import build_plugin_manager
+from fly_o_myte.tracker import poll_trip, poll_all_active
+from tests.conftest import _StubTequilaSource
 
 
 def _make_profile() -> FamilyProfile:
@@ -37,77 +33,83 @@ def _make_profile() -> FamilyProfile:
     )
 
 
-def _make_offer(price: float = 149.0) -> FlightOffer:
-    return FlightOffer(
-        source="tequila",
-        airline_code="QF",
-        flight_number="QF500",
-        base_fare_per_adult=price,
-        currency="AUD",
-        stops=0,
-        departure_time="10:30",
-        arrival_time="12:10",
-        duration_minutes=100,
-        price_level_signal=None,
-        offer_raw={},
-    )
+# ─── poll_trip ────────────────────────────────────────────────────────────────
 
 
-def _mock_pm(offer: FlightOffer | None = None):
-    """Create a mock plugin manager that returns a preset offer."""
-    pm = MagicMock()
-    pm.hook.search_flights.return_value = [[offer]] if offer else [[]]
-    return pm
-
-
+@pytest.mark.integration
 class TestPollTrip:
-    def test_poll_saves_snapshot(self, db_session, sample_trip):
-        """Successful poll saves one snapshot to the database."""
-        pm = _mock_pm(_make_offer())
-        snap = poll_trip(db_session, sample_trip, _make_profile(), pm, send_alerts=False)
+    def test_poll_saves_snapshot(self, db_session, sample_trip, stub_pm):
+        snap = poll_trip(db_session, sample_trip, _make_profile(), stub_pm, send_alerts=False)
         assert snap is not None
         assert snap.trip_id == sample_trip.id
         assert snap.true_family_cost > 0
 
-    def test_poll_saves_recommendation(self, db_session, sample_trip):
-        """Successful poll saves a recommendation."""
-        pm = _mock_pm(_make_offer())
-        poll_trip(db_session, sample_trip, _make_profile(), pm, send_alerts=False)
+    def test_poll_saves_recommendation(self, db_session, sample_trip, stub_pm):
+        poll_trip(db_session, sample_trip, _make_profile(), stub_pm, send_alerts=False)
         rec = get_latest_recommendation(db_session, sample_trip.id)
         assert rec is not None
         assert rec.decision in ("book_now", "wait", "monitor")
 
     def test_poll_no_offers_returns_none(self, db_session, sample_trip):
-        """When no offers are returned, poll returns None and saves nothing."""
-        pm = _mock_pm(None)
+        """Empty price source returns None, nothing persisted."""
+        from fly_o_myte.price_sources.hookspecs import hookimpl
+
+        class _EmptySource:
+            @hookimpl
+            def source_name(self) -> str:
+                return "empty"
+
+            @hookimpl
+            def supports_route(self, origin, destination) -> bool:
+                return True
+
+            @hookimpl
+            def search_flights(self, **_kwargs):
+                return []
+
+        pm = build_plugin_manager()
+        pm.register(_EmptySource())
         snap = poll_trip(db_session, sample_trip, _make_profile(), pm, send_alerts=False)
         assert snap is None
-        snaps = get_snapshots_for_trip(db_session, sample_trip.id)
-        assert len(snaps) == 0
+        assert len(get_snapshots_for_trip(db_session, sample_trip.id)) == 0
 
-    def test_poll_computes_true_cost(self, db_session, sample_trip):
-        """True cost must exceed base fare (bags/seats/infant fees added)."""
-        pm = _mock_pm(_make_offer(price=99.0))
-        snap = poll_trip(db_session, sample_trip, _make_profile(), pm, send_alerts=False)
-        # 2 adults × $99 = $198 base; true cost may include bags for unknown fare type
-        assert snap.true_family_cost >= 99.0 * 2
+    def test_poll_true_cost_exceeds_base_fare(self, db_session, sample_trip, stub_pm):
+        """
+        Stub returns QF at $149/adult, 2 adults.
+        Qantas has zero bag/seat/infant fees domestically, so true cost = 2 × $149 = $298.
+        """
+        snap = poll_trip(db_session, sample_trip, _make_profile(), stub_pm, send_alerts=False)
+        assert snap is not None
+        assert snap.true_family_cost == pytest.approx(298.0)
 
-    def test_poll_accumulates_snapshots(self, db_session, sample_trip):
+    def test_poll_accumulates_snapshots(self, db_session, sample_trip, stub_pm):
         """Each poll adds a new snapshot row."""
-        pm = _mock_pm(_make_offer())
         for _ in range(3):
-            poll_trip(db_session, sample_trip, _make_profile(), pm, send_alerts=False)
+            poll_trip(db_session, sample_trip, _make_profile(), stub_pm, send_alerts=False)
         snaps = get_snapshots_for_trip(db_session, sample_trip.id)
         assert len(snaps) == 3
 
+    @pytest.mark.parametrize("stub_pm", [{"price": 99.0, "airline": "JQ"}], indirect=True)
+    def test_poll_jetstar_true_cost_includes_bags(self, db_session, sample_trip, stub_pm):
+        """
+        Jetstar at $99/adult, 2 adults, 1 bag/person, return (2 legs).
+        Bags: 2 pax × $55 × 2 legs = $220
+        Seats: 2 pax × $8 × 2 legs = $32
+        Base: 2 × $99 = $198
+        Expected total = $450
+        """
+        snap = poll_trip(db_session, sample_trip, _make_profile(), stub_pm, send_alerts=False)
+        assert snap is not None
+        assert snap.true_family_cost == pytest.approx(450.0)
 
+
+# ─── poll_all_active ──────────────────────────────────────────────────────────
+
+
+@pytest.mark.integration
 class TestPollAllActive:
-    def test_polls_all_active_trips(self, db_session, in_memory_engine):
-        """poll_all_active runs against every active trip."""
-        from travo.db.sqlite import get_session
+    def test_polls_all_active_trips(self, db_session, stub_pm):
         profile = _make_profile()
-        pm = _mock_pm(_make_offer())
-
         trip1 = insert_trip(db_session, Trip(
             label="Trip A", origin="BNE", destination="SYD",
             depart_date="2026-07-20", return_date="2026-07-27",
@@ -116,34 +118,64 @@ class TestPollAllActive:
             label="Trip B", origin="BNE", destination="MEL",
             depart_date="2026-08-10", return_date="2026-08-17",
         ))
+        results = poll_all_active(db_session, profile, stub_pm, send_alerts=False)
+        assert results[trip1.id] == "ok"
+        assert results[trip2.id] == "ok"
 
-        results = poll_all_active(db_session, profile, pm, send_alerts=False)
-        assert trip1.id in results
-        assert trip2.id in results
+    def test_error_in_one_trip_continues_others(self, db_session, stub_pm):
+        """If one trip's price source raises, poll continues to next trip."""
+        from fly_o_myte.price_sources.hookspecs import hookimpl
 
-    def test_error_in_one_trip_continues_others(self, db_session, in_memory_engine):
-        """If one trip fails, poll continues to next trip."""
-        profile = _make_profile()
-
-        # Plugin manager raises for first call, succeeds for second
-        pm = MagicMock()
         call_count = [0]
-        def side_effect(**_kwargs):
-            call_count[0] += 1
-            if call_count[0] == 1:
-                raise Exception("API error")
-            return [[_make_offer()]]
-        pm.hook.search_flights.side_effect = side_effect
 
+        class _FailFirstSource:
+            @hookimpl
+            def source_name(self):
+                return "fail_first"
+
+            @hookimpl
+            def supports_route(self, origin, destination):
+                return True
+
+            @hookimpl
+            def search_flights(self, **_kwargs):
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    raise RuntimeError("simulated API error")
+                return [
+                    __import__("fly_o_myte.price_sources.hookspecs", fromlist=["FlightOffer"])
+                    .FlightOffer(
+                        source="fail_first", airline_code="QF", flight_number=None,
+                        base_fare_per_adult=149.0, currency="AUD", stops=0,
+                        departure_time="10:30", arrival_time="12:10",
+                        duration_minutes=100, price_level_signal=None, offer_raw={},
+                    )
+                ]
+
+        pm = build_plugin_manager()
+        pm.register(_FailFirstSource())
+
+        profile = _make_profile()
         trip1 = insert_trip(db_session, Trip(
-            label="Trip fail", origin="BNE", destination="SYD",
+            label="Fail", origin="BNE", destination="SYD",
             depart_date="2026-07-20", return_date="2026-07-27",
         ))
         trip2 = insert_trip(db_session, Trip(
-            label="Trip ok", origin="BNE", destination="MEL",
+            label="OK", origin="BNE", destination="MEL",
             depart_date="2026-08-10", return_date="2026-08-17",
         ))
-
         results = poll_all_active(db_session, profile, pm, send_alerts=False)
         assert results[trip1.id] == "error"
         assert results[trip2.id] == "ok"
+
+    def test_paused_trip_not_polled(self, db_session, stub_pm):
+        """Paused trips (is_active=0) are excluded from poll_all_active."""
+        from fly_o_myte.db.sqlite import set_trip_active
+        profile = _make_profile()
+        trip = insert_trip(db_session, Trip(
+            label="Paused", origin="BNE", destination="SYD",
+            depart_date="2026-07-20", return_date="2026-07-27",
+        ))
+        set_trip_active(db_session, trip.id, active=False)
+        results = poll_all_active(db_session, profile, stub_pm, send_alerts=False)
+        assert trip.id not in results

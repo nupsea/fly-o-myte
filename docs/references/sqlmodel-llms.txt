@@ -1,0 +1,42 @@
+SQLMODEL REFERENCE — Fly-O-Myte uses SQLModel for SQLite OLTP layer
+
+# Model definition (db/sqlite.py)
+from sqlmodel import SQLModel, Field
+from typing import Optional
+
+class Trip(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    label: str
+    origin: str
+    destination: str
+    depart_date: str          # YYYY-MM-DD
+    return_date: Optional[str] = None
+    is_active: int = 1        # 1 = active, 0 = paused
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+# Engine + table creation
+from sqlmodel import create_engine
+engine = create_engine("sqlite:///~/.fly-o-myte/fly-o-myte.db")
+SQLModel.metadata.create_all(engine)
+
+# Session context manager
+from sqlmodel import Session
+with Session(engine) as session:
+    session.add(trip)
+    session.commit()
+    session.refresh(trip)
+
+# Query
+from sqlmodel import select
+stmt = select(Trip).where(Trip.is_active == 1)
+trips = session.exec(stmt).all()
+
+# In-memory for tests
+engine = create_engine("sqlite:///:memory:")
+SQLModel.metadata.create_all(engine)
+
+# WAL mode for concurrent access
+from sqlalchemy import event
+@event.listens_for(engine, "connect")
+def set_wal_mode(dbapi_conn, connection_record):
+    dbapi_conn.execute("PRAGMA journal_mode=WAL")

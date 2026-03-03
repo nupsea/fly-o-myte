@@ -1,0 +1,31 @@
+UV REFERENCE — Fly-O-Myte project uses uv exclusively
+
+# Install all dependencies including dev extras
+uv sync --all-extras
+
+# Run any command in the project venv
+uv run python -m pytest
+uv run ruff check .
+uv run pyright .
+
+# Add a dependency
+uv add httpx
+
+# Add a dev dependency
+uv add --dev pytest-mock
+
+# Build the package
+uv build
+
+# Install the tool globally (editable)
+uv tool install -e .
+
+# Run the installed CLI
+uv run fom --help
+
+# Show installed packages
+uv pip list
+
+# Lock file is uv.lock — always commit it
+# pyproject.toml is the source of truth for dependencies
+# Never use pip, Poetry, or pipenv in this project

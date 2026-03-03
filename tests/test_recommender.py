@@ -10,8 +10,8 @@ from __future__ import annotations
 import pytest
 from datetime import datetime, timedelta
 
-from travo.recommender import (
-    HolidayContext,
+from fly_o_myte.calendar import HolidayContext
+from fly_o_myte.recommender import (
     SnapshotPoint,
     compute,
     price_deviation_pct,
@@ -60,10 +60,11 @@ class TestDecisionMatrix:
 
     def test_book_now_below_average_rising(self):
         """Price >= 15% below average + rising → BOOK NOW (priority 4)."""
-        avg_cost = 1600.0
-        current = avg_cost * 0.82  # 18% below average
-        rising_snaps = make_snapshots([1200, 1250, 1310, 1380, current])
-        result = compute(rising_snaps, current_true_cost=current, days_to_departure=50,
+        # Historical prices around 1600, trending up. Current price is a dip at 18% below avg.
+        # Snapshots are purely historical (do not include current) so the rolling avg stays ~1600.
+        current = 1312.0  # 18% below 1600
+        historical_snaps = make_snapshots([1520, 1560, 1600, 1640, 1680])  # avg=1600, slope=+40/day
+        result = compute(historical_snaps, current_true_cost=current, days_to_departure=50,
                          price_level_signal="TYPICAL")
         assert result.decision == "book_now"
 
@@ -97,8 +98,9 @@ class TestDecisionMatrix:
         assert result.decision == "wait"
 
     def test_monitor_long_lead_no_signal(self):
-        """days > 90 + no strong signal → MONITOR."""
-        snaps = make_snapshots([1400, 1410, 1395, 1405, 1400])
+        """days > 90 + no directional trend + no strong signal → MONITOR (priority 9)."""
+        # Symmetric values give slope = 0, so rule 7 (slope < 0) does not fire.
+        snaps = make_snapshots([1400, 1410, 1420, 1410, 1400])
         result = compute(snaps, current_true_cost=1400, days_to_departure=120,
                          price_level_signal="TYPICAL")
         assert result.decision == "monitor"

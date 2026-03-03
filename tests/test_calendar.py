@@ -10,7 +10,7 @@ from datetime import date
 
 import pytest
 
-from travo.calendar import get_calendar, SchoolCalendar
+from fly_o_myte.calendar import get_calendar, SchoolCalendar
 
 
 class TestHolidayOverlap:

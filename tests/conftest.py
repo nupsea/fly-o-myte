@@ -1,21 +1,89 @@
 """
 Shared pytest fixtures for the Travo test suite.
 
-All external I/O (API calls, file reads beyond package data) is
-handled via fixtures and mocks. Tests must never make real network calls.
+Key pattern (adopted from learning-mate):
+  session-scoped isolation fixture resets all module-level singletons
+  (get_settings cache, airline DB, school calendar) before each test session,
+  pointing them at a temp directory so tests never touch ~/.travo.
+
+Test pyramid:
+  unit        — pure function tests (recommender, true_cost, calendar)
+                no I/O, no mocking required
+  integration — real in-memory SQLite, deterministic mock price source
+                marked with @pytest.mark.integration
+  slow        — real Tequila API calls (excluded from `make ci`)
+  e2e         — full CLI invocation (excluded from `make ci`)
 """
 
 from __future__ import annotations
 
-from datetime import date, datetime
+import os
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pytest
 from sqlmodel import create_engine
 
-from travo.db.sqlite import Trip, PriceSnapshot, Recommendation, create_tables, get_session
-from travo.fees import AirlineFees
-from travo.recommender import SnapshotPoint
+from fly_o_myte.db.sqlite import (
+    Trip,
+    PriceSnapshot,
+    Recommendation,
+    create_tables,
+    get_session,
+    insert_trip,
+)
+from fly_o_myte.fees import AirlineFees
+from fly_o_myte.price_sources.hookspecs import FlightOffer, hookimpl
+from fly_o_myte.recommender import SnapshotPoint
+
+
+# ─── Session-scoped isolation ──────────────────────────────────────────────────
+#
+# Resets all module-level singletons before the test session so tests run
+# in an isolated temp dir, never touching ~/.travo.
+# Pattern taken from learning-mate/backend/tests/conftest.py.
+
+
+@pytest.fixture(scope="session", autouse=True)
+def isolated_travo_dir(tmp_path_factory: pytest.TempPathFactory) -> str:
+    """
+    Point all singletons at a session-scoped temp directory.
+    Runs once per pytest session; tears down on exit.
+    """
+    tmp = str(tmp_path_factory.mktemp("travo_test"))
+
+    # Override env before any module loads Settings
+    os.environ["FLY_O_MYTE_DB_PATH"] = str(Path(tmp) / "travo.db")
+    os.environ["FLY_O_MYTE_ANALYTICS_DIR"] = str(Path(tmp) / "analytics")
+    os.environ["FLY_O_MYTE_CONFIG_PATH"] = str(Path(tmp) / "config.yaml")
+    os.environ["FLY_O_MYTE_LOG_PATH"] = str(Path(tmp) / "travo.log")
+    os.environ["TEQUILA_API_KEY"] = ""
+    os.environ["ANTHROPIC_API_KEY"] = ""
+
+    # Clear lru_cache on get_settings so it re-reads the env vars
+    from fly_o_myte.config import get_settings
+    get_settings.cache_clear()
+
+    # Reset module-level singletons
+    import fly_o_myte.fees as fees_module
+    import fly_o_myte.calendar as calendar_module
+
+    fees_module._db = None
+    calendar_module._calendar = None
+
+    yield tmp
+
+    # Teardown — restore env and caches
+    for key in (
+        "FLY_O_MYTE_DB_PATH", "FLY_O_MYTE_ANALYTICS_DIR", "FLY_O_MYTE_CONFIG_PATH",
+        "FLY_O_MYTE_LOG_PATH", "TEQUILA_API_KEY", "ANTHROPIC_API_KEY",
+    ):
+        os.environ.pop(key, None)
+
+    from fly_o_myte.config import get_settings as _gs
+    _gs.cache_clear()
+    fees_module._db = None
+    calendar_module._calendar = None
 
 
 # ─── Database fixtures ─────────────────────────────────────────────────────────
@@ -23,7 +91,7 @@ from travo.recommender import SnapshotPoint
 
 @pytest.fixture
 def in_memory_engine():
-    """Ephemeral SQLite engine for each test — no disk state."""
+    """Ephemeral in-memory SQLite engine — isolated per test, no disk state."""
     engine = create_engine("sqlite:///:memory:")
     create_tables(engine)
     return engine
@@ -37,29 +105,34 @@ def db_session(in_memory_engine):
 
 @pytest.fixture
 def sample_trip(db_session) -> Trip:
-    """A minimal active trip for testing."""
-    from travo.db.sqlite import insert_trip
-    trip = Trip(
-        label="Test BNE-SYD",
-        origin="BNE",
-        destination="SYD",
-        depart_date="2026-07-20",
-        return_date="2026-07-27",
-        adults=2,
-        children_json='[{"name": "Mia", "dob": "2018-06-15"}]',
-        bags_per_person=1,
-        max_stops=1,
+    """A minimal active trip used across tracker and CLI tests."""
+    return insert_trip(
+        db_session,
+        Trip(
+            label="Test BNE-SYD",
+            origin="BNE",
+            destination="SYD",
+            depart_date="2026-07-20",
+            return_date="2026-07-27",
+            adults=2,
+            children_json='[{"name": "Mia", "dob": "2018-06-15"}]',
+            bags_per_person=1,
+            max_stops=1,
+        ),
     )
-    return insert_trip(db_session, trip)
 
 
-# ─── Recommender fixtures ──────────────────────────────────────────────────────
+# ─── Recommender snapshot helpers ─────────────────────────────────────────────
 
 
-def make_snapshots(costs: list[float], start: datetime | None = None) -> list[SnapshotPoint]:
-    """Create SnapshotPoint list with evenly-spaced timestamps."""
+def make_snapshots(
+    costs: list[float], start: datetime | None = None
+) -> list[SnapshotPoint]:
+    """
+    Build a list of SnapshotPoints with evenly-spaced daily timestamps.
+    Used directly by test functions (not a fixture) for conciseness.
+    """
     base = start or datetime(2026, 6, 1, 9, 0)
-    from datetime import timedelta
     return [
         SnapshotPoint(
             fetched_at=base + timedelta(days=i),
@@ -67,24 +140,6 @@ def make_snapshots(costs: list[float], start: datetime | None = None) -> list[Sn
         )
         for i, cost in enumerate(costs)
     ]
-
-
-@pytest.fixture
-def snapshots_rising():
-    """Prices rising steadily — supports book_now signal."""
-    return make_snapshots([1200, 1250, 1310, 1380, 1450])
-
-
-@pytest.fixture
-def snapshots_falling():
-    """Prices falling steadily — supports wait signal."""
-    return make_snapshots([1600, 1520, 1440, 1380, 1310])
-
-
-@pytest.fixture
-def snapshots_flat():
-    """Stable prices — typical monitor situation."""
-    return make_snapshots([1400, 1410, 1395, 1405, 1400])
 
 
 # ─── Airline fee fixtures ──────────────────────────────────────────────────────
@@ -128,8 +183,78 @@ def jetstar_fees() -> AirlineFees:
     )
 
 
-# ─── Mock Tequila response ─────────────────────────────────────────────────────
+# ─── Deterministic mock price source ──────────────────────────────────────────
+#
+# Use this instead of MagicMock() in tracker/integration tests.
+# Returns a fixed FlightOffer so cost calculations are predictable.
 
+
+class _StubTequilaSource:
+    """
+    Deterministic Pluggy plugin for tests.
+    Always returns one QF offer at a fixed price, regardless of search params.
+    Replace `price` in the constructor to test different cost scenarios.
+    """
+
+    def __init__(self, price: float = 149.0, airline: str = "QF") -> None:
+        self._price = price
+        self._airline = airline
+
+    @hookimpl
+    def source_name(self) -> str:
+        return "stub"
+
+    @hookimpl
+    def supports_route(self, origin: str, destination: str) -> bool:
+        return True
+
+    @hookimpl
+    def search_flights(
+        self,
+        origin: str,
+        destination: str,
+        depart_date: object,
+        return_date: object,
+        adults: int,
+        children_ages: list,
+        max_stops: object,
+        currency: str,
+    ) -> list[FlightOffer]:
+        return [
+            FlightOffer(
+                source="stub",
+                airline_code=self._airline,
+                flight_number=f"{self._airline}500",
+                base_fare_per_adult=self._price,
+                currency=currency,
+                stops=0,
+                departure_time="10:30",
+                arrival_time="12:10",
+                duration_minutes=100,
+                price_level_signal=None,
+                offer_raw={},
+            )
+        ]
+
+
+@pytest.fixture
+def stub_pm(request: pytest.FixtureRequest):
+    """
+    Build a plugin manager pre-loaded with _StubTequilaSource.
+    Accepts an optional indirect parameter dict: {"price": 200.0, "airline": "VA"}
+    Usage in tests:
+        def test_foo(stub_pm): ...
+        @pytest.mark.parametrize("stub_pm", [{"price": 200}], indirect=True)
+    """
+    from fly_o_myte.price_sources.hookspecs import build_plugin_manager
+
+    kwargs = getattr(request, "param", {})
+    pm = build_plugin_manager()
+    pm.register(_StubTequilaSource(**kwargs))
+    return pm
+
+
+# ─── Shared raw Tequila API response ──────────────────────────────────────────
 
 MOCK_TEQUILA_RESPONSE = {
     "data": [

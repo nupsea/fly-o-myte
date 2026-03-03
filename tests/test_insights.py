@@ -14,7 +14,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from travo.insights import TravelInsight, generate_insight
+from fly_o_myte.insights import TravelInsight, generate_insight
 
 
 class TestInsightSchema:
@@ -44,7 +44,7 @@ class TestInsightSchema:
 class TestGracefulDegradation:
     def test_no_llm_provider_returns_none(self):
         """When no LLM credentials are configured, generate_insight returns None."""
-        with patch("travo.insights._select_provider", return_value=None):
+        with patch("fly_o_myte.insights._select_provider", return_value=None):
             result = generate_insight(
                 origin="BNE",
                 destination="SYD",
@@ -60,8 +60,8 @@ class TestGracefulDegradation:
 
     def test_llm_error_returns_none(self):
         """LLM API error → graceful None, not exception."""
-        with patch("travo.insights._call_llm", side_effect=Exception("API timeout")):
-            with patch("travo.insights._select_provider", return_value="claude"):
+        with patch("fly_o_myte.insights._call_llm", side_effect=Exception("API timeout")):
+            with patch("fly_o_myte.insights._select_provider", return_value="claude"):
                 result = generate_insight(
                     origin="BNE",
                     destination="SYD",

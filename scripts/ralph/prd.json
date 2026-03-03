@@ -1,0 +1,360 @@
+{
+  "branchName": "ralph/fly-o-myte-phase1",
+  "product": "fly-o-myte",
+  "version": "0.1.0",
+  "tagline": "Family flight advisor — Book Now, Wait, or Monitor.",
+  "cliCommand": "fom",
+  "pythonPackage": "fly_o_myte",
+
+  "harnessEngineering": {
+    "principle": "Humans steer; agents execute.",
+    "systemOfRecord": "All decisions in docs/. Repository is the only shared memory.",
+    "enforceInvariantsMechanically": "Layer linter + make ci gate every change.",
+    "agentInstructions": "scripts/ralph/CLAUDE.md",
+    "qualityScore": "docs/QUALITY_SCORE.md"
+  },
+
+  "techStack": {
+    "language": "Python 3.11+",
+    "packageManager": "uv",
+    "cli": "Typer 0.12+",
+    "output": "Rich 13+",
+    "oltp": "SQLite via SQLModel",
+    "olap": "DuckDB + PyArrow + Parquet",
+    "config": "pydantic-settings 2+",
+    "http": "httpx + tenacity",
+    "pluginSystem": "Pluggy 1.4+",
+    "llm": "pydantic-ai 1.63+ (Claude haiku or Ollama)",
+    "testing": "pytest + pytest-httpx + syrupy + ruff + pyright",
+    "ciCommand": "make ci"
+  },
+
+  "layerRule": {
+    "description": "Forward-only imports enforced by tools/layer_linter.py",
+    "layers": {
+      "0": "price_sources.hookspecs — FlightOffer, plugin contracts",
+      "1": "config, db.sqlite, db.duckdb",
+      "2": "fees, calendar — static data loaders",
+      "3": "recommender, true_cost — pure logic, no I/O",
+      "4": "price_sources.tequila, price_sources.amadeus",
+      "5": "tracker, scout, analytics, insights, notifier — orchestration",
+      "6": "display — Rich output",
+      "7": "cli — Typer entry-point"
+    }
+  },
+
+  "stories": [
+    {
+      "id": "S01",
+      "title": "Project scaffold — package, pyproject.toml, CI",
+      "phase": 1,
+      "priority": 1,
+      "description": "Python package fly_o_myte with pyproject.toml, uv.lock, Makefile, layer linter, CI workflow.",
+      "acceptanceCriteria": [
+        "make ci passes (lint + typecheck + layer-lint + data-check + test)",
+        "uv sync --all-extras installs all dependencies",
+        "tools/layer_linter.py reports OK"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S02",
+      "title": "Embedded data — airlines.json + school_holidays.yaml",
+      "phase": 1,
+      "priority": 2,
+      "description": "QF, VA, JQ, ZL fee database in airlines.json. QLD 2025-2027 school terms in school_holidays.yaml.",
+      "acceptanceCriteria": [
+        "make data-check passes",
+        "QF bag1_fee=0, JQ bag1_fee=55 parsed correctly",
+        "QLD mid-year 2026 overlap detected for 2026-07-01 to 2026-07-10"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S03",
+      "title": "Config — pydantic-settings + family profile YAML",
+      "phase": 1,
+      "priority": 3,
+      "description": "Settings class reading env vars + .env file. FamilyProfile dataclass with child age calculation at travel date.",
+      "acceptanceCriteria": [
+        "FamilyProfile.child_ages_at(travel_date) returns correct ages",
+        "get_settings() is cached with lru_cache",
+        "config path overrideable via FLY_O_MYTE_CONFIG_PATH env var"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S04",
+      "title": "SQLite OLTP layer — Trip, PriceSnapshot, Recommendation",
+      "phase": 1,
+      "priority": 4,
+      "description": "SQLModel tables, in-memory engine for tests, CRUD helpers.",
+      "acceptanceCriteria": [
+        "insert_trip(), insert_snapshot(), insert_recommendation() all work",
+        "get_snapshots_for_trip() returns ordered rows",
+        "WAL mode enabled",
+        "set_trip_active() pauses/resumes trips"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S05",
+      "title": "Airline fee database + true cost calculator",
+      "phase": 1,
+      "priority": 5,
+      "description": "AirlineFees dataclass, fees.py loader, true_cost.py compute_true_cost().",
+      "acceptanceCriteria": [
+        "QF: 2 adults × $149 = $298 (zero bags/seats)",
+        "JQ: 2 adults × $99 + 2 bags × $55 × 2 legs + 2 seats × $8 × 2 legs = $450",
+        "Infant fee: Jetstar $35/sector, Qantas $0",
+        "Child age 8 = seated (not infant)",
+        "All assertions pass in test_true_cost.py"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S06",
+      "title": "School holiday calendar — overlap detection",
+      "phase": 1,
+      "priority": 6,
+      "description": "SchoolCalendar.check_overlap() returns HolidayContext for overlapping trips.",
+      "acceptanceCriteria": [
+        "QLD mid-year 2026 overlap correctly detected",
+        "Trip outside all holidays returns None",
+        "Partial overlap returns correct overlap_days count",
+        "Term periods (no label key) are correctly skipped"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S07",
+      "title": "Recommendation engine — decision matrix + regret risk",
+      "phase": 1,
+      "priority": 7,
+      "description": "10-rule decision matrix, confidence scaling, regret risk via RRM, pure functions no I/O.",
+      "acceptanceCriteria": [
+        "All 10 decision rules covered by tests",
+        "Confidence scales correctly from 1 to 10+ snapshots",
+        "Regret risk classified as low/medium/high",
+        "trend_slope() correct for rising, falling, flat series",
+        "All 35+ tests in test_recommender.py pass"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S08",
+      "title": "Price source plugin system — hookspecs + stub",
+      "phase": 1,
+      "priority": 8,
+      "description": "Pluggy hookspecs for FlightOffer, build_plugin_manager(), _StubTequilaSource in conftest.",
+      "acceptanceCriteria": [
+        "FlightOffer dataclass defined in hookspecs.py",
+        "_StubTequilaSource is a real Pluggy plugin (not MagicMock)",
+        "stub_pm fixture supports indirect parametrize for different prices/airlines",
+        "hookimpl marker is 'fly_o_myte'"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S09",
+      "title": "Tequila price source adapter",
+      "phase": 1,
+      "priority": 9,
+      "description": "TequilaPriceSource with httpx + tenacity retry. Parses Tequila /v2/search response into FlightOffer.",
+      "acceptanceCriteria": [
+        "Retries up to 3 times with exponential backoff on 5xx",
+        "Parses price, airline_code, stops, departure_time from Tequila response",
+        "Returns empty list on 404 or no results",
+        "Unit tests mock httpx with pytest-httpx"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S10",
+      "title": "Tracker — poll cycle orchestration",
+      "phase": 1,
+      "priority": 10,
+      "description": "poll_trip() and poll_all_active() fully wired. Integration tests with _StubTequilaSource.",
+      "acceptanceCriteria": [
+        "poll_trip() returns PriceSnapshot with correct true_family_cost",
+        "QF $149 × 2 adults = $298 assertion passes",
+        "JQ $99 × 2 adults + bags + seats = $450 assertion passes",
+        "Paused trips excluded from poll_all_active()",
+        "Error in one trip continues to next trip",
+        "All tests in test_tracker.py pass"
+      ],
+      "passes": true
+    },
+    {
+      "id": "DR-A",
+      "title": "Smoke test gate — basic CLI flow (watch / status / check / remove)",
+      "phase": 1,
+      "priority": 11,
+      "type": "demo-review",
+      "description": "Human runs scripts/ralph/smoke_test.sh and verifies all commands exit 0 with sensible output. Gate prevents proceeding until the full CLI lifecycle works against a real SQLite DB — no mocking.",
+      "reviewInstructions": [
+        "Run: bash scripts/ralph/smoke_test.sh",
+        "Verify all PASS lines present and 0 FAIL",
+        "Manually run: fom watch BNE SYD 2026-07-20 2026-07-27 --label 'Easter trip'",
+        "Run: fom status — should list the trip",
+        "Run: fom check 1 — should show 'no price history' gracefully (no crash)",
+        "Run: fom data-version — should list all 4 airlines with fees",
+        "Run: fom remove 1 --yes — should confirm removal",
+        "If all good, create scripts/ralph/demo-reviews/DR-A-approved.md"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S11",
+      "title": "LLM insights — Pydantic AI + graceful degradation",
+      "phase": 1,
+      "priority": 12,
+      "description": "TravelInsight Pydantic model, generate_insight() returning None when LLM unavailable.",
+      "acceptanceCriteria": [
+        "TravelInsight model validates correctly",
+        "Returns None when ANTHROPIC_API_KEY is empty",
+        "Returns None on LLM error (no crash)",
+        "Schema validation tests pass"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S12",
+      "title": "CLI — all 15 commands wired",
+      "phase": 1,
+      "priority": 13,
+      "description": "All fom commands implemented: setup, scout, watch, status, check, compare, history, refresh, insight, poll, analytics, pause, resume, remove, profile, data-version.",
+      "acceptanceCriteria": [
+        "fom --version outputs 'fly-o-myte 0.1.0'",
+        "fom --help shows usage",
+        "fom data-version shows QF and Qantas in output",
+        "fom status with no trips exits 0",
+        "fom poll with no trips exits 0",
+        "fom pause <nonexistent> shows error message"
+      ],
+      "passes": true
+    },
+    {
+      "id": "S13",
+      "title": "Tequila adapter unit tests",
+      "phase": 1,
+      "priority": 14,
+      "description": "pytest-httpx mocking for TequilaPriceSource. Tests for happy path, 5xx retry, empty results, parse errors.",
+      "acceptanceCriteria": [
+        "Happy path: MOCK_TEQUILA_RESPONSE parses to correct FlightOffer",
+        "Empty data array returns []",
+        "HTTP 500 triggers retry (assert 3 calls made)",
+        "No real network calls in test suite"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S14",
+      "title": "Notifier — wire SMTP into poll cycle",
+      "phase": 1,
+      "priority": 15,
+      "description": "Wire send_alert() into poll_trip() when decision == 'book_now' and threshold crossed. Add unit test.",
+      "acceptanceCriteria": [
+        "Alert sent when decision=book_now and true_family_cost <= alert_threshold_aud",
+        "No alert when send_alerts=False (test mode)",
+        "SMTP credentials missing → logs warning, does not crash",
+        "email_sent=1 recorded in Recommendation row after send"
+      ],
+      "passes": false
+    },
+    {
+      "id": "DR-B",
+      "title": "Smoke test gate — poll cycle + recommendation output",
+      "phase": 1,
+      "priority": 16,
+      "type": "demo-review",
+      "description": "Human verifies the full poll cycle produces a visible recommendation with a sensible rationale. This gate exists because poll → snapshot → recommend → display is the core value proposition — it must work end-to-end before snapshot baselines are locked in.",
+      "reviewInstructions": [
+        "Run: bash scripts/ralph/smoke_test.sh — must still pass 0 failures",
+        "In a separate shell with the real app: fom watch BNE SYD 2026-07-20 2026-07-27 --label 'Test'",
+        "Run: fom poll --dry-run — verify it lists the trip without crashing",
+        "Manually insert a snapshot via Python if poll requires a real API key:",
+        "  uv run python -c \"from fly_o_myte.db.sqlite import *; ...\"",
+        "OR: add TEQUILA_API_KEY to .env and run fom poll once",
+        "Run: fom check 1 — verify recommendation panel renders (decision + rationale visible)",
+        "Run: fom history 1 — verify sparkline renders without error",
+        "Run: fom status — verify trip appears with correct decision badge",
+        "Rationale text must be a complete English sentence (not 'None' or empty)",
+        "If all good, create scripts/ralph/demo-reviews/DR-B-approved.md"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S15",
+      "title": "Syrupy snapshot tests for Rich output",
+      "phase": 1,
+      "priority": 17,
+      "description": "Snapshot tests for fom status, fom check, fom compare using Syrupy. Establishes output baseline.",
+      "type": "demo-review",
+      "acceptanceCriteria": [
+        "fom status output snapshot created and committed",
+        "fom check output snapshot created and committed",
+        "fom compare output snapshot created and committed",
+        "pytest --snapshot-update regenerates snapshots correctly"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S16",
+      "title": "DuckDB analytics layer — incremental Parquet aggregation",
+      "phase": 2,
+      "priority": 20,
+      "description": "Implement analytics.py: write snapshot to Parquet after poll, recompute route_stats, DuckDB sqlite_scan bridge.",
+      "acceptanceCriteria": [
+        "New snapshot appended to snapshots Parquet after poll_trip()",
+        "route_stats Parquet recomputed for affected origin/destination",
+        "DuckDB sqlite_scan query returns joined SQLite + Parquet rows",
+        "Analytics update < 200ms per poll",
+        "Pandera schema validation on Parquet output"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S17",
+      "title": "LLM insights golden fixture evaluation",
+      "phase": 2,
+      "priority": 21,
+      "description": "10 golden fixtures in tests/fixtures/insights/. LLM-as-judge evaluation. Pass threshold 80%.",
+      "acceptanceCriteria": [
+        "10+ fixture JSON files in tests/fixtures/insights/",
+        "Each fixture has input (route, snapshots, news) and expected criteria",
+        "LLM-as-judge evaluation scores each insight",
+        "Aggregate pass rate >= 80% causes make eval to exit 0"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S18",
+      "title": "Scout command — date range scouting with tests",
+      "phase": 2,
+      "priority": 22,
+      "description": "Implement scout_date_windows() fully. Add integration tests using _StubTequilaSource.",
+      "acceptanceCriteria": [
+        "scout BNE SYD --month jul-2026 returns DateWindow list",
+        "School holiday windows flagged with higher estimated cost",
+        "Output ranked cheapest-first",
+        "Test coverage > 80% for scout.py"
+      ],
+      "passes": false
+    },
+    {
+      "id": "S19",
+      "title": "Multi-state school calendar — NSW, VIC, WA, SA, TAS, NT, ACT",
+      "phase": 2,
+      "priority": 23,
+      "description": "Populate school_holidays.yaml with 2025-2027 data for all Australian states.",
+      "acceptanceCriteria": [
+        "All 7 states present in YAML with 2025-2027 data",
+        "cal.supported_states() returns all 8 states (QLD + 7)",
+        "make data-check passes",
+        "test_calendar.py extended with tests for each state"
+      ],
+      "passes": false
+    }
+  ]
+}

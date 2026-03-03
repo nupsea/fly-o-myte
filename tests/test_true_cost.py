@@ -11,7 +11,7 @@ from datetime import date
 
 import pytest
 
-from travo.true_cost import compute_true_cost, compute_family_score
+from fly_o_myte.true_cost import compute_true_cost, compute_family_score
 
 
 class TestQantasCost:

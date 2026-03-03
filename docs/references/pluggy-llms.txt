@@ -1,0 +1,54 @@
+PLUGGY REFERENCE — Fly-O-Myte price source plugin system
+
+# Core concepts
+hookspec   = declares the hook interface (what plugins can implement)
+hookimpl   = marks a method as implementing a hook
+PluginManager = registers plugins and calls hooks
+
+# Hook specification (hookspecs.py)
+import pluggy
+hookspec = pluggy.HookspecMarker("fly_o_myte")
+hookimpl = pluggy.HookimplMarker("fly_o_myte")
+
+class PriceSourceSpec:
+    @hookspec
+    def search_flights(self, origin, destination, ...) -> list[FlightOffer]: ...
+    @hookspec
+    def source_name(self) -> str: ...
+    @hookspec
+    def supports_route(self, origin, destination) -> bool: ...
+
+# Plugin implementation (tequila.py)
+class TequilaPriceSource:
+    @hookimpl
+    def source_name(self) -> str: return "tequila"
+    @hookimpl
+    def supports_route(self, origin, destination) -> bool: return True
+    @hookimpl
+    def search_flights(self, ...) -> list[FlightOffer]: ...
+
+# Plugin manager setup (hookspecs.py)
+def build_plugin_manager() -> pluggy.PluginManager:
+    pm = pluggy.PluginManager("fly_o_myte")
+    pm.add_hookspecs(PriceSourceSpec)
+    return pm
+
+# Registering a plugin
+pm = build_plugin_manager()
+pm.register(TequilaPriceSource(api_key="..."))
+
+# Calling a hook (firstresult=True returns first non-None result)
+result = pm.hook.search_flights(origin="BNE", destination="SYD", ...)
+
+# Testing with a stub plugin
+class _StubTequilaSource:
+    @hookimpl
+    def source_name(self) -> str: return "stub"
+    @hookimpl
+    def supports_route(self, origin, destination) -> bool: return True
+    @hookimpl
+    def search_flights(self, **kwargs) -> list[FlightOffer]:
+        return [FlightOffer(source="stub", airline_code="QF", base_fare_per_adult=149.0, ...)]
+
+pm = build_plugin_manager()
+pm.register(_StubTequilaSource())

@@ -1,0 +1,82 @@
+## Codebase Patterns
+
+These patterns are maintained here and updated after each story. Read BEFORE implementing.
+
+### Package & Commands
+- Package: `fly_o_myte` (underscore). PyPI name: `fly-o-myte`. CLI command: `fom`.
+- All `uv run` commands must prefix with `uv run`. Never bare `python` or `pytest`.
+- Entry point: `fly_o_myte.cli:app` (Typer app with `name="fom"`).
+
+### Layer Rule (enforced by tools/layer_linter.py)
+- 0: hookspecs.py — Pluggy specs, FlightOffer dataclass
+- 1: config.py, db/sqlite.py, db/duckdb.py
+- 2: fees.py, calendar.py — HolidayContext defined HERE (not in recommender)
+- 3: true_cost.py, recommender.py — imports from 0,1,2 only
+- 4: price_sources/tequila.py, price_sources/amadeus.py
+- 5: tracker.py, scout.py, analytics.py, insights.py, notifier.py
+- 6: display.py
+- 7: cli.py
+- Run `uv run python tools/layer_linter.py` to verify. Must be clean before every commit.
+
+### Key Gotchas
+- Jetstar infant fee is PER SECTOR ($35 × n_sectors), NOT per journey.
+- Child ages computed at travel date (not today): use `FamilyProfile.child_ages_at(depart_date)`.
+- `calendar.py` YAML has both `term_1/term_2` (no `label` key) and break entries (have `label`).
+  Skip term periods: `if "label" not in break_data: continue`.
+- Recommender: do NOT include `current_true_cost` in the historical snapshots list when testing
+  deviation rules — it shifts the rolling average.
+- Canonical `bag1_fee` / `bag1_fee_lite` keys in `airlines.json` must match what `_parse_airline`
+  expects. Airline-specific keys (e.g. `bag1_fee_starter`) are documentation only.
+- `conftest.py` sets env vars `FLY_O_MYTE_*` (not `TRAVO_*`).
+
+### Testing
+- Stubs: use `_StubTequilaSource` (real Pluggy plugin) in conftest.py, not MagicMock.
+- NEVER patch `fly_o_myte.*` internals. Only mock at process boundaries:
+  httpx calls via pytest-httpx, SMTP via smtplib mock. Internal patches prove nothing.
+- CLI tests: do NOT monkeypatch env vars per-test — get_settings() is lru_cache'd and
+  ignores per-test env changes. The session-scoped `isolated_travo_dir` fixture (autouse)
+  already points all singletons at a temp dir. Remove any lingering `TRAVO_DB_PATH` refs.
+- CLI exit code: `no_args_is_help=True` exits with 2, not 0 — assert `exit_code in (0, 2)`.
+- Snapshot tests: `pytest --snapshot-update` to regenerate Syrupy baselines.
+- All 80 tests pass: `uv run make ci`.
+- Smoke test (real CLI, no pytest): `bash scripts/ralph/smoke_test.sh` — run after any
+  change to tracker.py, cli.py, or display.py.
+- Manual stub snapshots for DR-B gate: `uv run python scripts/ralph/insert_stub_snapshot.py 1`
+
+### Data Files
+- `fly_o_myte/data/airlines.json` — version `2026-01`, four carriers: QF, VA, JQ, ZL.
+- `fly_o_myte/data/school_holidays.yaml` — QLD 2025-2027 complete. NSW/VIC etc. Phase 2.
+
+### Analytics / DuckDB
+- DuckDB file: `~/.fly-o-myte/analytics/fly_o_myte_analytics.duckdb`.
+- Phase 2 only — stub implementations exist but are not wired in tracker.py.
+
+---
+
+## 2026-03-03T00:00:00+10:00 - S01 through S12 - Phase 1 Baseline
+- Implemented: Full Phase 1 codebase — all source modules, tests, Makefile, CI config, docs/,
+  scripts/ralph/ harness. 80 tests passing. Layer linter clean.
+- Files changed:
+  - fly_o_myte/__init__.py, cli.py, config.py, display.py, notifier.py
+  - fly_o_myte/calendar.py, fees.py, true_cost.py, recommender.py
+  - fly_o_myte/tracker.py, scout.py, analytics.py, insights.py
+  - fly_o_myte/db/sqlite.py, db/duckdb.py
+  - fly_o_myte/price_sources/hookspecs.py, tequila.py, amadeus.py
+  - fly_o_myte/data/airlines.json, school_holidays.yaml
+  - tests/ (all 80 tests)
+  - tools/layer_linter.py
+  - pyproject.toml, Makefile, .github/workflows/ci.yml, cd.yml
+  - docs/ARCHITECTURE.md, docs/design-docs/core-beliefs.md, docs/QUALITY_SCORE.md
+  - docs/RELIABILITY.md, docs/SECURITY.md, docs/exec-plans/tech-debt-tracker.md
+  - docs/references/ (uv, pluggy, sqlmodel, pydantic-ai)
+  - docs/generated/db-schema.md
+  - scripts/ralph/ralph.sh, CLAUDE.md, prd.json
+- Learnings:
+  - HolidayContext belongs in calendar.py (layer 2), not recommender.py (layer 3).
+    The layer linter caught this violation before it landed.
+  - airlines.json used airline-specific key names (bag1_fee_starter). Added canonical
+    bag1_fee / bag1_fee_lite keys so _parse_airline can reliably look them up.
+  - YAML school holiday data has term periods (no label) mixed with break periods (have label).
+    Added guard: if "label" not in break_data: continue.
+  - README.md must not be referenced in pyproject.toml if the file doesn't exist.
+---

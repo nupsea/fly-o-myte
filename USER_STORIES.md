@@ -51,6 +51,9 @@
 | US-042 | Amadeus as international flight source | Price Intelligence | 3 |
 | US-043 | International booking window intelligence | Recommendations | 3 |
 | US-044 | Cross-country price comparison for same destination | Analytics | 3 |
+| US-045 | Async / batched polling for scaling | Trip Tracking | 2 |
+| US-046 | Dynamic iCal school holiday fetching | Holiday Awareness | 2 |
+| US-047 | Recommender robustness to intra-day refreshes | Recommendations | 1 |
 
 ---
 
@@ -667,5 +670,44 @@ As a user, I want Amadeus to supply both flight prices and historical price leve
 - `price_level_signal` is populated from Amadeus `Flight Price Analysis` endpoint (LOW/TYPICAL/HIGH)
 - Amadeus credentials stored in env vars (AMADEUS_CLIENT_ID, AMADEUS_CLIENT_SECRET)
 - Without Amadeus credentials, international routes still work — price_level_signal is NULL
+
+---
+
+## Epic: Architecture & Scaling
+
+### US-045 — Async / batched polling for scaling
+**Phase 2**
+
+As a power user tracking dozens or hundreds of trips, I want the scheduled cron poll to run efficiently and without hitting API rate limits so that I don't experience timeouts or multi-hour poll cycles.
+
+**Acceptance criteria:**
+- `poll_all_active` uses an asynchronous thread pool or `asyncio` with `httpx.AsyncClient` to fetch prices concurrently.
+- Concurrency limit is configurable (e.g. max 5 simultaneous requests).
+- Implements a global rate limiter to respect Tequila/Amadeus limits.
+- The DB writes are still serialized or batched safely into SQLite.
+
+---
+
+### US-046 — Dynamic iCal school holiday fetching
+**Phase 2**
+
+As an admin, I want school holidays to be fetched dynamically from public iCal feeds (or an API) so that the embedded `school_holidays.yaml` doesn't become stale and require constant package updates.
+
+**Acceptance criteria:**
+- `travo` can fetch and cache standard `.ics` format calendars.
+- State calendars are auto-updated once every 30 days.
+- User can override the default feed with a custom school calendar URL.
+
+---
+
+### US-047 — Recommender robustness to intra-day refreshes
+**Phase 1**
+
+As a user, I want manual `travo refresh` runs to not mathematically skew the recommendation average so that checking the price multiple times in one day doesn't artificially flatten the trendline.
+
+**Acceptance criteria:**
+- The recommendation engine's `rolling_average` and `trend_slope` calculations group snapshots by date.
+- Multiple snapshots on the same day are collapsed to just the latest value for that day before performing statistical calculations.
+- Data richness confidence scaling still appropriately reflects the number of *distinct days* of history rather than raw clicks.
 
 ---

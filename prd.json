@@ -1,0 +1,871 @@
+{
+  "meta": {
+    "product": "travo",
+    "version": "0.1.0",
+    "tagline": "Family flight advisor — Book Now, Wait, or Monitor.",
+    "description": "A personal CLI tool for Australian families that tracks flight prices, computes the true all-in family cost, and delivers one clear booking recommendation per trip.",
+    "target_user": "Australian family (2 adults + 1–4 children) planning 2–8 domestic or international trips per year",
+    "install_method": "uv tool install travo",
+    "phases": 3,
+    "created": "2026-03-03",
+    "design_doc": "docs/ARCHITECTURE.md"
+  },
+
+  "principles": [
+    {
+      "id": "P1",
+      "name": "One Answer",
+      "statement": "Every command ends with a clear recommendation. If you want to browse, open Google Flights."
+    },
+    {
+      "id": "P2",
+      "name": "Family-First Arithmetic",
+      "statement": "True cost = base fare + bags + seat selection + infant fees. Never show headline fares alone."
+    },
+    {
+      "id": "P3",
+      "name": "Australian-Native",
+      "statement": "Built for QLD/AU school terms, AU airlines, AUD pricing. Not a US tool retrofitted for Australia."
+    },
+    {
+      "id": "P4",
+      "name": "Quiet Unless Actionable",
+      "statement": "Morning digest: 5 lines. Only highlight trips that need action today."
+    },
+    {
+      "id": "P5",
+      "name": "Local-First",
+      "statement": "All decision logic runs locally. No cloud dependency for the recommendation engine."
+    }
+  ],
+
+  "features": [
+    {
+      "id": "F-001",
+      "title": "First-run setup wizard",
+      "epic": "Setup",
+      "phase": 1,
+      "priority": "P0",
+      "status": "planned",
+      "user_story": "US-001",
+      "description": "Interactive CLI wizard that creates ~/.travo/config.yaml with family profile.",
+      "acceptance_criteria": [
+        "Prompts for adults, children (name + DOB), origin airport, state, bags, max stops, alert email",
+        "Validates IATA airport codes (3-letter uppercase)",
+        "Writes valid ~/.travo/config.yaml on completion",
+        "Re-running shows existing values as defaults (idempotent)",
+        "Prints next-step instructions including crontab setup"
+      ],
+      "dependencies": [],
+      "command": "travo setup",
+      "module": "travo/cli.py"
+    },
+    {
+      "id": "F-002",
+      "title": "Family profile view",
+      "epic": "Setup",
+      "phase": 1,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-002",
+      "description": "Display the loaded family profile including dynamically-computed child ages.",
+      "acceptance_criteria": [
+        "Shows adults, children (name + age as of today), origin, state, bags, blocked airlines",
+        "Child ages computed from DOB at display time, not stored statically",
+        "Note shown when a child crosses age-2 boundary before travel date"
+      ],
+      "dependencies": ["F-001"],
+      "command": "travo profile",
+      "module": "travo/cli.py"
+    },
+    {
+      "id": "F-003",
+      "title": "Data version check",
+      "epic": "Setup",
+      "phase": 1,
+      "priority": "P2",
+      "status": "planned",
+      "user_story": "US-005",
+      "description": "Show embedded airline database and school holiday data freshness.",
+      "acceptance_criteria": [
+        "Shows data version, last updated date, and list of airline IATA codes",
+        "Shows which states have school holiday data",
+        "Warns if data version is older than 180 days",
+        "No network call — reads from embedded JSON/YAML only"
+      ],
+      "dependencies": [],
+      "command": "travo data-version",
+      "module": "travo/cli.py"
+    },
+    {
+      "id": "F-004",
+      "title": "Date window scouting",
+      "epic": "Date Scouting",
+      "phase": 1,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-006",
+      "description": "Sample cheapest travel windows across a requested month before committing to dates.",
+      "acceptance_criteria": [
+        "travo scout BNE SYD --month jul-2026 returns ≥8 sampled date windows",
+        "Output table: date range, true family cost, airline, stops, depart time, holiday flag",
+        "Sorted by true family cost ascending",
+        "School holiday periods highlighted",
+        "Read-only — no database writes"
+      ],
+      "dependencies": ["F-012", "F-010"],
+      "command": "travo scout",
+      "module": "travo/scout.py"
+    },
+    {
+      "id": "F-005",
+      "title": "Flexible date scouting",
+      "epic": "Date Scouting",
+      "phase": 1,
+      "priority": "P2",
+      "status": "planned",
+      "user_story": "US-007",
+      "description": "Scout ±N days around specific dates to find pricing differences from minor date shifts.",
+      "acceptance_criteria": [
+        "--flex N shows all ±N day combinations around the base dates",
+        "True family cost and holiday overlap per combination",
+        "Best option highlighted (lowest cost + no holiday overlap)",
+        "Maximum ±7 day flexibility supported"
+      ],
+      "dependencies": ["F-004"],
+      "command": "travo scout --depart ... --return ... --flex N",
+      "module": "travo/scout.py"
+    },
+    {
+      "id": "F-006",
+      "title": "Start tracking a trip",
+      "epic": "Trip Tracking",
+      "phase": 1,
+      "priority": "P0",
+      "status": "planned",
+      "user_story": "US-008",
+      "description": "Create a trip record and trigger an immediate first price fetch.",
+      "acceptance_criteria": [
+        "Creates Trip row in SQLite with is_active=1",
+        "Triggers immediate price fetch on watch (not deferred)",
+        "Confirms trip ID and label",
+        "Warns on duplicate (same origin + destination + depart_date)",
+        "--adults, --bags, --max-stops flags override family profile for this trip"
+      ],
+      "dependencies": ["F-012"],
+      "command": "travo watch",
+      "module": "travo/cli.py + travo/tracker.py"
+    },
+    {
+      "id": "F-007",
+      "title": "Pause and resume tracking",
+      "epic": "Trip Tracking",
+      "phase": 1,
+      "priority": "P2",
+      "status": "planned",
+      "user_story": "US-009",
+      "description": "Pause or resume price tracking for a trip without losing history.",
+      "acceptance_criteria": [
+        "pause sets is_active=0; resume sets is_active=1",
+        "status digest excludes paused trips by default",
+        "status --all shows paused trips with PAUSED label",
+        "Pausing does not delete price history"
+      ],
+      "dependencies": ["F-006"],
+      "command": "travo pause <id> / travo resume <id>",
+      "module": "travo/cli.py"
+    },
+    {
+      "id": "F-008",
+      "title": "Remove a trip",
+      "epic": "Trip Tracking",
+      "phase": 1,
+      "priority": "P2",
+      "status": "planned",
+      "user_story": "US-010",
+      "description": "Permanently delete a trip and all its snapshots and recommendations.",
+      "acceptance_criteria": [
+        "Asks for confirmation showing trip label and snapshot count",
+        "Cascades: deletes price_snapshots + recommendations for trip_id",
+        "--yes flag skips confirmation",
+        "Non-existent ID exits with code 1"
+      ],
+      "dependencies": ["F-006"],
+      "command": "travo remove <id>",
+      "module": "travo/cli.py + travo/db/sqlite.py"
+    },
+    {
+      "id": "F-009",
+      "title": "Manual price refresh",
+      "epic": "Trip Tracking",
+      "phase": 1,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-012",
+      "description": "Trigger an immediate price fetch for a specific trip without waiting for the cron poll.",
+      "acceptance_criteria": [
+        "Fetches price and saves new snapshot",
+        "Prints new true family cost and change vs previous snapshot",
+        "On API failure: logs error, retains last snapshot",
+        "Respects tenacity retry (3 attempts, exponential backoff)"
+      ],
+      "dependencies": ["F-006"],
+      "command": "travo refresh <id>",
+      "module": "travo/cli.py + travo/tracker.py"
+    },
+    {
+      "id": "F-010",
+      "title": "Scheduled cron poll",
+      "epic": "Trip Tracking",
+      "phase": 1,
+      "priority": "P0",
+      "status": "planned",
+      "user_story": "US-013",
+      "description": "Poll all active trips — the cron target that builds up price history automatically.",
+      "acceptance_criteria": [
+        "Polls all is_active=1 trips sequentially",
+        "One-line summary per trip: label, cost, change, recommendation",
+        "Error on one trip logs and continues (does not abort)",
+        "Exits with code 0 even on partial errors",
+        "--dry-run lists trips that would be polled without API calls",
+        "--no-email suppresses alerts for that run"
+      ],
+      "dependencies": ["F-006"],
+      "command": "travo poll",
+      "module": "travo/tracker.py"
+    },
+    {
+      "id": "F-011",
+      "title": "Morning status digest",
+      "epic": "Display",
+      "phase": 1,
+      "priority": "P0",
+      "status": "planned",
+      "user_story": "US-014",
+      "description": "Concise digest showing only trips that need action today.",
+      "acceptance_criteria": [
+        "Shows only book_now or wait trips by default",
+        "book_now trips appear at top, formatted prominently",
+        "When nothing needs action: prints quiet 'all fine' message",
+        "Runs in <1s — reads from database only, no API calls",
+        "--all flag shows every trip including paused"
+      ],
+      "dependencies": ["F-006"],
+      "command": "travo status",
+      "module": "travo/display.py"
+    },
+    {
+      "id": "F-012",
+      "title": "True family cost calculator",
+      "epic": "Price Intelligence",
+      "phase": 1,
+      "priority": "P0",
+      "status": "planned",
+      "user_story": "US-018",
+      "description": "Compute the full cost a family actually pays: base fare + bags + seat selection + infant fees.",
+      "acceptance_criteria": [
+        "Calculates: base (adults) + base (children at 90% adult fare) + bags + seats + infant",
+        "Bag fees: per person, per leg",
+        "Seat fees: per seated pax, per leg",
+        "Infant (age <2): Jetstar $35 per sector, Qantas $0 domestic",
+        "Child (age 2–11): needs seat; no seat purchased for lap infant",
+        "Ages computed at travel date from DOB, not at search time"
+      ],
+      "dependencies": [],
+      "module": "travo/true_cost.py"
+    },
+    {
+      "id": "F-013",
+      "title": "Airline fee database",
+      "epic": "Price Intelligence",
+      "phase": 1,
+      "priority": "P0",
+      "status": "planned",
+      "user_story": "US-019",
+      "description": "Static embedded JSON database of domestic Australian airline fees and family ratings.",
+      "acceptance_criteria": [
+        "Covers QF, VA, JQ, ZL, TL with bag, seat, infant, and family_score fields",
+        "Conservative default returned for unknown IATA codes",
+        "Jetstar infant fee field is per-sector (infant_lap_fee_per_sector_aud)",
+        "Virgin lite vs choice fare tiers both represented",
+        "data-version shows version + last_updated"
+      ],
+      "dependencies": [],
+      "module": "travo/fees.py + travo/data/airlines.json"
+    },
+    {
+      "id": "F-014",
+      "title": "Full trip recommendation",
+      "epic": "Recommendations",
+      "phase": 1,
+      "priority": "P0",
+      "status": "planned",
+      "user_story": "US-023",
+      "description": "Single-trip detail: itemised cost, rolling average, trend, recommendation, regret risk, rationale.",
+      "acceptance_criteria": [
+        "Shows one of: BOOK NOW / WAIT / MONITOR",
+        "Confidence as percentage, data richness note",
+        "Itemised true cost breakdown",
+        "Rolling average and trend (AUD/day)",
+        "Regret risk: LOW / MEDIUM / HIGH",
+        "Expected AUD regret for book vs wait decisions",
+        "With <3 snapshots: always MONITOR with 'building history' rationale"
+      ],
+      "dependencies": ["F-006", "F-012", "F-015"],
+      "command": "travo check <id>",
+      "module": "travo/recommender.py + travo/display.py"
+    },
+    {
+      "id": "F-015",
+      "title": "Recommendation engine",
+      "epic": "Recommendations",
+      "phase": 1,
+      "priority": "P0",
+      "status": "planned",
+      "user_story": "US-023",
+      "description": "Pure-function decision engine: 10-rule priority matrix, trend slope, regret risk, data richness scaling.",
+      "acceptance_criteria": [
+        "10-rule priority matrix (days_to_departure, price_level_signal, deviation_pct, trend, holiday)",
+        "confidence = base × (0.5 + 0.5 × min(n/10, 1.0))",
+        "trend_slope via least-squares linear regression, no numpy",
+        "Regret: p_drop × volatility × 1.5 for book; p_rise × volatility × 1.5 for wait",
+        "All math in pure Python stdlib",
+        "School holiday raises wait threshold when dates are fixed"
+      ],
+      "dependencies": [],
+      "module": "travo/recommender.py"
+    },
+    {
+      "id": "F-016",
+      "title": "Side-by-side trip comparison",
+      "epic": "Display",
+      "phase": 1,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-016",
+      "description": "Compare 2–3 trips in a table with best value highlighted per column.",
+      "acceptance_criteria": [
+        "Columns: label, true cost, airline, stops, depart time, recommendation, family score",
+        "Best value per column highlighted",
+        "2–3 trips maximum",
+        "Snapshot-tested via Syrupy"
+      ],
+      "dependencies": ["F-014"],
+      "command": "travo compare <id1> <id2> [id3]",
+      "module": "travo/display.py"
+    },
+    {
+      "id": "F-017",
+      "title": "Price history sparkline",
+      "epic": "Display",
+      "phase": 1,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-017",
+      "description": "Chronological price history table with Unicode block sparkline.",
+      "acceptance_criteria": [
+        "Table: date, true cost, change from previous, price level signal, airline, source",
+        "Unicode sparkline of price trend (block characters)",
+        "Most recent at bottom",
+        "--limit N shows last N snapshots (default 30)"
+      ],
+      "dependencies": ["F-006"],
+      "command": "travo history <id>",
+      "module": "travo/display.py"
+    },
+    {
+      "id": "F-018",
+      "title": "QLD school holiday awareness",
+      "epic": "Holiday Awareness",
+      "phase": 1,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-021",
+      "description": "Flag school holiday overlap in every trip evaluation using embedded YAML data.",
+      "acceptance_criteria": [
+        "Detects QLD 2025–2027 holiday periods from embedded YAML",
+        "Returns overlap_days, is_fully_within, label",
+        "Date shift tip shown for partial overlaps",
+        "No network call — embedded data only"
+      ],
+      "dependencies": [],
+      "module": "travo/calendar.py + travo/data/school_holidays.yaml"
+    },
+    {
+      "id": "F-019",
+      "title": "Book-now email alert",
+      "epic": "Notifications",
+      "phase": 1,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-025",
+      "description": "Send email when poll produces a book_now recommendation not yet alerted.",
+      "acceptance_criteria": [
+        "Sent automatically at end of travo poll for book_now + email_sent=0",
+        "Subject: [Travo] Book Now — {label}",
+        "Body includes route, cost, confidence, regret risk, rationale",
+        "email_sent=1 set after send to prevent duplicate alerts",
+        "New book_now recommendation row generates a new alert"
+      ],
+      "dependencies": ["F-010"],
+      "module": "travo/notifier.py"
+    },
+    {
+      "id": "F-020",
+      "title": "Pluggy price source plugin system",
+      "epic": "Extensibility",
+      "phase": 1,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-038",
+      "description": "Pluggy-based plugin architecture so new price sources can be added without touching core logic.",
+      "acceptance_criteria": [
+        "hookspecs: source_name(), supports_route(), search_flights()",
+        "PriceSourceError raised on connection/auth failures",
+        "build_plugin_manager() returns configured manager",
+        "Multiple sources registered; first successful result used per route"
+      ],
+      "dependencies": [],
+      "module": "travo/price_sources/hookspecs.py"
+    },
+    {
+      "id": "F-021",
+      "title": "Tequila API adapter",
+      "epic": "Extensibility",
+      "phase": 1,
+      "priority": "P0",
+      "status": "planned",
+      "user_story": "US-038",
+      "description": "Kiwi.com Tequila API Pluggy plugin — primary domestic Australian flight source.",
+      "acceptance_criteria": [
+        "Implements all three hookspec methods",
+        "supports_route() returns True for all routes",
+        "tenacity retry: 3 attempts, exponential backoff 2–10s",
+        "Parses price, airline_code, departure_time, stops, duration_minutes",
+        "PriceSourceError on HTTP 4xx/5xx or connection error"
+      ],
+      "dependencies": ["F-020"],
+      "module": "travo/price_sources/tequila.py"
+    },
+    {
+      "id": "F-022",
+      "title": "Family flight score",
+      "epic": "Price Intelligence",
+      "phase": 1,
+      "priority": "P2",
+      "status": "planned",
+      "user_story": "US-019",
+      "description": "Composite 0–100 score for ranking flights by family suitability beyond true cost.",
+      "acceptance_criteria": [
+        "Weights: true cost (40%) + stops (25%) + departure time quality (15%) + airline family rating (20%)",
+        "Nonstop = 100 stops score; 1 stop = 60; 2+ = 20",
+        "Departure within preferred window = 100 time score; penalty 15pts per hour outside window",
+        "Score stored in price_snapshots.family_score"
+      ],
+      "dependencies": ["F-012", "F-013"],
+      "module": "travo/true_cost.py"
+    },
+    {
+      "id": "F-023",
+      "title": "SQLite persistence layer",
+      "epic": "Storage",
+      "phase": 1,
+      "priority": "P0",
+      "status": "planned",
+      "user_story": "US-008",
+      "description": "SQLite with WAL mode for concurrent-safe writes from cron + manual CLI.",
+      "acceptance_criteria": [
+        "Tables: trips, price_snapshots, recommendations",
+        "WAL mode enabled via PRAGMA journal_mode=WAL",
+        "Foreign keys enabled via PRAGMA foreign_keys=ON",
+        "delete_trip cascades to snapshots + recommendations",
+        "get_unsent_book_now_recs() for email alert selection"
+      ],
+      "dependencies": [],
+      "module": "travo/db/sqlite.py"
+    },
+    {
+      "id": "F-024",
+      "title": "Amadeus price level signal integration",
+      "epic": "Price Intelligence",
+      "phase": 2,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-036",
+      "description": "Amadeus Flight Price Analysis provides LOW/TYPICAL/HIGH market benchmark signal.",
+      "acceptance_criteria": [
+        "AmadeusPriceSource registered as secondary plugin",
+        "price_level_signal populated from Amadeus when available",
+        "Graceful degradation when Amadeus credentials not set",
+        "Signal shown in travo check output: 'Market signal: LOW (below market average)'"
+      ],
+      "dependencies": ["F-020"],
+      "module": "travo/price_sources/amadeus.py"
+    },
+    {
+      "id": "F-025",
+      "title": "DuckDB + Parquet analytics layer",
+      "epic": "Analytics",
+      "phase": 2,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-029",
+      "description": "Incremental analytics: snapshots → Parquet → route stats recomputed after each poll.",
+      "acceptance_criteria": [
+        "Quarterly-partitioned Parquet for snapshots",
+        "Route stats: avg/min/max/p25/p75, school holiday premium, trend",
+        "Updated in-process after each poll (<100ms)",
+        "travo analytics --rebuild performs full rebuild from SQLite",
+        "DuckDB sqlite_scan extension for hybrid SQLite+Parquet queries"
+      ],
+      "dependencies": ["F-010", "F-023"],
+      "module": "travo/analytics.py + travo/db/duckdb.py"
+    },
+    {
+      "id": "F-026",
+      "title": "LLM contextual insights",
+      "epic": "Insights",
+      "phase": 2,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-031",
+      "description": "3–4 sentence LLM explanation of why prices are at their current level for a route.",
+      "acceptance_criteria": [
+        "Pydantic AI agent returns typed TravelInsight (summary, price_impact, event_type, confidence, sources)",
+        "No personal data in prompts (names, DOBs, emails)",
+        "Cached 7 days; regenerated on >10% price change",
+        "Graceful degradation: LLM unavailable → recommendation works normally",
+        "Supports Claude haiku (Anthropic API) and Ollama (local)"
+      ],
+      "dependencies": ["F-025"],
+      "module": "travo/insights.py"
+    },
+    {
+      "id": "F-027",
+      "title": "All Australian state school calendars",
+      "epic": "Holiday Awareness",
+      "phase": 2,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-027",
+      "description": "Extend school_holidays.yaml with NSW, VIC, WA, SA, TAS, NT, ACT for 2025–2027.",
+      "acceptance_criteria": [
+        "All Australian states populated in school_holidays.yaml",
+        "State from family profile selects the correct calendar",
+        "data-version lists which states are covered",
+        "No code change required — calendar loader is data-driven"
+      ],
+      "dependencies": ["F-018"],
+      "module": "travo/data/school_holidays.yaml"
+    },
+    {
+      "id": "F-028",
+      "title": "Textual TUI",
+      "epic": "TUI",
+      "phase": 2,
+      "priority": "P2",
+      "status": "planned",
+      "user_story": "US-035",
+      "description": "Interactive Textual terminal dashboard for navigating trips without running individual commands.",
+      "acceptance_criteria": [
+        "Left panel: scrollable trip list, colour-coded by recommendation",
+        "Right panel: trip detail with price history, recommendation, rationale",
+        "Arrow keys navigate; Enter expands; R refreshes; Q quits",
+        "R triggers live price fetch and updates panel in place",
+        "Works in 80×24 or larger terminal"
+      ],
+      "dependencies": ["F-014"],
+      "command": "travo ui",
+      "module": "travo/tui.py"
+    },
+    {
+      "id": "F-029",
+      "title": "Evidence HTML report",
+      "epic": "Reporting",
+      "phase": 2,
+      "priority": "P2",
+      "status": "planned",
+      "user_story": "US-034",
+      "description": "SQL-driven HTML report of tracked trips, analytics, and price history charts.",
+      "acceptance_criteria": [
+        "Output: ~/.travo/reports/travo_report_{date}.html",
+        "Includes: trips + latest recs, price history charts, route comparison, holiday overlay",
+        "Opens in default browser automatically",
+        "Generation <10s on typical data volume"
+      ],
+      "dependencies": ["F-025"],
+      "command": "travo report",
+      "module": "travo/cli.py"
+    },
+    {
+      "id": "F-030",
+      "title": "International route tracking",
+      "epic": "Trip Tracking",
+      "phase": 3,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-039",
+      "description": "Track international routes with true-cost and recommendation features.",
+      "acceptance_criteria": [
+        "Amadeus used as primary source for international routes",
+        "international infant fees (infant_lap_fee_intl) applied",
+        "AUD conversion via Frankfurter API",
+        "Both origin state and destination country school holiday flags shown"
+      ],
+      "dependencies": ["F-024", "F-031"],
+      "module": "travo/price_sources/amadeus.py"
+    },
+    {
+      "id": "F-031",
+      "title": "Multi-currency AUD conversion",
+      "epic": "Price Intelligence",
+      "phase": 3,
+      "priority": "P1",
+      "status": "planned",
+      "user_story": "US-040",
+      "description": "Fetch exchange rates from Frankfurter API and convert all costs to AUD.",
+      "acceptance_criteria": [
+        "Rates from https://api.frankfurter.app/latest?from=AUD",
+        "24-hour cache — not fetched per search",
+        "Source currency shown in parentheses alongside AUD total",
+        "No network call for AUD-denominated routes"
+      ],
+      "dependencies": [],
+      "module": "travo/true_cost.py"
+    },
+    {
+      "id": "F-032",
+      "title": "International school holiday calendars",
+      "epic": "Holiday Awareness",
+      "phase": 3,
+      "priority": "P2",
+      "status": "planned",
+      "user_story": "US-041",
+      "description": "Destination country school holiday calendars for NZ, SG, UK, JP, TH, US.",
+      "acceptance_criteria": [
+        "Initial support: NZ, Singapore, UK, Japan, Thailand, USA",
+        "Both origin and destination holiday flags shown separately",
+        "Embedded YAML, updated with package releases"
+      ],
+      "dependencies": ["F-027"],
+      "module": "travo/data/school_holidays.yaml"
+    }
+  ],
+
+  "tech_decisions": [
+    {
+      "id": "TD-001",
+      "decision": "SQLite + DuckDB dual-store",
+      "rationale": "DuckDB has a hard single-writer-across-processes limit. When travo poll (cron) and travo refresh (manual) run simultaneously, only SQLite with WAL mode handles concurrent writes safely. DuckDB is used read-only for analytics over Parquet.",
+      "alternatives_considered": ["DuckDB only", "PostgreSQL"],
+      "phase": 1
+    },
+    {
+      "id": "TD-002",
+      "decision": "Tequila API as primary domestic source (not Amadeus)",
+      "rationale": "Amadeus has incomplete Australian domestic coverage as of 2026 — Qantas NDC only launched July 2025, Virgin/Jetstar uncertain. Tequila covers all Australian carriers (QF, VA, JQ, ZL) on a free tier for personal use.",
+      "alternatives_considered": ["Amadeus", "SerpAPI Google Flights"],
+      "phase": 1
+    },
+    {
+      "id": "TD-003",
+      "decision": "Embedded YAML/JSON for school holidays and airline fees",
+      "rationale": "No free Australian school holiday API exists (OpenHolidays explicitly excludes AU). No structured airline ancillary fee API exists. Embedded data is reliable, offline-capable, and update-controlled.",
+      "alternatives_considered": ["OpenHolidays API", "Web scraping"],
+      "phase": 1
+    },
+    {
+      "id": "TD-004",
+      "decision": "Pluggy for price source extensibility",
+      "rationale": "Pluggy provides a clean hook specification pattern that decouples provider implementations from core business logic. New providers register without touching tracker.py or recommender.py.",
+      "alternatives_considered": ["Abstract base classes", "FastAPI plugin pattern"],
+      "phase": 1
+    },
+    {
+      "id": "TD-005",
+      "decision": "Pydantic AI for LLM integration",
+      "rationale": "Multi-provider (Claude + Ollama in same interface), typed structured outputs via Pydantic models, built-in retry, native Logfire integration for observability. Production-stable at v1.63.",
+      "alternatives_considered": ["Raw Anthropic SDK", "LangChain", "LangGraph"],
+      "phase": 2
+    },
+    {
+      "id": "TD-006",
+      "decision": "uv for package management",
+      "rationale": "10–100× faster than pip. uv.lock is universal across platforms. uv tool install for CLI distribution. uv sync --all-extras for dev setup.",
+      "alternatives_considered": ["pip + venv", "poetry", "pipx"],
+      "phase": 1
+    },
+    {
+      "id": "TD-007",
+      "decision": "Incremental event-driven analytics (not batch-weekly)",
+      "rationale": "DuckDB recomputes affected aggregates in <100ms in-process after each poll snapshot. No separate cron job needed. Data is always current.",
+      "alternatives_considered": ["Weekly batch job", "Real-time streaming"],
+      "phase": 2
+    }
+  ],
+
+  "non_functional": [
+    {
+      "id": "NF-001",
+      "category": "Performance",
+      "requirement": "travo status reads from database only — no API calls, completes in <1s"
+    },
+    {
+      "id": "NF-002",
+      "category": "Performance",
+      "requirement": "travo check renders recommendation in <500ms (database reads + recommender calculation)"
+    },
+    {
+      "id": "NF-003",
+      "category": "Performance",
+      "requirement": "Incremental analytics update after each poll: <100ms"
+    },
+    {
+      "id": "NF-004",
+      "category": "Reliability",
+      "requirement": "travo poll continues to next trip on any single-trip error — never aborts the full cycle"
+    },
+    {
+      "id": "NF-005",
+      "category": "Reliability",
+      "requirement": "LLM unavailability does not break recommendation — insights degrade gracefully to None"
+    },
+    {
+      "id": "NF-006",
+      "category": "Concurrency",
+      "requirement": "Concurrent travo poll (cron) and travo refresh (manual) do not corrupt the database (SQLite WAL mode)"
+    },
+    {
+      "id": "NF-007",
+      "category": "Privacy",
+      "requirement": "No personal data (family member names, DOBs, emails) sent to any LLM provider. Only routes, dates, price data."
+    },
+    {
+      "id": "NF-008",
+      "category": "Testability",
+      "requirement": "Recommendation engine and true cost calculator are pure functions with no I/O — tested without any mocking"
+    },
+    {
+      "id": "NF-009",
+      "category": "Portability",
+      "requirement": "Python 3.11+, tested on macOS and Linux (GitHub Actions matrix)"
+    },
+    {
+      "id": "NF-010",
+      "category": "Data freshness",
+      "requirement": "travo data-version warns if embedded data is older than 180 days"
+    }
+  ],
+
+  "data_sources": [
+    {
+      "id": "DS-001",
+      "name": "Kiwi.com Tequila API",
+      "type": "REST API",
+      "phase": 1,
+      "use": "Primary domestic flight search (QF, VA, JQ, ZL, all global carriers)",
+      "auth": "API key (TEQUILA_API_KEY)",
+      "cost": "Free tier for personal use",
+      "notes": "750+ carriers, flexible itinerary types, purpose-built flight API"
+    },
+    {
+      "id": "DS-002",
+      "name": "Amadeus",
+      "type": "REST API (OAuth2)",
+      "phase": 3,
+      "use": "International routes + Flight Price Analysis signal (LOW/TYPICAL/HIGH)",
+      "auth": "Client ID + Secret (AMADEUS_CLIENT_ID, AMADEUS_CLIENT_SECRET)",
+      "cost": "Free test tier; production pricing per call",
+      "notes": "Best value is the historical price analysis endpoint — unique market benchmark data"
+    },
+    {
+      "id": "DS-003",
+      "name": "Australian airline fees",
+      "type": "Embedded JSON (travo/data/airlines.json)",
+      "phase": 1,
+      "use": "Bag fees, seat selection fees, infant fees, family scores per IATA carrier",
+      "auth": "None",
+      "cost": "Free — manually maintained",
+      "notes": "Updated 2–3× per year; travo data-version shows last_updated date"
+    },
+    {
+      "id": "DS-004",
+      "name": "Australian school holidays",
+      "type": "Embedded YAML (travo/data/school_holidays.yaml)",
+      "phase": 1,
+      "use": "Holiday period detection for QLD (Phase 1), all AU states (Phase 2)",
+      "auth": "None",
+      "cost": "Free — manually maintained from state DoE websites",
+      "notes": "No free Australian school holiday API exists; OpenHolidays API explicitly excludes AU"
+    },
+    {
+      "id": "DS-005",
+      "name": "Frankfurter API",
+      "type": "REST API",
+      "phase": 3,
+      "use": "AUD exchange rates for international route true cost",
+      "auth": "None",
+      "cost": "Free, no rate limit",
+      "url": "https://api.frankfurter.app/latest?from=AUD",
+      "notes": "24-hour cache to minimize calls"
+    }
+  ],
+
+  "test_strategy": {
+    "pyramid": [
+      {
+        "tier": "unit",
+        "description": "Pure function tests — recommender, true_cost, calendar. No I/O, no mocking.",
+        "marker": null,
+        "ci_included": true,
+        "example_files": ["test_recommender.py", "test_true_cost.py", "test_calendar.py"]
+      },
+      {
+        "tier": "integration",
+        "description": "Real in-memory SQLite, deterministic _StubTequilaSource, no external API calls.",
+        "marker": "integration",
+        "ci_included": true,
+        "example_files": ["test_tracker.py", "test_cli.py"]
+      },
+      {
+        "tier": "slow",
+        "description": "Real Tequila API calls. Requires TEQUILA_API_KEY. Excluded from make ci.",
+        "marker": "slow",
+        "ci_included": false,
+        "example_files": ["test_tequila_live.py (future)"]
+      },
+      {
+        "tier": "e2e",
+        "description": "Full CLI invocation with live services. Excluded from make ci.",
+        "marker": "e2e",
+        "ci_included": false,
+        "example_files": ["test_e2e.py (future)"]
+      }
+    ],
+    "key_patterns": [
+      "Session-scoped singleton isolation: module-level _db, _calendar, get_settings cache reset before each session",
+      "Deterministic _StubTequilaSource: fixed FlightOffer output for predictable cost assertions",
+      "In-memory SQLite engine per test: create_engine('sqlite:///:memory:')",
+      "pytest markers for CI fast path: addopts = \"-m 'not slow and not e2e'\"",
+      "Syrupy snapshot tests for Rich terminal output regression detection",
+      "LLM eval: Pydantic schema validation + golden fixture LLM-as-judge (Phase 2)"
+    ],
+    "ci_command": "make ci",
+    "test_command": "make test"
+  },
+
+  "layer_architecture": {
+    "description": "Forward-only dependency rule enforced by tools/layer_linter.py",
+    "layers": [
+      {"level": 0, "name": "Types", "modules": ["price_sources.hookspecs"]},
+      {"level": 1, "name": "Config + Storage", "modules": ["config", "db.sqlite", "db.duckdb"]},
+      {"level": 2, "name": "Static data loaders", "modules": ["fees", "calendar"]},
+      {"level": 3, "name": "Pure logic", "modules": ["recommender", "true_cost"]},
+      {"level": 4, "name": "External I/O (price sources)", "modules": ["price_sources.tequila", "price_sources.amadeus"]},
+      {"level": 5, "name": "Orchestration", "modules": ["tracker", "scout", "analytics", "insights", "notifier"]},
+      {"level": 6, "name": "Presentation", "modules": ["display"]},
+      {"level": 7, "name": "CLI entry point", "modules": ["cli"]}
+    ],
+    "linter": "tools/layer_linter.py"
+  }
+}

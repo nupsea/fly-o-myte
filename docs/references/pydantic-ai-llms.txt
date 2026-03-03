@@ -1,0 +1,50 @@
+PYDANTIC AI REFERENCE — Fly-O-Myte uses pydantic-ai for LLM insights
+
+# Version: pydantic-ai>=1.63 (production-stable)
+# Supports: Claude, Ollama, OpenAI via unified interface
+
+# Define a structured output model
+from pydantic import BaseModel
+from pydantic_ai import Agent
+
+class TravelInsight(BaseModel):
+    summary: str          # 3-4 sentence explanation
+    price_impact: str     # "higher" | "lower" | "uncertain" | "none"
+    event_type: str       # "holiday" | "disruption" | "capacity" | "seasonal"
+    confidence: float     # 0.0–1.0
+    sources: list[str]    # cited sources
+
+# Create an agent (Claude)
+agent = Agent(
+    model="claude-haiku-4-5-20251001",
+    result_type=TravelInsight,
+    system_prompt="You are a travel pricing analyst advising an Australian family...",
+)
+
+# Create an agent (Ollama local)
+agent = Agent(
+    model="ollama:llama3.2",
+    result_type=TravelInsight,
+    system_prompt="...",
+)
+
+# Run the agent (sync)
+result = agent.run_sync("Route BNE→SYD, current price $298, average $350...")
+insight: TravelInsight = result.data
+
+# Graceful degradation pattern (insights.py)
+def generate_insight(...) -> TravelInsight | None:
+    provider = _select_provider(settings)
+    if provider is None:
+        return None          # No LLM available — caller suppresses insight section
+    try:
+        result = agent.run_sync(prompt)
+        return result.data
+    except Exception:
+        logger.warning("LLM insight failed — returning None")
+        return None
+
+# Model IDs
+# Claude haiku (fast, cheap): "claude-haiku-4-5-20251001"
+# Claude sonnet (better):     "claude-sonnet-4-6"
+# Ollama local:               "ollama:llama3.2"

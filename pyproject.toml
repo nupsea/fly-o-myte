@@ -1,8 +1,7 @@
 [project]
-name = "travo"
+name = "fly-o-myte"
 version = "0.1.0"
 description = "Smart travel expense optimizer for Australian families"
-readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
 keywords = ["travel", "flights", "family", "australia", "cli", "optimizer"]
@@ -69,17 +68,18 @@ dev = [
     "syrupy>=4",             # snapshot tests for Rich output
     "ruff>=0.5",             # lint + format (replaces flake8/black/isort)
     "pyright>=1.1",          # type checking
+    "pytest-mock>=3.14",     # mocker fixture for cleaner monkeypatching
 ]
 
 [project.scripts]
-travo = "travo.cli:app"
+fom = "fly_o_myte.cli:app"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["travo"]
+packages = ["fly_o_myte"]
 
 # ─── Ruff ────────────────────────────────────────────────────────────────────
 
@@ -115,11 +115,19 @@ reportMissingTypeStubs = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --tb=short"
+# Default: run fast unit + integration tests only.
+# slow = real API calls (requires TEQUILA_API_KEY)
+# e2e  = full end-to-end with live services
+addopts = "-v --tb=short -m 'not slow and not e2e'"
+markers = [
+    "slow: real external API calls — excluded from make ci (requires API key)",
+    "e2e: full end-to-end with live services — excluded from make ci",
+    "integration: real in-memory SQLite, mocked price sources — included in make ci",
+]
 
 [tool.coverage.run]
-source = ["travo"]
-omit = ["tests/*", "travo/data/*"]
+source = ["fly_o_myte"]
+omit = ["tests/*", "fly_o_myte/data/*"]
 
 [tool.coverage.report]
 show_missing = true
