@@ -287,7 +287,7 @@
         "Tracker integration: send_alerts=False → email_sent remains 0",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "DR-B",

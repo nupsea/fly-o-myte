@@ -144,3 +144,31 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
     assert params["children"] == "2" not == 2 (integer).
   - Pluggy get_hookimpls() confirms registration without needing to call the hook.
 ---
+
+## 2026-03-03T00:30:00+10:00 - S14 - Notifier unit tests — SMTP alert wiring
+- Implemented: tests/test_notifier.py with 8 tests covering all S14 acceptance criteria.
+- Files changed: tests/test_notifier.py, scripts/ralph/prd.json
+- Tests added (TestSendBookNowAlert):
+  - test_sends_email_returns_true (happy path: SMTP called, returns True)
+  - test_returns_false_when_smtp_user_empty (no credentials → False, SMTP not instantiated)
+  - test_returns_false_when_no_recipient (no alert_email and no default → False)
+  - test_returns_false_on_smtp_exception (SMTP raises → False, no propagation)
+  - test_subject_contains_fly_o_myte_and_trip_label (branding check)
+  - test_body_contains_fom_check (CLI command reference check)
+- Tests added (TestTrackerNotifierIntegration):
+  - test_book_now_with_send_alerts_true_marks_email_sent (email_sent == 1)
+  - test_send_alerts_false_leaves_email_unsent (email_sent == 0)
+- make ci: 101 passed, 0 failed. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - Settings(**kwargs) overrides env values — clean way to inject test credentials
+    without patching fly_o_myte.* internals. Pass settings= directly to
+    send_book_now_alert() for direct notifier tests.
+  - For tracker integration tests requiring credentials in get_settings():
+    monkeypatch.setenv + get_settings.cache_clear() + finally: cache_clear()
+    injects env for one test and restores for subsequent tests safely.
+  - EmailMessage.set_content() may base64-encode the payload — use
+    msg.get_payload(decode=True).decode() not msg.as_string() to check body text.
+  - To force book_now in a tracker integration test: pre-seed 3 snapshots with
+    distinct past-day fetched_at values, use depart_date = today+5 days.
+    days_to_departure<=7 fires as the first rule regardless of price signal.
+---

@@ -1,12 +1,12 @@
 # Quality Score — Fly-O-Myte
 
-Last Updated: 2026-03-03 — Phase 1 baseline
+Last Updated: 2026-03-03 — S14 complete (Phase 1 stories S01–S14 all pass)
 
 Updated by ralph after each phase. Grades: A (complete), B (mostly done), C (partial), D (minimal), F (not started).
 
 | Domain          | Implemented | Tested | Documented | Quality Grade |
 |-----------------|-------------|--------|------------|---------------|
-| Price Sources   | yes         | no     | partial    | C             |
+| Price Sources   | yes         | yes    | partial    | B             |
 | Cost Engine     | yes         | yes    | yes        | A             |
 | Calendar        | yes         | yes    | yes        | A             |
 | Recommender     | yes         | yes    | yes        | A             |
@@ -14,7 +14,7 @@ Updated by ralph after each phase. Grades: A (complete), B (mostly done), C (par
 | Scout           | yes         | no     | partial    | C             |
 | Analytics       | stub        | stub   | partial    | D             |
 | Insights (LLM)  | yes         | yes    | partial    | B             |
-| Notifier        | yes         | no     | no         | D             |
+| Notifier        | yes         | yes    | partial    | B             |
 | Display         | yes         | no     | no         | C             |
 | CLI             | yes         | yes    | partial    | B             |
 | Dev Tooling     | yes         | n/a    | yes        | A             |
@@ -33,16 +33,16 @@ Updated by ralph after each phase. Grades: A (complete), B (mostly done), C (par
 
 **CLI (B)**: All 15 commands implemented: setup, scout, watch, status, check, compare, history, refresh, insight, poll, analytics, pause, resume, remove, profile, data-version. Basic integration tests pass. Missing: Syrupy snapshot tests for Rich output.
 
-**Price Sources (C)**: Tequila adapter implemented with tenacity retry. `_StubTequilaSource` in conftest serves integration tests. Missing: unit tests for Tequila adapter, Amadeus adapter is a stub.
+**Price Sources (B)**: Tequila adapter implemented with tenacity retry. S09/S13: 13 pytest-httpx unit tests covering happy path, HTTP errors, retry behaviour, param construction (children/infants, one-way/return, currency, max_stopovers), and Pluggy registration. `_StubTequilaSource` in conftest serves integration tests. SerpAPI adapter implemented — tests in S20 (Phase 2). Amadeus adapter is a stub.
 
 **Analytics (D)**: `analytics.py` is a scaffold — incremental DuckDB/Parquet aggregation not yet implemented. Phase 2 work.
 
 **Insights (B)**: `TravelInsight` Pydantic model, `generate_insight()` with graceful degradation (returns None when LLM unavailable). Schema validation passes. Missing: golden fixture evaluation with LLM-as-judge.
 
-**Scout (C)**: `scout_date_windows()` implemented, not yet tested. CLI `scout` command wired.
+**Scout (C)**: `scout_month()` and `scout_flex()` implemented, not yet tested. CLI `scout` command wired.
 
-**Notifier (D)**: `send_alert()` SMTP skeleton exists. Not tested. Email send not integrated into poll cycle.
+**Notifier (B)**: `send_book_now_alert()` fully implemented — SMTP via stdlib smtplib, graceful degradation (returns False on missing credentials/recipient/SMTP error). S14: 8 tests covering happy path, credential checks, recipient check, exception handling, subject/body content, and tracker integration (email_sent wiring via mark_email_sent).
 
 **Display (C)**: Rich rendering helpers implemented. Not yet tested with Syrupy snapshots.
 
-**Dev Tooling (A)**: `make ci` runs lint → typecheck → layer-lint → data-check → test. Layer linter covers 20 files. `make test` runs 80 tests in <0.5s.
+**Dev Tooling (A)**: `make ci` runs lint → typecheck → layer-lint → data-check → test → smoke-test. Layer linter covers 21 files. `make test` runs 101 tests in <0.6s.
