@@ -24,6 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
+from fly_o_myte.currency import get_converter
 from fly_o_myte.fees import AirlineFees
 
 
@@ -57,6 +58,7 @@ def compute_true_cost(
     bags_per_person: int,
     depart_date: date,
     return_date: date | None,
+    currency: str = "AUD",
     fare_type: str = "standard",
 ) -> TrueCostBreakdown:
     """
@@ -64,18 +66,26 @@ def compute_true_cost(
 
     Args:
         airline: AirlineFees for the operating carrier.
-        base_fare_per_adult: Fare per adult from the API (AUD).
+        base_fare_per_adult: Fare per adult from the API (in currency).
         adults: Number of adults.
         child_ages: Ages of children at the departure date (not DOB —
                     caller uses FamilyProfile.child_ages_at(depart_date)).
         bags_per_person: Checked bags per travelling person.
         depart_date: Outbound departure date.
         return_date: Return date (None = one-way).
+        currency: ISO currency code of base_fare_per_adult (default "AUD").
+                  Non-AUD fares are converted to AUD via the Frankfurter API.
         fare_type: "standard" | "lite" — affects bag and seat fee tier.
 
     Returns:
         TrueCostBreakdown with itemised and total AUD cost.
     """
+    # Convert base fare to AUD if the offer is priced in another currency
+    if currency.upper() != "AUD":
+        base_fare_per_adult = get_converter().convert_to_aud(
+            base_fare_per_adult, currency
+        )
+
     n_legs = 2 if return_date else 1
     lap_infants = sum(1 for age in child_ages if age < 2)
     seated_children = sum(1 for age in child_ages if 2 <= age < 12)

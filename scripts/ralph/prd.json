@@ -523,7 +523,7 @@
         "tools/layer_linter.py: currency.py assigned to layer 2",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S26",

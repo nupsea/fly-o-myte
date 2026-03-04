@@ -68,10 +68,12 @@ def isolated_travo_dir(
 
     # Reset module-level singletons
     import fly_o_myte.calendar as calendar_module
+    import fly_o_myte.currency as currency_module
     import fly_o_myte.fees as fees_module
 
     fees_module._db = None
     calendar_module._calendar = None
+    currency_module._converter = None
 
     yield tmp
 
@@ -92,6 +94,7 @@ def isolated_travo_dir(
     _gs.cache_clear()
     fees_module._db = None
     calendar_module._calendar = None
+    currency_module._converter = None
 
 
 # ─── Database fixtures ─────────────────────────────────────────────────────────

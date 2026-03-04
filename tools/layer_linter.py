@@ -39,6 +39,7 @@ LAYER_MAP: dict[str, int] = {
     # Layer 2 — static data loaders
     "fees": 2,
     "calendar": 2,
+    "currency": 2,
     # Layer 3 — pure logic (no I/O)
     "recommender": 3,
     "true_cost": 3,

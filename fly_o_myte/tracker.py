@@ -129,6 +129,7 @@ def poll_trip(
         bags_per_person=trip.bags_per_person,
         depart_date=depart,
         return_date=ret,
+        currency=offer.currency,
     )
 
     # ─── 3. Compute family score ───────────────────────────────────────────

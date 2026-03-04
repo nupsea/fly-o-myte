@@ -313,3 +313,35 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
   - The existing test_check_snapshot snapshot was unaffected because the test has
     no analytics dir seeded — market context section is silently skipped.
 ---
+
+## 2026-03-04T04:00:00+10:00 - S25 - Multi-currency support -- Frankfurter API
+- Implemented: fly_o_myte/currency.py at layer 2 wrapping the free Frankfurter
+  API (api.frankfurter.app). CurrencyConverter class with get_rate() and
+  convert_to_aud(). 24-hour in-memory cache keyed by "FROM_TO" pair.
+  Returns 1.0 gracefully when from_currency == to_currency, or on any API error.
+  Updated compute_true_cost() in true_cost.py to accept currency: str = "AUD"
+  and convert base_fare_per_adult to AUD via get_converter() when non-AUD.
+  Updated tracker.py to pass currency=offer.currency to compute_true_cost().
+  Updated tests/conftest.py to reset currency_module._converter = None.
+  Added "currency": 2 to tools/layer_linter.py LAYER_MAP.
+  Created tests/test_currency.py with 11 tests.
+- Files changed:
+  - fly_o_myte/currency.py (new)
+  - fly_o_myte/true_cost.py (add currency param + get_converter import)
+  - fly_o_myte/tracker.py (pass currency=offer.currency to compute_true_cost)
+  - tools/layer_linter.py (add "currency": 2 to LAYER_MAP)
+  - tests/test_currency.py (new — 11 tests)
+  - tests/conftest.py (reset currency_module._converter singleton)
+  - scripts/ralph/prd.json (S25 passes:true)
+- make ci: 185 passed, 1 deselected. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - pytest-httpx naturally enforces caching: if a second HTTP request is made
+    when only 1 mock response was queued, it raises — so the caching test just
+    queues 1 response and makes 2 calls; test fails automatically if cache broken.
+  - CurrencyConverter uses stdlib time.time() for TTL — monkeypatching time.time
+    in fly_o_myte.currency is valid (stdlib boundary, not internal fly_o_myte code).
+  - Layer 3 (true_cost.py) importing layer 2 (currency.py) is correct per layer rule.
+    compute_true_cost no longer pure I/O-free but AUD path skips the HTTP call.
+  - Singleton reset in conftest.py teardown needed to avoid stale converter across
+    sessions (especially if future tests set up canned rates in the converter).
+---
