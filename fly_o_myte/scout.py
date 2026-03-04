@@ -22,6 +22,7 @@ from fly_o_myte.calendar import HolidayContext, SchoolCalendar
 from fly_o_myte.config import FamilyProfile
 from fly_o_myte.fees import AirlineDatabase
 from fly_o_myte.price_sources.hookspecs import FlightOffer, PriceSourceError
+from fly_o_myte.recommender import classify_route
 from fly_o_myte.true_cost import TrueCostBreakdown, compute_true_cost
 
 logger = logging.getLogger(__name__)
@@ -165,16 +166,19 @@ def _scout_single(
         return None
 
     best = min(all_offers, key=lambda o: o.base_fare_per_adult)
-    airline = airline_db.get_or_default(best.airline_code)
+    bundle = airline_db.get_or_default(best.airline_code)
+    route_type = classify_route(origin, destination)
 
     breakdown = compute_true_cost(
-        airline=airline,
+        airline_bundle=bundle,
         base_fare_per_adult=best.base_fare_per_adult,
         adults=profile.adults,
         child_ages=child_ages,
         bags_per_person=profile.bags_per_person,
         depart_date=depart_date,
         return_date=return_date,
+        stops=best.stops,
+        route_type=route_type,
     )
 
     holiday_ctx = calendar.check_overlap(profile.state, depart_date, return_date)

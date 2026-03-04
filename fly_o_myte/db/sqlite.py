@@ -114,7 +114,23 @@ def create_db_engine(db_path: Path):
 
 
 def create_tables(engine) -> None:
+    """Create all tables and perform lightweight migrations."""
     SQLModel.metadata.create_all(engine)
+
+    # Lightweight migration for S31 (rank column)
+    with engine.connect() as conn:
+        # Check if column exists
+        res = conn.execute(
+            __import__("sqlalchemy").text("PRAGMA table_info(pricesnapshot)")
+        )
+        columns = [row[1] for row in res]
+        if "rank" not in columns:
+            conn.execute(
+                __import__("sqlalchemy").text(
+                    "ALTER TABLE pricesnapshot ADD COLUMN rank INTEGER DEFAULT 1"
+                )
+            )
+            conn.commit()
 
 
 @contextmanager

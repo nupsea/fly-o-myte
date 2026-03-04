@@ -21,7 +21,7 @@ class AirlineFees:
     name: str
     family_score: int  # 0–100
 
-    # Domestic bag fees (AUD)
+    # Bag fees (AUD)
     bag1_fee: float  # first checked bag — standard fare
     bag1_fee_lite: float  # first bag on budget/lite fares (if different)
     bag1_weight_kg: int
@@ -34,9 +34,8 @@ class AirlineFees:
     # Family seating
     family_seating_guaranteed: bool
 
-    # Infant fees
-    infant_lap_fee_domestic: float  # AUD per sector (0 if free)
-    infant_lap_fee_intl: float  # AUD per sector international
+    # Infant fees (per sector)
+    infant_lap_fee: float
 
     # On-time performance (0–100)
     on_time_pct: int
@@ -64,13 +63,22 @@ class AirlineFees:
         )
         return fee * n_seats
 
-    def infant_domestic_fee(self, n_infants: int, n_sectors: int = 2) -> float:
+    def infant_fee(self, n_infants: int, n_sectors: int = 2) -> float:
         """
         Total infant lap fee for n_infants on n_sectors.
-        Jetstar charges per sector; Qantas charges 0.
         n_sectors=2 for a return trip (outbound + inbound).
         """
-        return self.infant_lap_fee_domestic * n_infants * n_sectors
+        return self.infant_lap_fee * n_infants * n_sectors
+
+
+@dataclass(frozen=True)
+class AirlineFeeBundle:
+    iata: str
+    name: str
+    family_score: int
+    on_time_pct: int
+    domestic: AirlineFees
+    international: AirlineFees
 
 
 def _load_raw() -> dict:
@@ -80,45 +88,68 @@ def _load_raw() -> dict:
         return json.load(f)
 
 
-def _parse_airline(raw: dict, iata: str) -> AirlineFees:
-    dom = raw.get("domestic", raw.get("international", {}))
+def _parse_fees(
+    section: dict, iata: str, name: str, is_intl: bool = False
+) -> AirlineFees:
+    """Parse a domestic or international section into AirlineFees."""
     return AirlineFees(
         iata=iata,
-        name=raw["name"],
-        family_score=raw.get("family_score", 50),
-        bag1_fee=dom.get("bag1_fee", dom.get("bag1_fee_economy_choice", 45)),
-        bag1_fee_lite=dom.get(
+        name=name,
+        family_score=50,  # placeholder, unused in sub-object
+        bag1_fee=section.get("bag1_fee", section.get("bag1_fee_economy_choice", 45)),
+        bag1_fee_lite=section.get(
             "bag1_fee_lite",
-            dom.get(
+            section.get(
                 "bag1_fee_starter",
-                dom.get("bag1_fee_economy_lite", dom.get("bag1_fee", 45)),
+                section.get("bag1_fee_economy_lite", section.get("bag1_fee", 45)),
             ),
         ),
-        bag1_weight_kg=dom.get("bag1_weight_kg", 23),
-        bag2_fee=dom.get("bag2_fee", 60),
-        seat_selection_fee=dom.get(
+        bag1_weight_kg=section.get("bag1_weight_kg", 23),
+        bag2_fee=section.get("bag2_fee", 60),
+        seat_selection_fee=section.get(
             "seat_selection_fee",
-            dom.get("seat_selection_fee_choice", 0),
+            section.get("seat_selection_fee_choice", 0),
         ),
-        seat_selection_fee_lite=dom.get(
+        seat_selection_fee_lite=section.get(
             "seat_selection_fee",
-            dom.get("seat_selection_fee_lite", dom.get("seat_selection_fee", 0)),
+            section.get(
+                "seat_selection_fee_lite", section.get("seat_selection_fee", 0)
+            ),
         ),
-        family_seating_guaranteed=dom.get("family_seating_guaranteed", False),
-        infant_lap_fee_domestic=dom.get(
-            "infant_lap_fee_domestic_aud",
-            dom.get("infant_lap_fee_per_sector_aud", 0),
+        family_seating_guaranteed=section.get("family_seating_guaranteed", False),
+        infant_lap_fee=section.get(
+            "infant_lap_fee_intl_shorthaul_aud"
+            if is_intl
+            else "infant_lap_fee_domestic_aud",
+            section.get("infant_lap_fee_per_sector_aud", 0),
         ),
-        infant_lap_fee_intl=dom.get("infant_lap_fee_intl_shorthaul_aud", 0),
-        on_time_pct=raw.get("on_time_pct", 70),
-        notes=dom.get("notes", ""),
+        on_time_pct=70,  # placeholder
+        notes=section.get("notes", ""),
+    )
+
+
+def _parse_airline(raw: dict, iata: str) -> AirlineFeeBundle:
+    name = raw["name"]
+    family_score = raw.get("family_score", 50)
+    on_time_pct = raw.get("on_time_pct", 70)
+
+    dom_raw = raw.get("domestic", raw.get("international", {}))
+    intl_raw = raw.get("international", raw.get("domestic", {}))
+
+    return AirlineFeeBundle(
+        iata=iata,
+        name=name,
+        family_score=family_score,
+        on_time_pct=on_time_pct,
+        domestic=_parse_fees(dom_raw, iata, name, is_intl=False),
+        international=_parse_fees(intl_raw, iata, name, is_intl=True),
     )
 
 
 class AirlineDatabase:
     def __init__(self) -> None:
         raw = _load_raw()
-        self._db: dict[str, AirlineFees] = {}
+        self._db: dict[str, AirlineFeeBundle] = {}
         self._version: str = raw.get("_version", "unknown")
         self._last_updated: str = raw.get("_last_updated", "unknown")
 
@@ -128,15 +159,19 @@ class AirlineDatabase:
             if "name" in value:
                 self._db[key] = _parse_airline(value, key)
 
-    def get(self, iata: str) -> AirlineFees | None:
+    def get(self, iata: str) -> AirlineFeeBundle | None:
         return self._db.get(iata.upper())
 
-    def get_or_default(self, iata: str) -> AirlineFees:
+    def get_or_default(self, iata: str) -> AirlineFeeBundle:
         """
         Return airline fees or a conservative default for unknown carriers.
-        Conservative default: charges for everything (safe to overestimate).
         """
-        return self._db.get(iata.upper()) or AirlineFees(
+        bundle = self._db.get(iata.upper())
+        if bundle:
+            return bundle
+
+        # Create a default bundle
+        default_fees = AirlineFees(
             iata=iata,
             name=f"Unknown ({iata})",
             family_score=50,
@@ -147,10 +182,17 @@ class AirlineDatabase:
             seat_selection_fee=20,
             seat_selection_fee_lite=20,
             family_seating_guaranteed=False,
-            infant_lap_fee_domestic=0,
-            infant_lap_fee_intl=0,
+            infant_lap_fee=0,
             on_time_pct=70,
             notes="Unknown airline — using conservative default fees.",
+        )
+        return AirlineFeeBundle(
+            iata=iata,
+            name=f"Unknown ({iata})",
+            family_score=50,
+            on_time_pct=70,
+            domestic=default_fees,
+            international=default_fees,
         )
 
     @property

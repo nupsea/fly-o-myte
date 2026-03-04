@@ -38,6 +38,7 @@ from fly_o_myte.db.sqlite import (
     insert_snapshot,
 )
 from fly_o_myte.fees import get_airline_db
+from fly_o_myte.recommender import classify_route
 from fly_o_myte.true_cost import compute_true_cost
 
 
@@ -94,16 +95,19 @@ def main() -> int:
         depart = date.fromisoformat(trip.depart_date)
         ret = date.fromisoformat(trip.return_date) if trip.return_date else None
         child_ages = profile.child_ages_at(date.fromisoformat(trip.depart_date))
+        route_type = classify_route(trip.origin, trip.destination)
 
         for i, price in enumerate(prices):
             breakdown = compute_true_cost(
-                airline=fees,
+                airline_bundle=fees,
                 base_fare_per_adult=price,
                 adults=profile.adults,
                 child_ages=child_ages,
                 bags_per_person=trip.bags_per_person,
                 depart_date=depart,
                 return_date=ret,
+                stops=0,
+                route_type=route_type,
             )
 
             fetched_at = datetime.now(UTC) - timedelta(days=args.count - 1 - i)

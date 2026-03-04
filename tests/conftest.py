@@ -31,7 +31,7 @@ from fly_o_myte.db.sqlite import (
     get_session,
     insert_trip,
 )
-from fly_o_myte.fees import AirlineFees
+from fly_o_myte.fees import AirlineFeeBundle, AirlineFees
 from fly_o_myte.price_sources.hookspecs import FlightOffer, hookimpl
 from fly_o_myte.recommender import SnapshotPoint
 
@@ -157,8 +157,8 @@ def make_snapshots(
 
 
 @pytest.fixture
-def qantas_fees() -> AirlineFees:
-    return AirlineFees(
+def qantas_fees() -> AirlineFeeBundle:
+    fees = AirlineFees(
         iata="QF",
         name="Qantas",
         family_score=88,
@@ -169,15 +169,22 @@ def qantas_fees() -> AirlineFees:
         seat_selection_fee=0.0,
         seat_selection_fee_lite=15.0,
         family_seating_guaranteed=True,
-        infant_lap_fee_domestic=0.0,
-        infant_lap_fee_intl=0.0,
+        infant_lap_fee=0.0,
         on_time_pct=82,
+    )
+    return AirlineFeeBundle(
+        iata="QF",
+        name="Qantas",
+        family_score=88,
+        on_time_pct=82,
+        domestic=fees,
+        international=fees,
     )
 
 
 @pytest.fixture
-def jetstar_fees() -> AirlineFees:
-    return AirlineFees(
+def jetstar_fees() -> AirlineFeeBundle:
+    fees = AirlineFees(
         iata="JQ",
         name="Jetstar",
         family_score=42,
@@ -188,9 +195,16 @@ def jetstar_fees() -> AirlineFees:
         seat_selection_fee=8.0,
         seat_selection_fee_lite=8.0,
         family_seating_guaranteed=False,
-        infant_lap_fee_domestic=35.0,
-        infant_lap_fee_intl=0.0,
+        infant_lap_fee=35.0,
         on_time_pct=74,
+    )
+    return AirlineFeeBundle(
+        iata="JQ",
+        name="Jetstar",
+        family_score=42,
+        on_time_pct=74,
+        domestic=fees,
+        international=fees,
     )
 
 

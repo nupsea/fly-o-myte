@@ -350,11 +350,33 @@ def watch(
     with get_session(engine) as session:
         trip = insert_trip(session, trip)
         console.print(f"[green]Tracking trip #{trip.id}: {trip_label}[/green]")
+
+        # Tip for long-haul routes with low stops
+        from fly_o_myte.recommender import RouteType, classify_route
+
+        if (
+            classify_route(origin, destination) == RouteType.LONG_HAUL
+            and (max_stops if max_stops is not None else profile.max_stops) <= 1
+        ):
+            console.print(
+                "[dim]Tip: Long-haul routes often have much cheaper 2-stop options. "
+                "Try adding [bold]--max-stops 2[/bold] to see more candidates.[/dim]"
+            )
+
         console.print("Fetching initial price...")
         snap = poll_trip(session, trip, profile, pm, send_alerts=False)
         if snap:
+            stops_label = (
+                "nonstop" if snap.stops == 0 else f"{snap.stops} stop{'s' if snap.stops > 1 else ''}"
+            )
+            details = f"  {snap.airline_code or '?'} · {stops_label}"
+            if snap.departure_time:
+                details += f" · departs {snap.departure_time}"
             console.print(
-                f"Initial price: [bold]${snap.true_family_cost:,.0f} AUD[/bold]"
+                f"Initial price: [bold]${snap.true_family_cost:,.0f} AUD[/bold]{details}"
+            )
+            console.print(
+                f"[dim]Run [bold]fom check {trip.id}[/bold] for full breakdown and alternatives.[/dim]"
             )
         else:
             console.print("[yellow]No offers found — will retry on next poll.[/yellow]")
@@ -552,7 +574,13 @@ def refresh(
         snap = poll_trip(session, trip, profile, pm, send_alerts=not no_email)
 
         if snap:
-            console.print(f"[green]Updated: ${snap.true_family_cost:,.0f} AUD[/green]")
+            stops_label = (
+                "nonstop" if snap.stops == 0 else f"{snap.stops} stop{'s' if snap.stops > 1 else ''}"
+            )
+            details = f"  {snap.airline_code or '?'} · {stops_label}"
+            if snap.departure_time:
+                details += f" · departs {snap.departure_time}"
+            console.print(f"[green]Updated: ${snap.true_family_cost:,.0f} AUD[/green]{details}")
         else:
             console.print("[yellow]No offers found.[/yellow]")
 

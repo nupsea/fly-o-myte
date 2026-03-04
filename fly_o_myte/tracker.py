@@ -43,7 +43,7 @@ from fly_o_myte.price_sources.hookspecs import (
 )
 from fly_o_myte.price_sources.serpapi import (
     SerpAPIFlightSource,
-    detect_destination_country,
+    detect_airport_country,
 )
 from fly_o_myte.price_sources.tequila import TequilaPriceSource
 from fly_o_myte.recommender import RouteType, SnapshotPoint, classify_route, compute
@@ -141,20 +141,22 @@ def poll_trip(
     airline_db = get_airline_db()
     offers_with_data: list[tuple[FlightOffer, TrueCostBreakdown, float]] = []
     for offer in offers:
-        airline = airline_db.get_or_default(offer.airline_code)
+        bundle = airline_db.get_or_default(offer.airline_code)
         bd = compute_true_cost(
-            airline=airline,
+            airline_bundle=bundle,
             base_fare_per_adult=offer.base_fare_per_adult,
             adults=trip.adults,
             child_ages=child_ages,
             bags_per_person=trip.bags_per_person,
             depart_date=depart,
             return_date=ret,
+            stops=offer.stops,
+            route_type=route_type,
             currency=offer.currency,
         )
         dep_hour = _parse_hour(offer.departure_time)
         fs = compute_family_score(
-            airline=airline,
+            airline_bundle=bundle,
             true_cost=bd.total,
             avg_cost_on_route=bd.total,
             stops=offer.stops,
@@ -231,7 +233,7 @@ def poll_trip(
 
     # For international routes also check the destination country's school calendar
     if holiday_ctx is None and route_type != RouteType.DOMESTIC:
-        dest_country = detect_destination_country(trip.destination)
+        dest_country = detect_airport_country(trip.destination)
         if (
             dest_country
             and dest_country != "AU"
@@ -325,7 +327,7 @@ def _fetch_top_offers(
     adults: int,
     children_ages: list[int],
     max_stops: int,
-    n: int = 3,
+    n: int = 10,
 ) -> list[FlightOffer]:
     """
     Call all registered price sources and return up to n cheapest offers by base fare.

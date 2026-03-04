@@ -31,14 +31,14 @@ Read this file as a MAP. Follow the links below for deeper context.
 
 1. `uv` only. Never pip, Poetry, or pipenv. `uv run` for all commands.
 2. Python >=3.11. Specified in `pyproject.toml requires-python`.
-3. Layer order: hookspecs(0) -> config/db(1) -> fees/calendar(2) -> pure-logic(3) -> price-plugins(4) -> orchestration(5) -> display(6) -> cli(7). No reverse imports. Enforced by `tools/layer_linter.py`.
-4. Validate at every boundary. `FlightOffer`, `TrueCostBreakdown`, `RecommendationResult` are typed dataclasses. No raw dicts across module boundaries.
+3. Layer order: hookspecs(0) -> config/db(1) -> fees/calendar(2) -> pure-logic(3) -> price-plugins(4) -> orchestration(5) -> display(6) -> cli(7). No reverse imports. Enforced by `tools/layer_linter.py`. New modules: `airports.py` is layer 2; `planner.py` is layer 5.
+4. Validate at every boundary. `FlightOffer`, `TrueCostBreakdown`, `RecommendationResult`, `TripIntent`, `ScoutResult` are typed dataclasses. No raw dicts across module boundaries.
 5. No `print()` in package code outside `cli.py` and `display.py`. Use `logging.getLogger(__name__)`.
 6. No change outside a prd.json story. Every file modification maps to a story ID.
 7. Docs are the system of record. Discoveries go in `docs/`. CLAUDE.md stays under 100 lines.
 8. Every new module or command must have at least one test.
 9. Child ages are computed at the **travel date**, not today. Use `FamilyProfile.child_ages_at(depart_date)`.
-10. LLM features degrade gracefully. If no API key, return `None` and suppress the section -- never crash.
+10. LLM features degrade gracefully. If no API key, return `None` and suppress the section -- never crash. `fom plan` specifically falls back to structured Rich prompts and prints what capability is lost; it never requires an API key to function.
 11. Never patch `fly_o_myte.*` internals in tests. Only mock at process boundaries: HTTP responses via `pytest-httpx`, SMTP via `smtplib` mock. Use real Pluggy plugins (`_StubTequilaSource`) for price source tests. A test that patches internal functions proves nothing about runtime behaviour.
 
 ## Progress Report Format

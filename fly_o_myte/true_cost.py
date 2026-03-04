@@ -25,7 +25,8 @@ from dataclasses import dataclass
 from datetime import date
 
 from fly_o_myte.currency import get_converter
-from fly_o_myte.fees import AirlineFees
+from fly_o_myte.fees import AirlineFeeBundle
+from fly_o_myte.recommender import RouteType
 
 
 @dataclass(frozen=True)
@@ -51,13 +52,15 @@ class TrueCostBreakdown:
 
 
 def compute_true_cost(
-    airline: AirlineFees,
+    airline_bundle: AirlineFeeBundle,
     base_fare_per_adult: float,
     adults: int,
     child_ages: list[int],
     bags_per_person: int,
     depart_date: date,
     return_date: date | None,
+    stops: int = 0,
+    route_type: RouteType = RouteType.DOMESTIC,
     currency: str = "AUD",
     fare_type: str = "standard",
 ) -> TrueCostBreakdown:
@@ -65,16 +68,16 @@ def compute_true_cost(
     Compute the true family cost for a given flight offer.
 
     Args:
-        airline: AirlineFees for the operating carrier.
+        airline_bundle: AirlineFeeBundle for the operating carrier.
         base_fare_per_adult: Fare per adult from the API (in currency).
         adults: Number of adults.
-        child_ages: Ages of children at the departure date (not DOB —
-                    caller uses FamilyProfile.child_ages_at(depart_date)).
+        child_ages: Ages of children at the departure date.
         bags_per_person: Checked bags per travelling person.
         depart_date: Outbound departure date.
         return_date: Return date (None = one-way).
+        stops: Number of layovers (0 = nonstop). Used for per-sector fees.
+        route_type: Route classification (domestic vs international).
         currency: ISO currency code of base_fare_per_adult (default "AUD").
-                  Non-AUD fares are converted to AUD via the Frankfurter API.
         fare_type: "standard" | "lite" — affects bag and seat fee tier.
 
     Returns:
@@ -86,28 +89,42 @@ def compute_true_cost(
             base_fare_per_adult, currency
         )
 
+    # Select domestic or international fee rules
+    airline = (
+        airline_bundle.domestic
+        if route_type == RouteType.DOMESTIC
+        else airline_bundle.international
+    )
+
     n_legs = 2 if return_date else 1
+    # Total sectors = (number of flights per direction) * number of directions
+    n_sectors = (stops + 1) * n_legs
+
     lap_infants = sum(1 for age in child_ages if age < 2)
     seated_children = sum(1 for age in child_ages if 2 <= age < 12)
     total_seated_pax = adults + seated_children
 
     # Base fares
     base_adults = base_fare_per_adult * adults
-    # Child fares are typically ~90% of adult fare (API may not return separately)
-    child_fare_per_child = base_fare_per_adult * 0.90
+
+    # Child fares: typically 90% for domestic/short-haul, often 75% for long-haul
+    child_fare_factor = 0.90
+    if route_type in (RouteType.ASIA_PACIFIC, RouteType.LONG_HAUL):
+        child_fare_factor = 0.75
+
+    child_fare_per_child = base_fare_per_adult * child_fare_factor
     base_children = child_fare_per_child * seated_children
 
-    # Bag fees — charged per person per leg for return trips
-    # Most Australian airlines charge per direction (not round-trip bundled)
+    # Bag fees — most Australian/Regional airlines charge per direction (leg)
+    # Some long-haul international carriers charge per journey, but we use a
+    # conservative per-leg model if they charge at all.
     bag_fees = airline.bag_fee(bags_per_person, fare_type) * total_seated_pax * n_legs
 
-    # Seat selection — per seat per leg
+    # Seat selection — per seated pax per direction
     seat_fees = airline.seat_fee(total_seated_pax, fare_type) * n_legs
 
-    # Infant fees — domestic only in Phase 1
-    # Jetstar: per sector per infant (sector = each one-way leg)
-    # Qantas / Rex: free domestic
-    infant_fees = airline.infant_domestic_fee(lap_infants, n_sectors=n_legs)
+    # Infant fees — per sector (per flight)
+    infant_fees = airline.infant_fee(lap_infants, n_sectors=n_sectors)
 
     total = base_adults + base_children + bag_fees + seat_fees + infant_fees
 
@@ -122,7 +139,7 @@ def compute_true_cost(
 
 
 def compute_family_score(
-    airline: AirlineFees,
+    airline_bundle: AirlineFeeBundle,
     true_cost: float,
     avg_cost_on_route: float,
     stops: int,
@@ -162,7 +179,7 @@ def compute_family_score(
         time_score = max(0.0, 100.0 - penalty)
 
     # Airline family score
-    airline_score = float(airline.family_score)
+    airline_score = float(airline_bundle.family_score)
 
     return round(
         cost_score * 0.40

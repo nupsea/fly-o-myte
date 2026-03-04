@@ -379,37 +379,37 @@ def test_serpapi_registers_correctly_via_pluggy():
     assert len(pm.hook.search_flights.get_hookimpls()) == 1
 
 
-# ─── international gl routing ─────────────────────────────────────────────────
+# ─── origin-based gl routing ──────────────────────────────────────────────────
 
 
-def test_bne_to_sin_uses_gl_sg(httpx_mock):
-    """BNE -> SIN is international — gl must be 'sg'."""
+def test_bne_to_sin_uses_gl_au(httpx_mock):
+    """BNE -> SIN departs AU — gl must be 'au' (user POS)."""
     httpx_mock.add_response(json=MOCK_SERPAPI_RESPONSE)
     src = SerpAPIFlightSource(api_key="test-key")
-    _search(src, destination="SIN")
+    _search(src, origin="BNE", destination="SIN")
+
+    params = dict(httpx_mock.get_requests()[0].url.params)
+    assert params["gl"] == "au"
+
+
+def test_sin_to_bne_uses_gl_sg(httpx_mock):
+    """SIN -> BNE departs SG — gl must be 'sg'."""
+    httpx_mock.add_response(json=MOCK_SERPAPI_RESPONSE)
+    src = SerpAPIFlightSource(api_key="test-key")
+    _search(src, origin="SIN", destination="BNE")
 
     params = dict(httpx_mock.get_requests()[0].url.params)
     assert params["gl"] == "sg"
 
 
-def test_bne_to_lhr_uses_gl_gb(httpx_mock):
-    """BNE -> LHR is international — gl must be 'gb'."""
+def test_lhr_to_jfk_uses_gl_gb(httpx_mock):
+    """LHR -> JFK departs GB — gl must be 'gb'."""
     httpx_mock.add_response(json=MOCK_SERPAPI_RESPONSE)
     src = SerpAPIFlightSource(api_key="test-key")
-    _search(src, destination="LHR")
+    _search(src, origin="LHR", destination="JFK")
 
     params = dict(httpx_mock.get_requests()[0].url.params)
     assert params["gl"] == "gb"
-
-
-def test_bne_to_nrt_uses_gl_jp(httpx_mock):
-    """BNE -> NRT is international — gl must be 'jp'."""
-    httpx_mock.add_response(json=MOCK_SERPAPI_RESPONSE)
-    src = SerpAPIFlightSource(api_key="test-key")
-    _search(src, destination="NRT")
-
-    params = dict(httpx_mock.get_requests()[0].url.params)
-    assert params["gl"] == "jp"
 
 
 def test_domestic_bne_syd_uses_gl_au(httpx_mock):
@@ -422,11 +422,11 @@ def test_domestic_bne_syd_uses_gl_au(httpx_mock):
     assert params["gl"] == "au"
 
 
-def test_unknown_destination_falls_back_to_gl_au(httpx_mock):
-    """Unknown airport codes fall back to gl='au'."""
+def test_unknown_origin_falls_back_to_gl_au(httpx_mock):
+    """Unknown origin airport codes fall back to gl='au'."""
     httpx_mock.add_response(json=MOCK_SERPAPI_RESPONSE)
     src = SerpAPIFlightSource(api_key="test-key")
-    _search(src, destination="ZZZ")
+    _search(src, origin="ZZZ", destination="BNE")
 
     params = dict(httpx_mock.get_requests()[0].url.params)
     assert params["gl"] == "au"
@@ -476,31 +476,31 @@ def test_international_airline_name_mapping(httpx_mock, airline_name, expected_c
     assert offers[0].airline_code == expected_code
 
 
-# ─── detect_destination_country helper ───────────────────────────────────────
+# ─── detect_airport_country helper ───────────────────────────────────────────
 
 
-def test_detect_destination_country_au_airport():
+def test_detect_airport_country_au_airport():
     """Australian airports return 'AU'."""
-    from fly_o_myte.price_sources.serpapi import detect_destination_country
+    from fly_o_myte.price_sources.serpapi import detect_airport_country
 
-    assert detect_destination_country("SYD") == "AU"
-    assert detect_destination_country("MEL") == "AU"
-    assert detect_destination_country("BNE") == "AU"
+    assert detect_airport_country("SYD") == "AU"
+    assert detect_airport_country("MEL") == "AU"
+    assert detect_airport_country("BNE") == "AU"
 
 
-def test_detect_destination_country_international():
+def test_detect_airport_country_international():
     """Known international airports return their country code."""
-    from fly_o_myte.price_sources.serpapi import detect_destination_country
+    from fly_o_myte.price_sources.serpapi import detect_airport_country
 
-    assert detect_destination_country("SIN") == "SG"
-    assert detect_destination_country("LHR") == "GB"
-    assert detect_destination_country("NRT") == "JP"
-    assert detect_destination_country("DXB") == "AE"
-    assert detect_destination_country("HKG") == "HK"
+    assert detect_airport_country("SIN") == "SG"
+    assert detect_airport_country("LHR") == "GB"
+    assert detect_airport_country("NRT") == "JP"
+    assert detect_airport_country("DXB") == "AE"
+    assert detect_airport_country("HKG") == "HK"
 
 
-def test_detect_destination_country_unknown():
+def test_detect_airport_country_unknown():
     """Unknown airport codes return None."""
-    from fly_o_myte.price_sources.serpapi import detect_destination_country
+    from fly_o_myte.price_sources.serpapi import detect_airport_country
 
-    assert detect_destination_country("ZZZ") is None
+    assert detect_airport_country("ZZZ") is None

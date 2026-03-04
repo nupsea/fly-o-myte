@@ -70,6 +70,15 @@ _AIRLINE_IATA: dict[str, str] = {
     "thai airways international": "TG",
     "thai airways": "TG",
     "air india": "AI",
+    "indigo": "6E",
+    "srilankan airlines": "UL",
+    "srilankan": "UL",
+    "vietjet air": "VJ",
+    "vietjet": "VJ",
+    "batik air": "OD",
+    "malindo air": "OD",
+    "airasia (india)": "I5",
+    "vistara": "UK",
     # Middle East
     "emirates": "EK",
     "etihad airways": "EY",
@@ -268,9 +277,9 @@ _PRICE_LEVEL: dict[str, str] = {
 }
 
 
-def detect_destination_country(airport_iata: str) -> str | None:
+def detect_airport_country(airport_iata: str) -> str | None:
     """
-    Return the ISO country code for a destination airport.
+    Return the ISO country code for an airport.
 
     Returns 'AU' for Australian domestic airports.
     Returns None when the airport is not in the known list.
@@ -353,21 +362,30 @@ class SerpAPIFlightSource:
 
         # SerpAPI returns errors as JSON even on HTTP 200
         if "error" in data:
+            error_msg = data["error"]
+            if "hasn't returned any results" in error_msg.lower():
+                # Google Flights' stops filter is intermittently strict — for some
+                # routes it returns no results even though flights exist.
+                # Retry without the server-side stops filter if one was applied,
+                # then enforce max_stops client-side on the results.
+                if max_stops is not None and "stops" in params:
+                    logger.debug(
+                        "SerpAPI: stops=%d filter returned no results for %s→%s — retrying without filter",
+                        params["stops"],
+                        origin,
+                        destination,
+                    )
+                    return self._search_without_stops_filter(
+                        params, max_stops, origin, destination, depart_date
+                    )
+                logger.debug("SerpAPI: No results found for this query")
+                return []
             raise PriceSourceError(
                 source="serpapi",
-                message=data["error"],
+                message=error_msg,
             )
 
-        # Extract price level signal from price_insights if present
-        insights = data.get("price_insights", {})
-        raw_level = insights.get("price_level", "")
-        price_level_signal = _PRICE_LEVEL.get(raw_level.lower()) if raw_level else None
-
-        offers: list[FlightOffer] = []
-        for container in data.get("best_flights", []) + data.get("other_flights", []):
-            offer = self._parse_container(container, price_level_signal)
-            if offer is not None:
-                offers.append(offer)
+        offers = self._extract_offers(data)
 
         logger.debug(
             "SerpAPI: %s → %s on %s — %d offer(s) found",
@@ -389,9 +407,9 @@ class SerpAPIFlightSource:
         max_stops: int | None,
         currency: str,
     ) -> dict:
-        # Use destination-country gl for better local pricing on international routes
-        dest_country = detect_destination_country(destination)
-        gl = _COUNTRY_GL_MAP.get(dest_country or "AU", "au")
+        # Use origin-country gl for correct Point of Sale (POS) pricing
+        origin_country = detect_airport_country(origin)
+        gl = _COUNTRY_GL_MAP.get(origin_country or "AU", "au")
 
         params: dict = {
             "engine": "google_flights",
@@ -416,6 +434,57 @@ class SerpAPIFlightSource:
 
         return params
 
+    def _search_without_stops_filter(
+        self,
+        params: dict,
+        max_stops: int,
+        origin: str,
+        destination: str,
+        depart_date: date,
+    ) -> list[FlightOffer]:
+        """Retry a search without the stops server filter, enforcing max_stops client-side."""
+        params_no_stops = {k: v for k, v in params.items() if k != "stops"}
+        try:
+            response = self._client.get(_BASE_URL, params=params_no_stops)
+            response.raise_for_status()
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            logger.debug("SerpAPI: retry without stops filter failed: %s", exc)
+            return []
+
+        data = response.json()
+        if "error" in data:
+            logger.debug(
+                "SerpAPI: retry without stops filter also returned no results for %s→%s",
+                origin,
+                destination,
+            )
+            return []
+
+        offers = self._extract_offers(data)
+        filtered = [o for o in offers if o.stops <= max_stops]
+        logger.debug(
+            "SerpAPI: %s→%s retry without stops filter — %d raw / %d after client-side filter (max_stops=%d)",
+            origin,
+            destination,
+            len(offers),
+            len(filtered),
+            max_stops,
+        )
+        return filtered
+
+    def _extract_offers(self, data: dict) -> list[FlightOffer]:
+        """Extract and parse all flight offers from a SerpAPI response dict."""
+        insights = data.get("price_insights", {})
+        raw_level = insights.get("price_level", "")
+        price_level_signal = _PRICE_LEVEL.get(raw_level.lower()) if raw_level else None
+
+        offers: list[FlightOffer] = []
+        for container in data.get("best_flights", []) + data.get("other_flights", []):
+            offer = self._parse_container(container, price_level_signal)
+            if offer is not None:
+                offers.append(offer)
+        return offers
+
     def _parse_container(
         self,
         container: dict,
@@ -432,11 +501,13 @@ class SerpAPIFlightSource:
 
             # Airline name → IATA code
             airline_name = first_leg.get("airline", "")
-            airline_code: str = (
-                _AIRLINE_IATA.get(airline_name.lower())
-                or airline_name[:2].upper()
-                or "XX"
-            )
+            airline_code: str = _AIRLINE_IATA.get(airline_name.lower()) or "XX"
+
+            # Fallback for unknown airlines: use first 2 chars ONLY if not colliding with known codes
+            if airline_code == "XX" and airline_name:
+                code_candidate = airline_name[:2].upper()
+                if code_candidate not in _AIRLINE_IATA.values():
+                    airline_code = code_candidate
 
             # Flight number — Google returns "QF 500", normalise to "QF500"
             raw_fn = first_leg.get("flight_number", "")
@@ -469,7 +540,10 @@ class SerpAPIFlightSource:
                 offer_raw=container,
             )
         except (KeyError, ValueError, TypeError) as exc:
-            logger.warning("Failed to parse SerpAPI flight container: %s", exc)
+            if isinstance(exc, KeyError) and exc.args[0] == "price":
+                logger.debug("Skipping SerpAPI flight container with no price")
+            else:
+                logger.warning("Failed to parse SerpAPI flight container: %s", exc)
             return None
 
     def close(self) -> None:
