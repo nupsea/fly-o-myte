@@ -817,6 +817,11 @@ def flex(
     fix_depart: bool = typer.Option(
         False, "--fix-depart", help="Fix depart date, vary return"
     ),
+    month: bool = typer.Option(
+        False,
+        "--month",
+        help="Scan the full departure month rather than ±N days",
+    ),
     refresh: bool = typer.Option(
         False, "--refresh", help="Bypass cache and fetch fresh prices"
     ),
@@ -840,7 +845,7 @@ def flex(
     )
     from fly_o_myte.display import FlexResultRow, print_flex_results
     from fly_o_myte.fees import get_airline_db
-    from fly_o_myte.scout import scout_flex
+    from fly_o_myte.scout import compute_price_variance_ratio, scout_flex, scout_month
 
     engine = _get_engine()
     with get_session(engine) as session:
@@ -849,19 +854,35 @@ def flex(
             err_console.print(f"[red]Trip {trip_id} not found.[/red]")
             raise typer.Exit(1)
 
-        # Determine flex mode
-        if fix_return:
-            depart_flex_val = flex_days
-            return_flex_val = 0
-        elif fix_depart:
-            depart_flex_val = 0
-            return_flex_val = flex_days
-        else:
-            depart_flex_val = flex_days
-            return_flex_val = flex_days
+        depart_dt = date.fromisoformat(trip.depart_date)
+        year_val = depart_dt.year
+        month_val = depart_dt.month
+        trip_length = (
+            (date.fromisoformat(trip.return_date) - depart_dt).days
+            if trip.return_date
+            else 7
+        )
 
-        # Compute cache key
-        flex_key = f"{trip.origin}_{trip.destination}_{trip.depart_date}_{trip.return_date}_{depart_flex_val}_{return_flex_val}"
+        # Determine mode + cache key
+        if month:
+            flex_key = f"month_{trip.origin}_{trip.destination}_{year_val}_{month_val}"
+            depart_flex_val = 0
+            return_flex_val = 0  # not used in month mode
+            symmetric = False
+        else:
+            if fix_return:
+                depart_flex_val = flex_days
+                return_flex_val = 0
+                symmetric = False
+            elif fix_depart:
+                depart_flex_val = 0
+                return_flex_val = flex_days
+                symmetric = False
+            else:
+                depart_flex_val = flex_days
+                return_flex_val = flex_days
+                symmetric = True
+            flex_key = f"{trip.origin}_{trip.destination}_{trip.depart_date}_{trip.return_date}_{depart_flex_val}_{return_flex_val}"
 
         # Get tracked cost from latest rank-1 snapshot
         latest_snap = get_latest_snapshot(session, trip_id)
@@ -911,21 +932,36 @@ def flex(
             airline_db = get_airline_db()
             cal = get_calendar()
 
-            depart = date.fromisoformat(trip.depart_date)
-            ret = date.fromisoformat(trip.return_date) if trip.return_date else depart
-
-            scout_results = scout_flex(
-                pm=pm,
-                profile=profile,
-                airline_db=airline_db,
-                calendar=cal,
-                origin=trip.origin,
-                destination=trip.destination,
-                depart_date=depart,
-                return_date=ret,
-                depart_flex=depart_flex_val,
-                return_flex=return_flex_val,
-            )
+            if month:
+                scout_results = scout_month(
+                    pm=pm,
+                    profile=profile,
+                    airline_db=airline_db,
+                    calendar=cal,
+                    origin=trip.origin,
+                    destination=trip.destination,
+                    year=year_val,
+                    month=month_val,
+                    trip_length_days=trip_length,
+                )
+            else:
+                ret = (
+                    date.fromisoformat(trip.return_date)
+                    if trip.return_date
+                    else depart_dt
+                )
+                scout_results = scout_flex(
+                    pm=pm,
+                    profile=profile,
+                    airline_db=airline_db,
+                    calendar=cal,
+                    origin=trip.origin,
+                    destination=trip.destination,
+                    depart_date=depart_dt,
+                    return_date=ret,
+                    depart_flex=depart_flex_val,
+                    return_flex=return_flex_val,
+                )
 
             rows = [
                 FlexResultRow(
@@ -961,7 +997,33 @@ def flex(
             console.print(f"No cheaper windows found within \u00b1{flex_days} days.")
             return
 
-        print_flex_results(rows, tracked_cost, trip.origin, trip.destination)
+        # Build display title for month mode
+        title_override: str | None = None
+        if month:
+            import calendar as _cal
+
+            month_name = _cal.month_name[depart_dt.month]
+            title_override = (
+                f"Full month view: {month_name} {depart_dt.year} -- all sampled windows"
+            )
+
+        print_flex_results(
+            rows,
+            tracked_cost,
+            trip.origin,
+            trip.destination,
+            title_override=title_override,
+        )
+
+        # Smart range suggestion (symmetric flex only, >= 3 results, not month mode)
+        if symmetric and len(rows) >= 3 and not month:
+            ratio = compute_price_variance_ratio([r.true_family_cost for r in rows])
+            if ratio > 0.20:
+                pct = int(ratio * 100)
+                console.print(
+                    f"[yellow]Prices vary significantly (\u00b1{pct}%) in this window. "
+                    f"Consider running fom flex {trip_id} --flex 7 for a broader view.[/yellow]"
+                )
 
         # Check if any are cheaper than tracked
         cheaper = [
@@ -1071,6 +1133,174 @@ def airports(
     for iata, display_name in matches:
         table.add_row(iata, display_name)
     console.print(table)
+
+
+# ─── plan ──────────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def plan(
+    intent_text: str | None = typer.Argument(
+        None, help="Natural language trip description, e.g. 'Sri Lanka in December'"
+    ),
+    budget: float | None = typer.Option(
+        None, "--budget", help="Maximum true family cost in AUD"
+    ),
+) -> None:
+    """Plan a trip from a natural language idea or guided prompts."""
+    import calendar as _cal
+
+    from fly_o_myte.calendar import get_calendar
+    from fly_o_myte.db.sqlite import Trip, get_session, insert_trip
+    from fly_o_myte.display import FlexResultRow, print_flex_results
+    from fly_o_myte.fees import get_airline_db
+    from fly_o_myte.planner import TripIntent, extract_trip_intent
+    from fly_o_myte.scout import scout_month
+    from fly_o_myte.tracker import poll_trip
+
+    settings = _get_settings()
+    api_key: str | None = settings.anthropic_api_key or None
+
+    intent: TripIntent = extract_trip_intent(intent_text or "", api_key)
+
+    profile = _get_profile()
+    origin = intent.origin_override or profile.origin_airport
+
+    # Confirm origin if user specified an override
+    if intent.origin_override:
+        from rich.prompt import Prompt as _Prompt
+
+        answer = _Prompt.ask(
+            f"Origin: {intent.origin_override} (from your input) instead of "
+            f"{profile.origin_airport} (profile). Use {intent.origin_override}?",
+            choices=["y", "n"],
+            default="y",
+        )
+        if answer != "y":
+            origin = profile.origin_airport
+
+    month_name = _cal.month_name[intent.month]
+    console.print(f"\nPlanning trip to: [bold]{intent.destination_display}[/bold]")
+    console.print(
+        f"Searching {origin} \u2192 {intent.destination_iata} for "
+        f"{month_name} {intent.year}..."
+    )
+
+    pm = _get_pm()
+    airline_db = get_airline_db()
+    cal = get_calendar()
+
+    results = scout_month(
+        pm=pm,
+        profile=profile,
+        airline_db=airline_db,
+        calendar=cal,
+        origin=origin,
+        destination=intent.destination_iata,
+        year=intent.year,
+        month=intent.month,
+        trip_length_days=intent.nights,
+    )
+
+    if not results:
+        console.print(
+            f"No results found for {month_name} {intent.year}. "
+            "Check your API key or try a different destination."
+        )
+        return
+
+    # Budget filter
+    display_results = results
+    if budget is not None:
+        qualified = [r for r in results if r.true_family_cost <= budget]
+        if not qualified:
+            console.print(
+                f"[yellow]No windows found under ${budget:,.0f}. "
+                "Showing cheapest 3 for reference.[/yellow]"
+            )
+            display_results = results[:3]
+        else:
+            display_results = qualified
+
+    # School holiday warning: flag if top results overlap a holiday
+    holiday_count = sum(1 for r in display_results[:5] if r.school_holiday)
+    if holiday_count > 0:
+        first_holiday = next(
+            r.school_holiday for r in display_results if r.school_holiday
+        )
+        console.print(
+            f"[yellow]Note: top {holiday_count} windows overlap "
+            f"{first_holiday.label} \u2014 prices are typically 15-30% higher. "
+            "Cheaper windows shown below.[/yellow]"
+        )
+
+    # Display using print_flex_results (delta vs tracked = None since no tracked trip yet)
+    rows = [
+        FlexResultRow(
+            depart_date=r.depart_date,
+            return_date=r.return_date,
+            true_family_cost=r.true_family_cost,
+            airline_code=r.airline_code,
+            stops=r.stops,
+            departure_time=r.departure_time,
+            school_holiday_label=r.school_holiday.label if r.school_holiday else None,
+        )
+        for r in display_results
+    ]
+
+    print_flex_results(rows, None, origin, intent.destination_iata)
+
+    # Watch prompt
+    from rich.prompt import Prompt as _Prompt2
+
+    choices = [str(i) for i in range(1, len(rows) + 1)] + ["n"]
+    answer = _Prompt2.ask(
+        f"Start tracking one of these? [1-{len(rows)}/n]",
+        choices=choices,
+        default="n",
+    )
+    if answer == "n":
+        return
+
+    selected_idx = int(answer) - 1
+    selected = display_results[selected_idx]
+    trip_label = (
+        f"{origin}-{intent.destination_iata} {selected.depart_date} "
+        f"({intent.destination_display})"
+    )
+
+    engine = _get_engine()
+    with get_session(engine) as session:
+        new_trip = insert_trip(
+            session,
+            Trip(
+                label=trip_label,
+                origin=origin,
+                destination=intent.destination_iata,
+                depart_date=str(selected.depart_date),
+                return_date=str(selected.return_date),
+                adults=profile.adults,
+                bags_per_person=profile.bags_per_person,
+                max_stops=profile.max_stops,
+            ),
+        )
+        assert new_trip.id is not None
+        console.print(f"[green]Tracking trip #{new_trip.id}: {trip_label}[/green]")
+
+        snap = poll_trip(session, new_trip, profile, pm, send_alerts=False)
+        if snap:
+            n_stops = snap.stops or 0
+            stops_label = (
+                "nonstop"
+                if n_stops == 0
+                else f"{n_stops} stop{'s' if n_stops > 1 else ''}"
+            )
+            console.print(
+                f"  Initial price: ${snap.true_family_cost:,.0f} AUD  "
+                f"{snap.airline_code} . {stops_label} . departs {snap.departure_time}"
+            )
+        else:
+            console.print("[yellow]No offers found — will retry on next poll.[/yellow]")
 
 
 if __name__ == "__main__":

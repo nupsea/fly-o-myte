@@ -55,6 +55,7 @@ LAYER_MAP: dict[str, int] = {
     "analytics": 5,
     "insights": 5,
     "notifier": 5,
+    "planner": 5,
     # Layer 6 — presentation
     "display": 6,
     # Layer 7 — CLI entry point (imports anything)

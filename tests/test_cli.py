@@ -389,6 +389,90 @@ class TestFlexCommand:
         assert result.exit_code == 0
         assert result.output == snapshot
 
+    def test_flex_month_snapshot(self, snapshot: SnapshotAssertion):
+        """fom flex --month with pre-seeded FlexCache shows month-mode table."""
+        import json
+
+        from fly_o_myte.db.sqlite import (
+            FlexCache,
+            PriceSnapshot,
+            Trip,
+            get_session,
+            insert_snapshot,
+            insert_trip,
+        )
+
+        with get_session(self._engine) as session:  # type: ignore[attr-defined]
+            trip = insert_trip(
+                session,
+                Trip(
+                    label="BNE-SYD Month test",
+                    origin="BNE",
+                    destination="SYD",
+                    depart_date="2026-07-20",
+                    return_date="2026-07-27",
+                    adults=2,
+                ),
+            )
+            assert trip.id is not None
+
+            insert_snapshot(
+                session,
+                PriceSnapshot(
+                    trip_id=trip.id,
+                    fetched_at="2026-03-01T10:00:00",
+                    source="stub",
+                    airline_code="QF",
+                    true_family_cost=800.0,
+                    rank=1,
+                ),
+            )
+
+            # Pre-populate FlexCache with month-mode key
+            flex_key = "month_BNE_SYD_2026_7"
+            cache_data = [
+                {
+                    "depart_date": "2026-07-01",
+                    "return_date": "2026-07-08",
+                    "true_family_cost": 280.0,
+                    "airline_code": "QF",
+                    "stops": 0,
+                    "departure_time": "08:00",
+                    "school_holiday_label": "QLD Mid-Year",
+                },
+                {
+                    "depart_date": "2026-07-08",
+                    "return_date": "2026-07-15",
+                    "true_family_cost": 320.0,
+                    "airline_code": "VA",
+                    "stops": 0,
+                    "departure_time": "10:30",
+                    "school_holiday_label": None,
+                },
+                {
+                    "depart_date": "2026-07-15",
+                    "return_date": "2026-07-22",
+                    "true_family_cost": 360.0,
+                    "airline_code": "JQ",
+                    "stops": 1,
+                    "departure_time": "14:00",
+                    "school_holiday_label": None,
+                },
+            ]
+            session.add(
+                FlexCache(
+                    trip_id=trip.id,
+                    flex_key=flex_key,
+                    computed_at="2026-03-04T08:00:00+00:00",
+                    results_json=json.dumps(cache_data),
+                )
+            )
+            session.commit()
+
+        result = runner.invoke(app, ["flex", "1", "--month"], input="n\n")
+        assert result.exit_code == 0
+        assert result.output == snapshot
+
 
 class TestAirportsCommand:
     """S32: fom airports command resolves IATA codes by city/country name."""
@@ -495,3 +579,37 @@ class TestInternationalRouteCheck:
         assert result.exit_code == 0
         assert "International route" in result.output
         assert "1,600" in result.output  # AUD total visible
+
+
+class TestPlanCommand:
+    """S35: fom plan command — structured fallback when ANTHROPIC_API_KEY unset."""
+
+    @pytest.fixture(autouse=True)
+    def fresh_db(self, tmp_path, monkeypatch):
+        from fly_o_myte.config import get_settings
+        from fly_o_myte.db.sqlite import create_db_engine, create_tables
+
+        db_path = tmp_path / "plan_test.db"
+        monkeypatch.setenv("FLY_O_MYTE_DB_PATH", str(db_path))
+        get_settings.cache_clear()
+        engine = create_db_engine(db_path)
+        create_tables(engine)
+        self._engine = engine  # type: ignore[attr-defined]
+        yield
+        get_settings.cache_clear()
+
+    def test_plan_no_api_key_no_results(self):
+        """fom plan with no API key and empty PM → shows note + no results message."""
+        # Input: destination=Sri Lanka, month=dec-2026, nights=7, flex=3
+        result = runner.invoke(app, ["plan"], input="Sri Lanka\ndec-2026\n7\n3\n")
+        assert result.exit_code == 0
+        # Should show the API key note
+        assert "ANTHROPIC_API_KEY not set" in result.output
+        # Should show no results (empty PM in test env)
+        assert "No results" in result.output or "CMB" in result.output
+
+    def test_plan_snapshot(self, snapshot: SnapshotAssertion):
+        """Syrupy snapshot for fom plan structured fallback (no LLM, no results)."""
+        result = runner.invoke(app, ["plan"], input="Sri Lanka\ndec-2026\n7\n3\n")
+        assert result.exit_code == 0
+        assert result.output == snapshot

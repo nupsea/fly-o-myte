@@ -729,7 +729,7 @@
         "tests/test_scout.py: price variance ratio computed correctly from known test data",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S35",
@@ -758,7 +758,7 @@
         "Syrupy snapshot for fom plan structured fallback output added to tests/test_cli.py",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S36",

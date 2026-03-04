@@ -1,6 +1,6 @@
 # Fly-O-Myte Architecture
 
-Last reviewed: 2026-03-04 — Phase 2 complete; Phase 3 in progress (multi-currency, international routes).
+Last reviewed: 2026-03-04 — Phase 3 complete; Phase 4 in progress (airport resolver, flex comparison, fom plan NL planner).
 
 ## Top-Level Domain Map
 
@@ -24,7 +24,7 @@ Layer 1 — config, db.sqlite, db.duckdb
 Layer 2 — fees, calendar, currency  (load embedded data; currency rate cache)
 Layer 3 — recommender, true_cost    (pure logic; import types + layer 2)
 Layer 4 — price_sources.tequila, price_sources.amadeus
-Layer 5 — tracker, scout, analytics, insights, notifier  (orchestration)
+Layer 5 — tracker, scout, analytics, insights, notifier, planner  (orchestration)
 Layer 6 — display                   (Rich output)
 Layer 7 — cli                       (Typer entry-point; may import anything)
 ```

@@ -252,3 +252,18 @@ def _scout_single(
         school_holiday=holiday_ctx,
         breakdown=breakdown,
     )
+
+
+def compute_price_variance_ratio(costs: list[float]) -> float:
+    """Return std_dev / mean for a list of costs.
+
+    Used to detect high price variance across a flex window and suggest a wider
+    flex range to the user. Returns 0.0 if fewer than 2 values or mean is 0.
+    """
+    if len(costs) < 2:
+        return 0.0
+    mean = sum(costs) / len(costs)
+    if mean <= 0.0:
+        return 0.0
+    variance = sum((c - mean) ** 2 for c in costs) / (len(costs) - 1)
+    return variance**0.5 / mean

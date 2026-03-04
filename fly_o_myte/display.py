@@ -416,17 +416,20 @@ def print_flex_results(
     tracked_cost: float | None,
     origin: str,
     destination: str,
+    title_override: str | None = None,
 ) -> None:
     """Print a ranked flex-results table.
 
     Cheapest row is bold. Rows cheaper than tracked_cost are shown in green.
+    title_override replaces the default "Flex Windows: {origin} -> {destination}" title.
     """
     if not rows:
         console.print("No flex results to display.")
         return
 
+    title = title_override or f"Flex Windows: {origin} \u2192 {destination}"
     table = Table(
-        title=f"Flex Windows: {origin} \u2192 {destination}",
+        title=title,
         box=box.SIMPLE,
         show_lines=False,
     )

@@ -285,6 +285,39 @@ class TestScoutFlexModes:
         assert len(results) == 7
 
 
+class TestComputePriceVarianceRatio:
+    """Unit tests for compute_price_variance_ratio helper."""
+
+    def test_known_data_returns_correct_ratio(self) -> None:
+        """[100, 200, 300]: mean=200, sample_std≈100, ratio≈0.5."""
+        from fly_o_myte.scout import compute_price_variance_ratio
+
+        ratio = compute_price_variance_ratio([100.0, 200.0, 300.0])
+        assert abs(ratio - 0.5) < 0.01
+
+    def test_uniform_costs_ratio_is_zero(self) -> None:
+        from fly_o_myte.scout import compute_price_variance_ratio
+
+        ratio = compute_price_variance_ratio([300.0, 300.0, 300.0])
+        assert ratio == 0.0
+
+    def test_single_value_returns_zero(self) -> None:
+        from fly_o_myte.scout import compute_price_variance_ratio
+
+        assert compute_price_variance_ratio([200.0]) == 0.0
+
+    def test_empty_list_returns_zero(self) -> None:
+        from fly_o_myte.scout import compute_price_variance_ratio
+
+        assert compute_price_variance_ratio([]) == 0.0
+
+    def test_high_variance_exceeds_threshold(self) -> None:
+        from fly_o_myte.scout import compute_price_variance_ratio
+
+        ratio = compute_price_variance_ratio([100.0, 500.0])
+        assert ratio > 0.20
+
+
 class TestScoutCLI:
     """Tests for the fom scout CLI command."""
 

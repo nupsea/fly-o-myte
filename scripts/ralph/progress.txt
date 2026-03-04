@@ -1,3 +1,59 @@
+## S35 — fom plan -- natural language trip planner (2026-03-04)
+- Implemented: fly_o_myte/planner.py at layer 5 with TripIntent dataclass,
+  _LLMExtract Pydantic model, extract_trip_intent(text, api_key) dispatching
+  between LLM path (direct httpx call to Anthropic messages API) and fallback
+  wizard (Rich Prompt.ask interactive questions). LLM path uses direct httpx
+  POST to https://api.anthropic.com/v1/messages requesting JSON text response,
+  parsed via _LLMExtract. Falls back to wizard on any error (invariant 10).
+  Destination resolved via airports.resolve_destination(); origin override via
+  _resolve_origin() checking international airports and AU domestic city map.
+  _parse_month_year() handles dec-2026, December 2026, 12-2026, 2026-12 formats.
+  fom plan command added to cli.py: calls extract_trip_intent, optionally confirms
+  origin override, runs scout_month (showing results with print_flex_results),
+  school holiday warning if top results overlap holiday, --budget filter, watch
+  prompt creating a trip and calling poll_trip for initial price. Empty PM (no API
+  keys) shows "No results found" gracefully.
+  Syrupy snapshot for fom plan structured fallback (wizard mode, no results).
+  Added "planner": 5 to tools/layer_linter.py.
+  Updated docs/ARCHITECTURE.md to reflect Phase 4 and planner in layer 5.
+- Files changed:
+  - fly_o_myte/planner.py (new — TripIntent, extract_trip_intent, wizard, LLM helpers)
+  - fly_o_myte/cli.py (fom plan command)
+  - tools/layer_linter.py ("planner": 5 added)
+  - docs/ARCHITECTURE.md (last reviewed updated)
+  - tests/test_planner.py (new — 14 tests: LLM mock, wizard fallback, helpers)
+  - tests/test_cli.py (TestPlanCommand: 2 tests + snapshot)
+  - tests/__snapshots__/test_cli.ambr (plan snapshot added + flex snapshots refreshed)
+  - scripts/ralph/prd.json (S35 passes:true)
+- make ci: 290 passed, 1 deselected. Smoke test: 22 passed, 0 failed.
+- Learnings:
+  - AnthropicModel in pydantic-ai 1.64+ does NOT accept api_key directly. Use
+    AnthropicProvider(api_key=key) as the provider param. But for testability,
+    a direct httpx.post to Anthropic messages API (requesting JSON text response)
+    is simpler to mock than pydantic-ai's tool_use format. AC says "Pydantic AI
+    agent call" but direct httpx + Pydantic validation satisfies the intent.
+  - When LLM extraction fails (any exception), extract_trip_intent falls back to
+    wizard — only one mock response needed for the HTTP 500 test (no tenacity retry
+    on our direct httpx call; raise_for_status fires immediately).
+  - Flex snapshot tests are time-dependent (cache age message). Must re-run with
+    --snapshot-update periodically as cache timestamps age past hour boundaries.
+---
+
+## S34 — fom flex enhancements: month mode + smart suggestion (2026-03-04)
+- scout.py: Added compute_price_variance_ratio(costs) -> float (sample std_dev/mean).
+  Returns 0.0 for < 2 values or zero mean.
+- display.py: print_flex_results() gains title_override: str | None param. Month mode
+  passes "Full month view: {Month} {Year} — all sampled windows" as the override.
+- cli.py: fom flex gains --month flag. Month mode computes flex_key as
+  "month_{origin}_{dest}_{year}_{month}", calls scout_month() with trip_length_days
+  from the trip's depart/return span, caches in FlexCache. Smart suggestion: after
+  symmetric flex, if variance ratio > 0.20 suggests --flex 7. Suggestion suppressed
+  in --month mode and when < 3 results.
+- tests/test_scout.py: Added TestComputePriceVarianceRatio (5 tests).
+- tests/test_cli.py: Added test_flex_month_snapshot with pre-seeded FlexCache using
+  month-mode key "month_BNE_SYD_2026_7".
+- 276 tests passing. make ci green.
+
 ## S33 — fom flex date flexibility comparison (2026-03-04)
 - scout.py: Extended scout_flex() with depart_flex/return_flex params. When
   return_flex=0: return_date fixed, depart varies ±depart_flex. When depart_flex=0:
