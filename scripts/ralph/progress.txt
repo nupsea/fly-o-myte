@@ -1,3 +1,42 @@
+## S31 — fom check top-3 airline shortlist (2026-03-04)
+- Renamed `_fetch_best_offer()` → `_fetch_top_offers(n=3)` in tracker.py.
+  Returns list[FlightOffer] sorted by base_fare_per_adult, capped at n.
+- poll_trip() now computes true cost for all offers, sorts by true_family_cost,
+  assigns rank 1/2/3, and inserts all with a shared fetched_at timestamp.
+  Recommendation and alert logic uses rank-1 offer only.
+  snap_points for history filtered by rank==1 to avoid skewing rolling averages.
+- db/sqlite.py: get_latest_snapshot() now orders by (fetched_at DESC, rank ASC)
+  so rank-1 is always returned. Added get_snapshots_at_fetch() to retrieve all
+  snapshots at a given timestamp (for the Alternatives table in display.py).
+- display.py: print_trip_detail() accepts optional alternative_snapshots param.
+  When len > 1, renders an "Alternatives" Rich table: Rank, Airline, True cost,
+  Stops, Depart, Family score. Rank-1 row is bold.
+- cli.py check command: fetches get_snapshots_at_fetch() and passes to print_trip_detail.
+- tests/test_tracker.py: Added _StubThreeOfferSource (3 offers: JQ/QF/VA).
+  TestTopOffersRanking with 2 tests:
+    - test_three_offers_produce_three_ranked_snapshots
+    - test_ranking_by_true_cost_not_base_fare (QF ranks 1 despite higher base than JQ)
+- make ci: 228 passed, 1 deselected. Smoke test: 22 passed, 0 failed.
+- Syrupy snapshots unchanged (test DB has single-rank snapshots — Alternatives table
+  only appears when poll returns 2+ offers, not in the seeded test DB).
+- Files changed:
+  - fly_o_myte/tracker.py
+  - fly_o_myte/db/sqlite.py
+  - fly_o_myte/display.py
+  - fly_o_myte/cli.py
+  - tests/test_tracker.py
+  - scripts/ralph/prd.json
+- Learnings:
+  - With multi-rank snapshots per poll, snap_points for recommendation MUST filter
+    by rank==1 only. Including rank-2/3 (same fetched_at, same day) causes _group_by_day
+    to average all offers instead of tracking the best offer's price trend.
+  - shared_fetched_at = datetime.now(UTC).isoformat() ensures all 3 snapshots from
+    one poll have identical fetched_at. get_latest_snapshot needs secondary sort by
+    rank ASC to reliably return rank-1 when multiple rows share max fetched_at.
+  - Syrupy snapshot tests are unaffected because test seeds use only rank-1 snapshots;
+    the Alternatives table only renders during a live poll with 3 offers returned.
+---
+
 ## Codebase Patterns
 
 These patterns are maintained here and updated after each story. Read BEFORE implementing.

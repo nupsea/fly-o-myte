@@ -88,6 +88,7 @@ def print_trip_detail(
     snapshot: PriceSnapshot,
     breakdown: TrueCostBreakdown | None = None,
     insight_text: str | None = None,
+    alternative_snapshots: list[PriceSnapshot] | None = None,
 ) -> None:
     """Print the full recommendation panel for `fom check <id>`."""
     decision_style = _DECISION_STYLE.get(rec.decision, "white")
@@ -175,6 +176,41 @@ def print_trip_detail(
         console.print(
             Panel(insight_text, title="[dim]AI Insight[/dim]", border_style="dim")
         )
+
+    # Alternatives table (S31): show when rank-2/3 snapshots exist at same fetch time
+    if alternative_snapshots and len(alternative_snapshots) > 1:
+        alt_table = Table(title="Alternatives", box=box.SIMPLE)
+        alt_table.add_column("Rank", justify="center", min_width=4)
+        alt_table.add_column("Airline", min_width=8)
+        alt_table.add_column("True cost", justify="right", min_width=12)
+        alt_table.add_column("Stops", justify="center", min_width=5)
+        alt_table.add_column("Depart", min_width=8)
+        alt_table.add_column("Family score", justify="right", min_width=12)
+
+        for alt in alternative_snapshots:
+            cost_str = f"${alt.true_family_cost:,.0f} AUD"
+            stops_str = str(alt.stops) if alt.stops is not None else "—"
+            dep_str = alt.departure_time or "—"
+            score_str = (
+                f"{alt.family_score:.0f}" if alt.family_score is not None else "—"
+            )
+            airline_str = alt.airline_code or "—"
+
+            if alt.rank == 1:
+                alt_table.add_row(
+                    f"[bold]{alt.rank}[/bold]",
+                    f"[bold]{airline_str}[/bold]",
+                    f"[bold]{cost_str}[/bold]",
+                    f"[bold]{stops_str}[/bold]",
+                    f"[bold]{dep_str}[/bold]",
+                    f"[bold]{score_str}[/bold]",
+                )
+            else:
+                alt_table.add_row(
+                    str(alt.rank), airline_str, cost_str, stops_str, dep_str, score_str
+                )
+
+        console.print(alt_table)
 
     console.print()
 

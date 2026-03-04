@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 import pluggy
 
@@ -47,7 +47,11 @@ from fly_o_myte.price_sources.serpapi import (
 )
 from fly_o_myte.price_sources.tequila import TequilaPriceSource
 from fly_o_myte.recommender import RouteType, SnapshotPoint, classify_route, compute
-from fly_o_myte.true_cost import compute_family_score, compute_true_cost
+from fly_o_myte.true_cost import (
+    TrueCostBreakdown,
+    compute_family_score,
+    compute_true_cost,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,16 +91,17 @@ def poll_trip(
     send_alerts: bool = True,
 ) -> PriceSnapshot | None:
     """
-    Fetch the latest price for a trip, save a snapshot, and compute a recommendation.
+    Fetch the latest price for a trip, save snapshots for top-3 offers, and compute
+    a recommendation based on the rank-1 (lowest true family cost) offer.
 
-    Returns the saved snapshot on success, or None if the fetch failed.
+    Returns the rank-1 snapshot on success, or None if the fetch failed.
     """
     depart = date.fromisoformat(trip.depart_date)
     ret = date.fromisoformat(trip.return_date) if trip.return_date else None
     child_ages = profile.child_ages_at(depart)
 
-    # ─── 1. Fetch price ────────────────────────────────────────────────────
-    offer = _fetch_best_offer(
+    # ─── 1. Fetch top offers ───────────────────────────────────────────────
+    offers = _fetch_top_offers(
         pm=pm,
         origin=trip.origin,
         destination=trip.destination,
@@ -106,79 +111,94 @@ def poll_trip(
         children_ages=child_ages,
         max_stops=trip.max_stops,
     )
-    if offer is None:
+    if not offers:
         logger.warning("No offers found for trip %s (%s)", trip.id, trip.label)
         return None
 
     # ─── 1b. Route classification ───────────────────────────────────────────
     route_type = classify_route(trip.origin, trip.destination)
 
-    # ─── 1c. Amadeus signal enrichment ─────────────────────────────────────
+    # ─── 1c. Amadeus signal enrichment (applied to base-fare-cheapest offer) ─
     # ASIA_PACIFIC / LONG_HAUL: always call Amadeus for a reliable market signal.
     # DOMESTIC / TRANS_TASMAN: Amadeus only as fallback when SerpAPI returned None.
     _needs_amadeus = (
         route_type in (RouteType.ASIA_PACIFIC, RouteType.LONG_HAUL)
-        or offer.price_level_signal is None
+        or offers[0].price_level_signal is None
     )
     if _needs_amadeus:
         for plugin in pm.get_plugins():
             if isinstance(plugin, AmadeusPriceSource):
                 signal = plugin.get_price_level_signal(
-                    trip.origin, trip.destination, depart, offer.base_fare_per_adult
+                    trip.origin, trip.destination, depart, offers[0].base_fare_per_adult
                 )
                 if signal:
-                    offer = FlightOffer(**{**vars(offer), "price_level_signal": signal})
+                    offers[0] = FlightOffer(
+                        **{**vars(offers[0]), "price_level_signal": signal}
+                    )
                 break
 
-    # ─── 2. Compute true family cost ───────────────────────────────────────
+    # ─── 2. Compute true family cost for all offers ────────────────────────
     airline_db = get_airline_db()
-    airline = airline_db.get_or_default(offer.airline_code)
-    breakdown = compute_true_cost(
-        airline=airline,
-        base_fare_per_adult=offer.base_fare_per_adult,
-        adults=trip.adults,
-        child_ages=child_ages,
-        bags_per_person=trip.bags_per_person,
-        depart_date=depart,
-        return_date=ret,
-        currency=offer.currency,
-    )
-
-    # ─── 3. Compute family score ───────────────────────────────────────────
-    dep_hour = _parse_hour(offer.departure_time)
-    avg_cost = breakdown.total  # first snapshot — no history yet for avg
-    family_score = compute_family_score(
-        airline=airline,
-        true_cost=breakdown.total,
-        avg_cost_on_route=avg_cost,
-        stops=offer.stops,
-        departure_hour=dep_hour,
-        preferred_earliest=profile.preferred_departure_window.earliest_hour,
-        preferred_latest=profile.preferred_departure_window.latest_hour,
-    )
-
-    # ─── 4. Save snapshot ──────────────────────────────────────────────────
-    assert trip.id is not None  # guaranteed for persisted trips
-    snapshot = insert_snapshot(
-        session,
-        PriceSnapshot(
-            trip_id=trip.id,
-            source=offer.source,
-            airline_code=offer.airline_code,
-            flight_number=offer.flight_number,
+    offers_with_data: list[tuple[FlightOffer, TrueCostBreakdown, float]] = []
+    for offer in offers:
+        airline = airline_db.get_or_default(offer.airline_code)
+        bd = compute_true_cost(
+            airline=airline,
             base_fare_per_adult=offer.base_fare_per_adult,
-            true_family_cost=breakdown.total,
-            true_cost_breakdown=json.dumps(breakdown.as_dict()),
-            price_level_signal=offer.price_level_signal,
+            adults=trip.adults,
+            child_ages=child_ages,
+            bags_per_person=trip.bags_per_person,
+            depart_date=depart,
+            return_date=ret,
+            currency=offer.currency,
+        )
+        dep_hour = _parse_hour(offer.departure_time)
+        fs = compute_family_score(
+            airline=airline,
+            true_cost=bd.total,
+            avg_cost_on_route=bd.total,
             stops=offer.stops,
-            departure_time=offer.departure_time,
-            duration_minutes=offer.duration_minutes,
-            family_score=family_score,
-            offer_raw=json.dumps(offer.offer_raw),
-        ),
-    )
+            departure_hour=dep_hour,
+            preferred_earliest=profile.preferred_departure_window.earliest_hour,
+            preferred_latest=profile.preferred_departure_window.latest_hour,
+        )
+        offers_with_data.append((offer, bd, fs))
 
-    # ─── 4a. Analytics update (Phase 2) ───────────────────────────────────
+    # Sort by true family cost ascending → assign ranks 1, 2, 3
+    offers_with_data.sort(key=lambda x: x[1].total)
+
+    # ─── 3. Save snapshots (shared fetched_at, one per offer) ─────────────
+    assert trip.id is not None  # guaranteed for persisted trips
+    shared_fetched_at = datetime.now(UTC).isoformat()
+    primary_snapshot: PriceSnapshot | None = None
+
+    for rank, (offer, bd, fs) in enumerate(offers_with_data, 1):
+        snap = insert_snapshot(
+            session,
+            PriceSnapshot(
+                trip_id=trip.id,
+                fetched_at=shared_fetched_at,
+                source=offer.source,
+                airline_code=offer.airline_code,
+                flight_number=offer.flight_number,
+                base_fare_per_adult=offer.base_fare_per_adult,
+                true_family_cost=bd.total,
+                true_cost_breakdown=json.dumps(bd.as_dict()),
+                price_level_signal=offer.price_level_signal,
+                stops=offer.stops,
+                departure_time=offer.departure_time,
+                duration_minutes=offer.duration_minutes,
+                family_score=fs,
+                offer_raw=json.dumps(offer.offer_raw),
+                rank=rank,
+            ),
+        )
+        if rank == 1:
+            primary_snapshot = snap
+
+    assert primary_snapshot is not None
+
+    # ─── 3a. Analytics update (Phase 2) ───────────────────────────────────
     _settings = get_settings()
     update_after_snapshot(
         analytics_dir=_settings.analytics_dir,
@@ -188,14 +208,19 @@ def poll_trip(
         sqlite_db_path=_settings.db_path,
     )
 
-    # ─── 5. Build recommendation ───────────────────────────────────────────
+    # ─── 4. Build recommendation (rank-1 offer only) ──────────────────────
+    primary_offer, primary_breakdown, _ = offers_with_data[0]
+
     snapshots = get_snapshots_for_trip(session, trip.id)
+    # Use only rank-1 snapshots for recommendation history
+    # (rank-2/3 are alternatives at the same timestamp and should not skew history)
     snap_points = [
         SnapshotPoint(
             fetched_at=datetime.fromisoformat(s.fetched_at),
             true_family_cost=s.true_family_cost,
         )
         for s in snapshots
+        if s.rank == 1
     ]
 
     days_to_departure = (depart - date.today()).days
@@ -216,9 +241,9 @@ def poll_trip(
 
     result = compute(
         snapshots=snap_points,
-        current_true_cost=breakdown.total,
+        current_true_cost=primary_breakdown.total,
         days_to_departure=max(0, days_to_departure),
-        price_level_signal=offer.price_level_signal,
+        price_level_signal=primary_offer.price_level_signal,
         school_holiday_context=holiday_ctx,
         route_type=route_type,
     )
@@ -232,11 +257,11 @@ def poll_trip(
             regret_risk=result.regret_risk,
             regret_book_aud=result.regret_book_aud,
             regret_wait_aud=result.regret_wait_aud,
-            true_family_cost=breakdown.total,
+            true_family_cost=primary_breakdown.total,
             rolling_avg_cost=result.rolling_avg_cost,
             trend_slope=result.trend_slope,
             days_to_departure=days_to_departure,
-            price_level_signal=offer.price_level_signal,
+            price_level_signal=primary_offer.price_level_signal,
             school_holiday_flag=holiday_ctx.label if holiday_ctx else None,
             rationale=result.rationale,
         ),
@@ -246,19 +271,19 @@ def poll_trip(
         "Trip %s — %s: $%,.0f — %s (%.0f%% confident)",
         trip.id,
         trip.label,
-        breakdown.total,
+        primary_breakdown.total,
         result.decision.upper(),
         result.confidence * 100,
     )
 
-    # ─── 6. Send alerts ────────────────────────────────────────────────────
+    # ─── 5. Send alerts ────────────────────────────────────────────────────
     if send_alerts and result.decision == "book_now":
         sent = send_book_now_alert(trip, rec)
         if sent:
             assert rec.id is not None  # guaranteed after insert
             mark_email_sent(session, rec.id)
 
-    return snapshot
+    return primary_snapshot
 
 
 def poll_all_active(
@@ -291,7 +316,7 @@ def poll_all_active(
 # ─── Private helpers ───────────────────────────────────────────────────────────
 
 
-def _fetch_best_offer(
+def _fetch_top_offers(
     pm: pluggy.PluginManager,
     origin: str,
     destination: str,
@@ -300,9 +325,14 @@ def _fetch_best_offer(
     adults: int,
     children_ages: list[int],
     max_stops: int,
-) -> FlightOffer | None:
+    n: int = 3,
+) -> list[FlightOffer]:
     """
-    Call all registered price sources in order and return the cheapest offer found.
+    Call all registered price sources and return up to n cheapest offers by base fare.
+
+    Results are sorted by base_fare_per_adult ascending. True cost ranking
+    (which determines the final rank 1/2/3 saved to the DB) happens in poll_trip()
+    after fee calculation.
     """
     all_offers: list[FlightOffer] = []
 
@@ -321,11 +351,11 @@ def _fetch_best_offer(
         all_offers.extend(offer_list)
 
     if not all_offers:
-        return None
+        return []
 
-    # Return the offer with the lowest base fare per adult
-    # (True cost ranking happens after fee calculation in the caller)
-    return min(all_offers, key=lambda o: o.base_fare_per_adult)
+    # Sort by base fare and return top n candidates for true cost ranking
+    all_offers.sort(key=lambda o: o.base_fare_per_adult)
+    return all_offers[:n]
 
 
 def _parse_hour(departure_time: str) -> int:

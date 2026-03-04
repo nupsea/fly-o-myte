@@ -65,6 +65,7 @@ class PriceSnapshot(SQLModel, table=True):
     duration_minutes: int | None = None
     family_score: float | None = None  # 0–100
     offer_raw: str = "{}"  # JSON blob for debugging
+    rank: int = Field(default=1)  # 1=best true cost, 2=second, 3=third (S31)
 
 
 class Recommendation(SQLModel, table=True):
@@ -190,10 +191,24 @@ def get_latest_snapshot(session: Session, trip_id: int) -> PriceSnapshot | None:
     result = session.exec(
         select(PriceSnapshot)
         .where(PriceSnapshot.trip_id == trip_id)
-        .order_by(col(PriceSnapshot.fetched_at).desc())
+        .order_by(col(PriceSnapshot.fetched_at).desc(), col(PriceSnapshot.rank).asc())
         .limit(1)
     )
     return result.first()
+
+
+def get_snapshots_at_fetch(
+    session: Session, trip_id: int, fetched_at: str
+) -> list[PriceSnapshot]:
+    """Get all snapshots for a trip at a specific fetched_at timestamp, ordered by rank."""
+    return list(
+        session.exec(
+            select(PriceSnapshot)
+            .where(PriceSnapshot.trip_id == trip_id)
+            .where(PriceSnapshot.fetched_at == fetched_at)
+            .order_by(col(PriceSnapshot.rank).asc())
+        )
+    )
 
 
 def insert_recommendation(session: Session, rec: Recommendation) -> Recommendation:

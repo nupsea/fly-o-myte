@@ -438,7 +438,15 @@ def check(
             except (ValueError, KeyError):
                 pass
 
-        print_trip_detail(trip, rec, snap, breakdown)
+        # Fetch all snapshots at this fetched_at for the Alternatives table
+        from fly_o_myte.db.sqlite import get_snapshots_at_fetch
+
+        all_snaps = get_snapshots_at_fetch(session, trip_id, snap.fetched_at)
+        alternatives = all_snaps if len(all_snaps) > 1 else None
+
+        print_trip_detail(
+            trip, rec, snap, breakdown, alternative_snapshots=alternatives
+        )
 
         # International route context label
         from fly_o_myte.recommender import RouteType, classify_route

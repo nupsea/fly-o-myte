@@ -636,7 +636,7 @@
         "Syrupy snapshot updated for fom check output",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "DR-P3",

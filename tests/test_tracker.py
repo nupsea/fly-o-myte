@@ -24,6 +24,84 @@ from fly_o_myte.price_sources.hookspecs import (
 )
 from fly_o_myte.tracker import poll_all_active, poll_trip
 
+# ─── Multi-offer ranking stub (S31) ──────────────────────────────────────────
+
+
+class _StubThreeOfferSource:
+    """Returns 3 offers: JQ (cheapest base fare, expensive true cost due to bags),
+    QF (mid base fare, cheapest true cost — zero bag fees), VA (highest base fare).
+
+    With sample_trip (2 adults, 1 bag/person, return BNE→SYD):
+      JQ $99: 2×99=$198 + bags 2×55×2=$220 + seats 2×8×2=$32 → true=$450
+      QF $149: 2×149=$298 + bags=0 + seats=0 → true=$298  ← rank 1 (lowest true cost)
+      VA $200: 2×200=$400 + any VA fees → true ≥ $400       ← rank 3 (or 2)
+
+    True cost order: QF < VA (or QF < JQ < VA) depending on VA fees.
+    Base fare order: JQ < QF < VA  (reversed from true cost for JQ vs QF)
+    """
+
+    @hookimpl
+    def source_name(self) -> str:
+        return "three_offers"
+
+    @hookimpl
+    def supports_route(self, origin: str, destination: str) -> bool:
+        return True
+
+    @hookimpl
+    def search_flights(
+        self,
+        origin: str,
+        destination: str,
+        depart_date: object,
+        return_date: object,
+        adults: int,
+        children_ages: list,
+        max_stops: object,
+        currency: str,
+    ) -> list[FlightOffer]:
+        return [
+            FlightOffer(
+                source="three_offers",
+                airline_code="JQ",
+                flight_number="JQ501",
+                base_fare_per_adult=99.0,
+                currency="AUD",
+                stops=0,
+                departure_time="07:00",
+                arrival_time="09:00",
+                duration_minutes=120,
+                price_level_signal=None,
+                offer_raw={},
+            ),
+            FlightOffer(
+                source="three_offers",
+                airline_code="QF",
+                flight_number="QF500",
+                base_fare_per_adult=149.0,
+                currency="AUD",
+                stops=0,
+                departure_time="10:30",
+                arrival_time="12:10",
+                duration_minutes=100,
+                price_level_signal=None,
+                offer_raw={},
+            ),
+            FlightOffer(
+                source="three_offers",
+                airline_code="VA",
+                flight_number="VA502",
+                base_fare_per_adult=200.0,
+                currency="AUD",
+                stops=0,
+                departure_time="14:00",
+                arrival_time="15:40",
+                duration_minutes=100,
+                price_level_signal=None,
+                offer_raw={},
+            ),
+        ]
+
 
 def _make_profile() -> FamilyProfile:
     return FamilyProfile(
@@ -560,3 +638,66 @@ class TestInternationalRouteIntegration:
         assert rec.decision == "book_now", (
             f"Expected BOOK_NOW via ASIA_PACIFIC booking window, got {rec.decision}"
         )
+
+
+# ─── Top-3 offer ranking (S31) ────────────────────────────────────────────────
+
+
+@pytest.mark.integration
+class TestTopOffersRanking:
+    """S31: poll_trip saves up to 3 ranked snapshots per poll, sorted by true family cost."""
+
+    def test_three_offers_produce_three_ranked_snapshots(self, db_session, sample_trip):
+        """A source returning 3 offers → 3 PriceSnapshot rows with distinct ranks 1/2/3."""
+        pm = build_plugin_manager()
+        pm.register(_StubThreeOfferSource())
+
+        snap = poll_trip(
+            db_session, sample_trip, _make_profile(), pm, send_alerts=False
+        )
+        assert snap is not None
+        assert snap.rank == 1
+
+        all_snaps = get_snapshots_for_trip(db_session, sample_trip.id)
+        assert len(all_snaps) == 3
+
+        ranks = {s.rank for s in all_snaps}
+        assert ranks == {1, 2, 3}
+
+        # All 3 share the same fetched_at timestamp
+        fetched_ats = {s.fetched_at for s in all_snaps}
+        assert len(fetched_ats) == 1
+
+        # True costs are ordered rank-1 ≤ rank-2 ≤ rank-3
+        sorted_by_rank = sorted(all_snaps, key=lambda s: s.rank)
+        assert sorted_by_rank[0].true_family_cost <= sorted_by_rank[1].true_family_cost
+        assert sorted_by_rank[1].true_family_cost <= sorted_by_rank[2].true_family_cost
+
+    def test_ranking_by_true_cost_not_base_fare(self, db_session, sample_trip):
+        """JQ has lower base fare than QF but higher true cost (bag fees).
+        After ranking, QF (lower true cost) must be rank 1 and JQ rank 2.
+
+        sample_trip: 2 adults, 1 bag/person, return BNE→SYD
+          JQ $99 base: bags = 2 pax × $55 × 2 legs = $220 → true ≈ $450
+          QF $149 base: bags = $0 (QF domestic) → true = $298
+        """
+        pm = build_plugin_manager()
+        pm.register(_StubThreeOfferSource())
+
+        poll_trip(db_session, sample_trip, _make_profile(), pm, send_alerts=False)
+
+        all_snaps = get_snapshots_for_trip(db_session, sample_trip.id)
+        snap_by_rank = {s.rank: s for s in all_snaps}
+
+        # QF ($298 true cost) should be rank 1; JQ ($450 true cost) must be rank > 1
+        rank1 = snap_by_rank[1]
+        assert rank1.airline_code == "QF", (
+            f"Rank 1 should be QF (lowest true cost), got {rank1.airline_code} "
+            f"with true_family_cost={rank1.true_family_cost}"
+        )
+
+        jq_snap = next(s for s in all_snaps if s.airline_code == "JQ")
+        assert jq_snap.rank > 1, (
+            f"JQ has high bag fees → should rank > 1, got rank {jq_snap.rank}"
+        )
+        assert jq_snap.true_family_cost > rank1.true_family_cost
