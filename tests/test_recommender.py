@@ -13,7 +13,9 @@ import pytest
 
 from fly_o_myte.calendar import HolidayContext
 from fly_o_myte.recommender import (
+    RouteType,
     SnapshotPoint,
+    classify_route,
     compute,
     price_deviation_pct,
     rolling_average,
@@ -321,3 +323,86 @@ class TestRationale:
             "rising" in result.rationale.lower()
             or "falling" in result.rationale.lower()
         )
+
+
+# ─── Booking window intelligence (S28) ───────────────────────────────────────
+
+
+class TestBookingWindowIntelligence:
+    """S28: Route-type-aware booking windows extend the recommendation engine."""
+
+    def test_domestic_low_signal_books_at_30_days(self):
+        """DOMESTIC + LOW signal + 30 days → BOOK_NOW (optimal window=60)."""
+        snaps = make_snapshots([600, 610, 590, 605, 595])
+        result = compute(
+            snaps,
+            current_true_cost=595,
+            days_to_departure=30,
+            price_level_signal="LOW",
+            route_type=RouteType.DOMESTIC,
+        )
+        assert result.decision == "book_now"
+
+    def test_trans_tasman_low_signal_books_at_60_days(self):
+        """TRANS_TASMAN + LOW signal + 60 days → BOOK_NOW (optimal=90).
+
+        Without route_type, LOW signal at 60 days → MONITOR (> 45 day threshold).
+        """
+        snaps = make_snapshots([1200, 1210, 1200, 1205, 1195])
+        result = compute(
+            snaps,
+            current_true_cost=1195,
+            days_to_departure=60,
+            price_level_signal="LOW",
+            route_type=RouteType.TRANS_TASMAN,
+        )
+        assert result.decision == "book_now"
+
+    def test_asia_pacific_low_signal_books_at_100_days(self):
+        """ASIA_PACIFIC + LOW signal + 100 days → BOOK_NOW (optimal=120).
+
+        Without route_type, LOW signal at 100 days → MONITOR.
+        """
+        snaps = make_snapshots([1800, 1810, 1795, 1805, 1790])
+        result = compute(
+            snaps,
+            current_true_cost=1790,
+            days_to_departure=100,
+            price_level_signal="LOW",
+            route_type=RouteType.ASIA_PACIFIC,
+        )
+        assert result.decision == "book_now"
+
+    def test_long_haul_low_signal_books_at_180_days(self):
+        """LONG_HAUL + LOW signal + 180 days → BOOK_NOW (optimal=180).
+
+        Without route_type, LOW signal at 180 days → MONITOR.
+        """
+        snaps = make_snapshots([3200, 3210, 3195, 3205, 3190])
+        result = compute(
+            snaps,
+            current_true_cost=3190,
+            days_to_departure=180,
+            price_level_signal="LOW",
+            route_type=RouteType.LONG_HAUL,
+        )
+        assert result.decision == "book_now"
+
+
+class TestClassifyRoute:
+    """Unit tests for the classify_route() helper."""
+
+    def test_domestic_syd(self):
+        assert classify_route("BNE", "SYD") == RouteType.DOMESTIC
+
+    def test_trans_tasman_akl(self):
+        assert classify_route("SYD", "AKL") == RouteType.TRANS_TASMAN
+
+    def test_asia_pacific_sin(self):
+        assert classify_route("MEL", "SIN") == RouteType.ASIA_PACIFIC
+
+    def test_long_haul_lhr(self):
+        assert classify_route("SYD", "LHR") == RouteType.LONG_HAUL
+
+    def test_long_haul_jfk(self):
+        assert classify_route("MEL", "JFK") == RouteType.LONG_HAUL

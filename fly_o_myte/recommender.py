@@ -10,6 +10,7 @@ Supporting outputs: confidence (0–1), regret_risk (low|medium|high), rationale
 
 from __future__ import annotations
 
+import enum
 import math
 from dataclasses import dataclass
 from datetime import datetime
@@ -20,6 +21,127 @@ from fly_o_myte.calendar import HolidayContext
 Decision = Literal["book_now", "wait", "monitor"]
 RegretRisk = Literal["low", "medium", "high"]
 PriceSignal = Literal["LOW", "TYPICAL", "HIGH"]
+
+
+class RouteType(enum.Enum):
+    DOMESTIC = "domestic"
+    TRANS_TASMAN = "trans_tasman"
+    ASIA_PACIFIC = "asia_pacific"
+    LONG_HAUL = "long_haul"
+
+
+# (min_days, optimal_days, max_days) per route type
+BOOKING_WINDOWS: dict[RouteType, tuple[int, int, int]] = {
+    RouteType.DOMESTIC: (14, 60, 180),
+    RouteType.TRANS_TASMAN: (30, 90, 270),
+    RouteType.ASIA_PACIFIC: (45, 120, 300),
+    RouteType.LONG_HAUL: (60, 180, 365),
+}
+
+_AU_AIRPORTS: frozenset[str] = frozenset(
+    {
+        "SYD",
+        "MEL",
+        "BNE",
+        "PER",
+        "ADL",
+        "CBR",
+        "HBA",
+        "DRW",
+        "CNS",
+        "OOL",
+        "MCY",
+        "AVV",
+        "TSV",
+        "MKY",
+        "ROK",
+        "HTI",
+        "BHQ",
+        "NTL",
+        "LST",
+        "PPP",
+        "KGI",
+        "DBO",
+        "WGA",
+        "MQL",
+        "BME",
+        "KTA",
+        "ASP",
+        "ARM",
+        "MEB",
+        "ABX",
+        "EMD",
+        "MIM",
+        "CFS",
+        "GLT",
+    }
+)
+
+_NZ_AIRPORTS: frozenset[str] = frozenset({"AKL", "CHC", "WLG", "ZQN", "DUD"})
+
+_ASIA_PACIFIC_AIRPORTS: frozenset[str] = frozenset(
+    {
+        # Japan
+        "NRT",
+        "HND",
+        "KIX",
+        "NGO",
+        "FUK",
+        # Thailand
+        "BKK",
+        "DMK",
+        "HKT",
+        "CNX",
+        # Singapore
+        "SIN",
+        # Malaysia
+        "KUL",
+        "PEN",
+        # Indonesia
+        "CGK",
+        "DPS",
+        # Hong Kong
+        "HKG",
+        # South Korea
+        "ICN",
+        "GMP",
+        # China
+        "PEK",
+        "PKX",
+        "PVG",
+        "CAN",
+        "SHA",
+        # Philippines
+        "MNL",
+        "CEB",
+        # Vietnam
+        "SGN",
+        "HAN",
+        # India
+        "DEL",
+        "BOM",
+        "MAA",
+        "BLR",
+        "CCU",
+    }
+)
+
+
+def classify_route(origin: str, destination: str) -> RouteType:
+    """
+    Classify a route by type based on airport IATA codes.
+
+    Assumes origin is typically an AU airport for inter-regional routes.
+    Falls through to LONG_HAUL for any unrecognised destination.
+    """
+    dest = destination.upper()
+    if dest in _AU_AIRPORTS:
+        return RouteType.DOMESTIC
+    if dest in _NZ_AIRPORTS:
+        return RouteType.TRANS_TASMAN
+    if dest in _ASIA_PACIFIC_AIRPORTS:
+        return RouteType.ASIA_PACIFIC
+    return RouteType.LONG_HAUL
 
 
 @dataclass(frozen=True)
@@ -52,6 +174,7 @@ def compute(
     price_level_signal: str | None,
     school_holiday_context: HolidayContext | None = None,
     lookback_days: int = 30,
+    route_type: RouteType | None = None,
 ) -> RecommendationResult:
     """
     Compute booking recommendation from price history and context signals.
@@ -63,6 +186,7 @@ def compute(
         price_level_signal: "LOW" | "TYPICAL" | "HIGH" from Tequila/Amadeus.
         school_holiday_context: If the trip dates overlap a school holiday.
         lookback_days: History window for rolling average.
+        route_type: Route classification for booking-window-aware decisions.
 
     Returns:
         RecommendationResult with decision, confidence, regret risk, rationale.
@@ -104,6 +228,14 @@ def compute(
 
     elif signal == "LOW" and slope > 0:
         decision, base_confidence = "book_now", 0.90
+
+    elif (
+        route_type is not None
+        and signal == "LOW"
+        and days_to_departure <= BOOKING_WINDOWS[route_type][1]
+    ):
+        # Route-type-aware: LOW signal within the optimal booking window → book now
+        decision, base_confidence = "book_now", 0.85
 
     elif signal == "LOW" and days_to_departure <= 45:
         decision, base_confidence = "book_now", 0.85

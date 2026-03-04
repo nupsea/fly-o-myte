@@ -395,3 +395,26 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
     whether end date is in the next year.
   - ruff format also reformats test files — run ruff format before make ci.
 ---
+
+### S28 — International booking window intelligence (2026-03-04)
+- Added RouteType enum (DOMESTIC, TRANS_TASMAN, ASIA_PACIFIC, LONG_HAUL) to recommender.py.
+- Added BOOKING_WINDOWS dict: DOMESTIC=(14,60,180), TRANS_TASMAN=(30,90,270),
+  ASIA_PACIFIC=(45,120,300), LONG_HAUL=(60,180,365).
+- Added _AU_AIRPORTS, _NZ_AIRPORTS, _ASIA_PACIFIC_AIRPORTS frozensets + classify_route().
+- Added route_type: RouteType | None = None param to compute(). New decision rule:
+  when route_type set + LOW signal + days <= optimal_days[route_type] → book_now (0.85).
+  Rule fires BEFORE the existing "LOW + days <= 45" rule, preserving backward compat.
+- 9 new tests: TestBookingWindowIntelligence (4 tests, one per RouteType) +
+  TestClassifyRoute (5 unit tests).
+- Files changed:
+  - fly_o_myte/recommender.py (RouteType, BOOKING_WINDOWS, classify_route, compute sig)
+  - tests/test_recommender.py (TestBookingWindowIntelligence + TestClassifyRoute)
+  - scripts/ralph/prd.json (S28 passes:true)
+- make ci: 218 passed, 1 deselected. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - The route_type param is optional (default None) so all existing tests pass unchanged.
+  - Existing "LOW + days > 45 → monitor" rule (priority 5) correctly falls through when
+    route_type=None, proving backward compat. New rule fires only when route_type given.
+  - _ASIA_PACIFIC_AIRPORTS mirrors the subset of _AIRPORT_COUNTRY from serpapi.py that
+    covers the Asia-Pacific region (JP, TH, SG, MY, ID, HK, KR, CN, PH, VN, IN).
+---
