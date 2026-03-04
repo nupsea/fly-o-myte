@@ -613,3 +613,153 @@ class TestPlanCommand:
         result = runner.invoke(app, ["plan"], input="Sri Lanka\ndec-2026\n7\n3\n")
         assert result.exit_code == 0
         assert result.output == snapshot
+
+
+class TestGroupTagCommand:
+    """S36: fom watch --group stores tag; fom status --group filters; fom check shows tag."""
+
+    @pytest.fixture(autouse=True)
+    def fresh_db(self, tmp_path, monkeypatch):
+        from fly_o_myte.config import get_settings
+        from fly_o_myte.db.sqlite import create_db_engine, create_tables
+
+        db_path = tmp_path / "group_test.db"
+        monkeypatch.setenv("FLY_O_MYTE_DB_PATH", str(db_path))
+        get_settings.cache_clear()
+        engine = create_db_engine(db_path)
+        create_tables(engine)
+        self._engine = engine  # type: ignore[attr-defined]
+        yield
+        get_settings.cache_clear()
+
+    def test_status_group_filter(self):
+        """fom status --group shows only trips matching the group tag."""
+        from fly_o_myte.db.sqlite import (
+            Recommendation,
+            Trip,
+            get_session,
+            insert_recommendation,
+            insert_trip,
+        )
+
+        with get_session(self._engine) as session:  # type: ignore[attr-defined]
+            t1 = insert_trip(
+                session,
+                Trip(
+                    label="Easter BNE-SYD",
+                    origin="BNE",
+                    destination="SYD",
+                    depart_date="2026-04-03",
+                    return_date="2026-04-10",
+                    adults=2,
+                    group_tag="easter",
+                ),
+            )
+            assert t1.id is not None
+            insert_recommendation(
+                session,
+                Recommendation(
+                    trip_id=t1.id,
+                    decision="wait",
+                    confidence=0.60,
+                    regret_risk="medium",
+                    true_family_cost=500.0,
+                    rolling_avg_cost=510.0,
+                    trend_slope=-1.0,
+                    days_to_departure=30,
+                    rationale="Monitor.",
+                ),
+            )
+            t2 = insert_trip(
+                session,
+                Trip(
+                    label="Winter BNE-MEL",
+                    origin="BNE",
+                    destination="MEL",
+                    depart_date="2026-07-10",
+                    return_date="2026-07-17",
+                    adults=2,
+                    group_tag="winter",
+                ),
+            )
+            assert t2.id is not None
+            insert_recommendation(
+                session,
+                Recommendation(
+                    trip_id=t2.id,
+                    decision="monitor",
+                    confidence=0.50,
+                    regret_risk="low",
+                    true_family_cost=400.0,
+                    rolling_avg_cost=400.0,
+                    trend_slope=0.0,
+                    days_to_departure=128,
+                    rationale="Monitor.",
+                ),
+            )
+
+        result = runner.invoke(app, ["status", "--all", "--group", "easter"])
+        assert result.exit_code == 0
+        assert "Easter BNE-SYD" in result.output
+        assert "Winter BNE-MEL" not in result.output
+
+    def test_check_shows_group_tag(self):
+        """fom check shows 'Group: <tag>' in the info line when group_tag is set."""
+        from fly_o_myte.db.sqlite import (
+            PriceSnapshot,
+            Recommendation,
+            Trip,
+            get_session,
+            insert_recommendation,
+            insert_snapshot,
+            insert_trip,
+        )
+
+        with get_session(self._engine) as session:  # type: ignore[attr-defined]
+            trip = insert_trip(
+                session,
+                Trip(
+                    label="Easter BNE-SYD",
+                    origin="BNE",
+                    destination="SYD",
+                    depart_date="2026-04-03",
+                    return_date="2026-04-10",
+                    adults=2,
+                    group_tag="easter",
+                ),
+            )
+            assert trip.id is not None
+            insert_snapshot(
+                session,
+                PriceSnapshot(
+                    trip_id=trip.id,
+                    fetched_at="2026-03-01T10:00:00",
+                    source="stub",
+                    airline_code="QF",
+                    base_fare_per_adult=250.0,
+                    true_family_cost=500.0,
+                    true_cost_breakdown='{"base_adults": 500.0, "bags": 0.0, "seats": 0.0, "infant": 0.0, "total": 500.0}',
+                    stops=0,
+                    departure_time="09:00",
+                    family_score=85.0,
+                ),
+            )
+            insert_recommendation(
+                session,
+                Recommendation(
+                    trip_id=trip.id,
+                    generated_at="2026-03-01T10:00:00",
+                    decision="monitor",
+                    confidence=0.50,
+                    regret_risk="low",
+                    true_family_cost=500.0,
+                    rolling_avg_cost=500.0,
+                    trend_slope=0.0,
+                    days_to_departure=33,
+                    rationale="Not enough data yet.",
+                ),
+            )
+
+        result = runner.invoke(app, ["check", "1"])
+        assert result.exit_code == 0
+        assert "Group: easter" in result.output

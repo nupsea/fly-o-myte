@@ -323,6 +323,9 @@ def watch(
     max_stops: int | None = typer.Option(None),
     alert_email: str | None = typer.Option(None),
     alert_threshold: float | None = typer.Option(None),
+    group: str | None = typer.Option(
+        None, "--group", help="Group tag for multi-option trip sets"
+    ),
 ) -> None:
     """Start tracking a trip and trigger an immediate price fetch."""
     from fly_o_myte.db.sqlite import Trip, get_session, insert_trip
@@ -345,6 +348,7 @@ def watch(
         max_stops=max_stops if max_stops is not None else profile.max_stops,
         alert_email=alert_email or _get_settings().default_alert_email or None,
         alert_threshold_aud=alert_threshold,
+        group_tag=group or None,
     )
 
     with get_session(engine) as session:
@@ -393,6 +397,7 @@ def status(
     all_trips: bool = typer.Option(
         False, "--all", "-a", help="Show all trips including paused"
     ),
+    group: str | None = typer.Option(None, "--group", help="Filter by group tag"),
 ) -> None:
     """Morning digest — actionable trips only (or all with --all)."""
     from fly_o_myte.db.sqlite import (
@@ -406,6 +411,8 @@ def status(
     engine = _get_engine()
     with get_session(engine) as session:
         trips = list_all_trips(session) if all_trips else list_active_trips(session)
+        if group:
+            trips = [t for t in trips if t.group_tag == group]
         pairs = [
             (t, get_latest_recommendation(session, t.id))  # type: ignore[arg-type]
             for t in trips
@@ -1146,6 +1153,9 @@ def plan(
     budget: float | None = typer.Option(
         None, "--budget", help="Maximum true family cost in AUD"
     ),
+    group: str | None = typer.Option(
+        None, "--group", help="Group tag for the tracked trip"
+    ),
 ) -> None:
     """Plan a trip from a natural language idea or guided prompts."""
     import calendar as _cal
@@ -1185,6 +1195,8 @@ def plan(
         f"Searching {origin} \u2192 {intent.destination_iata} for "
         f"{month_name} {intent.year}..."
     )
+    if budget is not None:
+        console.print(f"Budget: [bold]${budget:,.0f} AUD[/bold] max true family cost")
 
     pm = _get_pm()
     airline_db = get_airline_db()
@@ -1282,6 +1294,7 @@ def plan(
                 adults=profile.adults,
                 bags_per_person=profile.bags_per_person,
                 max_stops=profile.max_stops,
+                group_tag=group or None,
             ),
         )
         assert new_trip.id is not None

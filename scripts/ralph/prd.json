@@ -782,7 +782,7 @@
         "Syrupy snapshot updated for fom check to show group tag in header",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "DR-P4",

@@ -105,9 +105,10 @@ def print_trip_detail(
     dates = trip.depart_date
     if trip.return_date:
         dates += f" → {trip.return_date}"
-    console.print(
-        f"  Dates: {dates}   Adults: {trip.adults}   Last updated: {rec.generated_at[:16]}"
-    )
+    info_line = f"  Dates: {dates}   Adults: {trip.adults}   Last updated: {rec.generated_at[:16]}"
+    if trip.group_tag:
+        info_line += f"   [dim]Group: {trip.group_tag}[/dim]"
+    console.print(info_line)
     console.print()
 
     # Cost breakdown table

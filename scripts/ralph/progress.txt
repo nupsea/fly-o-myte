@@ -1,3 +1,27 @@
+## S36 — fom plan enhancements -- trip group tagging and budget enforcement (2026-03-04)
+- Implemented:
+  - db/sqlite.py: added group_tag: str | None = None field to Trip model.
+    Migration in create_tables() uses ALTER TABLE trip ADD COLUMN group_tag TEXT
+    if absent (idempotent, logged at DEBUG level). S36 migration block added.
+  - display.py: print_trip_detail shows "Group: {tag}" in the info line when
+    trip.group_tag is set, formatted as [dim]Group: {tag}[/dim].
+  - cli.py: fom watch --group <tag> stores group_tag on the Trip row.
+    fom status --group <tag> filters the digest to matching trips.
+    fom plan --group <tag> stores group_tag on the created trip.
+    fom plan --budget prints "Budget: ${budget:,.0f} AUD max true family cost"
+    before search results.
+- Tests:
+  - TestGroupTagCommand: test_status_group_filter verifies --group filters
+    correctly (Easter trip shown, Winter trip excluded).
+    test_check_shows_group_tag verifies "Group: easter" appears in fom check output.
+- Files changed:
+  - fly_o_myte/db/sqlite.py (group_tag field + S36 migration)
+  - fly_o_myte/display.py (group tag in print_trip_detail)
+  - fly_o_myte/cli.py (--group on watch/status/plan; budget context line in plan)
+  - tests/test_cli.py (TestGroupTagCommand: 2 tests)
+  - scripts/ralph/prd.json (S36 passes:true)
+- make ci: 285 passed, 1 deselected. Smoke test: 22 passed, 0 failed.
+
 ## S35 — fom plan -- natural language trip planner (2026-03-04)
 - Implemented: fly_o_myte/planner.py at layer 5 with TripIntent dataclass,
   _LLMExtract Pydantic model, extract_trip_intent(text, api_key) dispatching

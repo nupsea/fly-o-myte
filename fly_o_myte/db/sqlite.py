@@ -42,6 +42,10 @@ class Trip(SQLModel, table=True):
     alert_threshold_aud: float | None = None
     alert_email: str | None = None
 
+    group_tag: str | None = (
+        None  # optional group label for multi-option trip sets (S36)
+    )
+
     @property
     def children(self) -> list[dict]:
         return json.loads(self.children_json)
@@ -127,20 +131,29 @@ def create_tables(engine) -> None:
     """Create all tables and perform lightweight migrations."""
     SQLModel.metadata.create_all(engine)
 
-    # Lightweight migration for S31 (rank column)
+    import logging
+
+    import sqlalchemy
+
+    _logger = logging.getLogger(__name__)
+
     with engine.connect() as conn:
-        # Check if column exists
-        res = conn.execute(
-            __import__("sqlalchemy").text("PRAGMA table_info(pricesnapshot)")
-        )
-        columns = [row[1] for row in res]
-        if "rank" not in columns:
+        # Migration S31: rank column on pricesnapshot
+        res = conn.execute(sqlalchemy.text("PRAGMA table_info(pricesnapshot)"))
+        if "rank" not in [row[1] for row in res]:
             conn.execute(
-                __import__("sqlalchemy").text(
+                sqlalchemy.text(
                     "ALTER TABLE pricesnapshot ADD COLUMN rank INTEGER DEFAULT 1"
                 )
             )
             conn.commit()
+
+        # Migration S36: group_tag column on trip
+        res2 = conn.execute(sqlalchemy.text("PRAGMA table_info(trip)"))
+        if "group_tag" not in [row[1] for row in res2]:
+            conn.execute(sqlalchemy.text("ALTER TABLE trip ADD COLUMN group_tag TEXT"))
+            conn.commit()
+            _logger.debug("Migrated trip table: added group_tag column")
 
 
 @contextmanager
