@@ -345,3 +345,29 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
   - Singleton reset in conftest.py teardown needed to avoid stale converter across
     sessions (especially if future tests set up canned rates in the converter).
 ---
+
+## 2026-03-04T05:00:00+10:00 - S26 - SerpAPI international routes -- per-country gl routing
+- Implemented: Added _COUNTRY_GL_MAP, _AU_AIRPORTS (frozenset), _AIRPORT_COUNTRY
+  (top ~60 international airports → ISO country code), and detect_destination_country()
+  module-level function to serpapi.py. Modified _build_params to call
+  detect_destination_country(destination) and look up gl from _COUNTRY_GL_MAP.
+  Domestic AU destinations (SYD, MEL, BNE...) → gl='au'; international → destination-
+  country gl (SIN→sg, LHR→gb, NRT→jp, etc.). Unknown airports fall back to gl='au'.
+  Expanded _AIRLINE_IATA from 14 unique airlines to 50+ entries (30+ unique carriers)
+  covering AU domestic + Asia Pacific + Middle East + Europe + North America.
+  Added 16 new tests to tests/test_serpapi.py including gl routing, international
+  airline IATA mapping, and detect_destination_country unit tests.
+- Files changed:
+  - fly_o_myte/price_sources/serpapi.py (_AIRLINE_IATA expanded + 4 new data dicts +
+    detect_destination_country() + _build_params updated)
+  - tests/test_serpapi.py (16 new tests)
+  - scripts/ralph/prd.json (S26 passes:true)
+- make ci: 201 passed, 1 deselected. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - Existing test_gl_au_always_present tests BNE→SYD (default) — after the change
+    SYD is still in _AU_AIRPORTS so gl='au' and the test still passes unchanged.
+  - frozenset in serpapi.py gets reformatted by ruff to multi-line — run ruff format
+    before make ci to avoid lint failure.
+  - detect_destination_country is a module-level function (not class method) so it
+    can be easily unit-tested and imported directly in tests.
+---

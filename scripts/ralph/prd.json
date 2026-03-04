@@ -543,7 +543,7 @@
         "Existing domestic tests still pass after changes",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S27",

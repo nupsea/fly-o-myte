@@ -1,6 +1,6 @@
 # Fly-O-Myte Architecture
 
-Last reviewed: 2026-03-03 — Phase 1 complete; test layer now includes Syrupy snapshot tests.
+Last reviewed: 2026-03-04 — Phase 2 complete; Phase 3 in progress (multi-currency, international routes).
 
 ## Top-Level Domain Map
 
@@ -21,7 +21,7 @@ Within the package, imports flow **forward only**:
 ```
 Layer 0 — price_sources.hookspecs  (FlightOffer, plugin contracts)
 Layer 1 — config, db.sqlite, db.duckdb
-Layer 2 — fees, calendar            (load embedded data; import only config)
+Layer 2 — fees, calendar, currency  (load embedded data; currency rate cache)
 Layer 3 — recommender, true_cost    (pure logic; import types + layer 2)
 Layer 4 — price_sources.tequila, price_sources.amadeus
 Layer 5 — tracker, scout, analytics, insights, notifier  (orchestration)
@@ -40,6 +40,7 @@ fly_o_myte/
   cli.py                      # Layer 7 — Typer app, all CLI commands
   config.py                   # Layer 1 — pydantic-settings + YAML profile
   calendar.py                 # Layer 2 — school holiday lookup (embedded YAML)
+  currency.py                 # Layer 2 — Frankfurter API exchange rates (24h cache)
   fees.py                     # Layer 2 — airline fee database loader
   true_cost.py                # Layer 3 — true family cost calculator
   recommender.py              # Layer 3 — decision engine (pure functions, no I/O)
@@ -101,9 +102,10 @@ SQLite (fly-o-myte.db)             DuckDB + Parquet (analytics/)
 DuckDB sqlite_scan extension joins both in one query for LLM context.
 ```
 
-## Current Implementation Status (Phase 1 baseline)
+## Current Implementation Status
 
-All Phase 1 modules implemented and tested. Layers 0–7 are in place.
-DuckDB analytics layer (Phase 2) is scaffolded — `analytics.py` is a stub.
-LLM insights (Phase 2) implemented with graceful degradation — no-op if no API key.
+Phase 1 and Phase 2 complete. Phase 3 in progress.
+- Phase 1: Domestic AU price tracking, recommendation engine, CLI, email alerts.
+- Phase 2: DuckDB analytics, Amadeus enrichment, compare breakdown, market context.
+- Phase 3 (in progress): Multi-currency (S25 done), international routes (S26+).
 See `scripts/ralph/prd.json` for story-level status.

@@ -35,22 +35,226 @@ _BASE_URL = "https://serpapi.com/search"
 # Google Flights returns full airline names; map to IATA codes.
 # Lowercase keys — compare with airline.lower().
 _AIRLINE_IATA: dict[str, str] = {
+    # AU domestic
     "qantas": "QF",
     "virgin australia": "VA",
     "jetstar": "JQ",
     "rex airlines": "ZL",
     "rex": "ZL",
-    "air new zealand": "NZ",
-    "singapore airlines": "SQ",
-    "cathay pacific": "CX",
     "tigerair australia": "TT",
     "bonza": "AB",
+    # International — Asia Pacific
+    "air new zealand": "NZ",
+    "singapore airlines": "SQ",
+    "scoot": "TR",
+    "cathay pacific": "CX",
+    "hong kong express": "UO",
+    "malaysia airlines": "MH",
+    "airasia": "AK",
+    "air asia": "AK",
+    "airasia x": "D7",
+    "garuda indonesia": "GA",
+    "korean air": "KE",
+    "asiana airlines": "OZ",
+    "china southern airlines": "CZ",
+    "china eastern airlines": "MU",
+    "air china": "CA",
+    "jetstar asia": "3K",
+    "all nippon airways": "NH",
+    "ana": "NH",
+    "japan airlines": "JL",
+    "jal": "JL",
+    "philippine airlines": "PR",
+    "cebu pacific": "5J",
+    "vietnam airlines": "VN",
+    "thai airways international": "TG",
+    "thai airways": "TG",
+    "air india": "AI",
+    # Middle East
+    "emirates": "EK",
+    "etihad airways": "EY",
+    "qatar airways": "QR",
+    # Europe
+    "british airways": "BA",
+    "lufthansa": "LH",
+    "klm": "KL",
+    "klm royal dutch airlines": "KL",
+    "air france": "AF",
+    "turkish airlines": "TK",
+    "swiss": "LX",
+    "swiss international air lines": "LX",
+    # North America
     "united airlines": "UA",
     "american airlines": "AA",
     "delta air lines": "DL",
-    "emirates": "EK",
-    "lufthansa": "LH",
-    "british airways": "BA",
+    "air canada": "AC",
+}
+
+# Destination country code → SerpAPI gl (Google country) value.
+# Using the destination country's Google instance gives better local pricing.
+_COUNTRY_GL_MAP: dict[str, str] = {
+    "AU": "au",
+    "SG": "sg",
+    "GB": "gb",
+    "JP": "jp",
+    "TH": "th",
+    "US": "us",
+    "NZ": "nz",
+    "AE": "ae",
+    "HK": "hk",
+    "IN": "in",
+    "FR": "fr",
+    "DE": "de",
+    "MY": "my",
+    "ID": "id",
+    "KR": "kr",
+    "CN": "cn",
+    "QA": "qa",
+    "PH": "ph",
+    "IT": "it",
+    "ES": "es",
+    "CA": "ca",
+    "TR": "tr",
+    "ZA": "za",
+    "VN": "vn",
+}
+
+# Australian domestic airports — destination in this set → gl='au'
+_AU_AIRPORTS: frozenset[str] = frozenset(
+    {
+        "SYD",
+        "MEL",
+        "BNE",
+        "PER",
+        "ADL",
+        "CBR",
+        "HBA",
+        "DRW",
+        "CNS",
+        "OOL",
+        "MCY",
+        "AVV",
+        "TSV",
+        "MKY",
+        "ROK",
+        "HTI",
+        "BHQ",
+        "NTL",
+        "LST",
+        "PPP",
+        "KGI",
+        "DBO",
+        "WGA",
+        "MQL",
+        "BME",
+        "KTA",
+        "ASP",
+        "ARM",
+        "MEB",
+        "ABX",
+        "EMD",
+        "MIM",
+        "CFS",
+        "GLT",
+    }
+)
+
+# Top international airports → ISO country code (covers most AU international routes)
+_AIRPORT_COUNTRY: dict[str, str] = {
+    # Singapore
+    "SIN": "SG",
+    # United Kingdom
+    "LHR": "GB",
+    "LGW": "GB",
+    "STN": "GB",
+    "MAN": "GB",
+    "EDI": "GB",
+    "BHX": "GB",
+    # Japan
+    "NRT": "JP",
+    "HND": "JP",
+    "KIX": "JP",
+    "NGO": "JP",
+    "FUK": "JP",
+    # Thailand
+    "BKK": "TH",
+    "DMK": "TH",
+    "HKT": "TH",
+    "CNX": "TH",
+    # USA
+    "LAX": "US",
+    "SFO": "US",
+    "JFK": "US",
+    "ORD": "US",
+    "DFW": "US",
+    "IAH": "US",
+    "SEA": "US",
+    "HNL": "US",
+    "EWR": "US",
+    "LAS": "US",
+    # New Zealand
+    "AKL": "NZ",
+    "CHC": "NZ",
+    "WLG": "NZ",
+    "ZQN": "NZ",
+    "DUD": "NZ",
+    # UAE
+    "DXB": "AE",
+    "AUH": "AE",
+    "SHJ": "AE",
+    # Hong Kong
+    "HKG": "HK",
+    # India
+    "DEL": "IN",
+    "BOM": "IN",
+    "MAA": "IN",
+    "BLR": "IN",
+    "CCU": "IN",
+    # France
+    "CDG": "FR",
+    "ORY": "FR",
+    # Germany
+    "FRA": "DE",
+    "MUC": "DE",
+    "DUS": "DE",
+    # Malaysia
+    "KUL": "MY",
+    "PEN": "MY",
+    # Indonesia
+    "CGK": "ID",
+    "DPS": "ID",
+    # South Korea
+    "ICN": "KR",
+    "GMP": "KR",
+    # China
+    "PEK": "CN",
+    "PKX": "CN",
+    "PVG": "CN",
+    "CAN": "CN",
+    "SHA": "CN",
+    # Qatar
+    "DOH": "QA",
+    # Philippines
+    "MNL": "PH",
+    "CEB": "PH",
+    # Italy
+    "FCO": "IT",
+    "MXP": "IT",
+    # Spain
+    "MAD": "ES",
+    "BCN": "ES",
+    # Canada
+    "YYZ": "CA",
+    "YVR": "CA",
+    # Turkey
+    "IST": "TR",
+    "SAW": "TR",
+    # South Africa
+    "JNB": "ZA",
+    "CPT": "ZA",
+    # Vietnam
+    "SGN": "VN",
+    "HAN": "VN",
 }
 
 # SerpAPI stops parameter values:
@@ -62,6 +266,19 @@ _PRICE_LEVEL: dict[str, str] = {
     "typical": "TYPICAL",
     "high": "HIGH",
 }
+
+
+def detect_destination_country(airport_iata: str) -> str | None:
+    """
+    Return the ISO country code for a destination airport.
+
+    Returns 'AU' for Australian domestic airports.
+    Returns None when the airport is not in the known list.
+    """
+    code = airport_iata.upper()
+    if code in _AU_AIRPORTS:
+        return "AU"
+    return _AIRPORT_COUNTRY.get(code)
 
 
 class SerpAPIFlightSource:
@@ -172,6 +389,10 @@ class SerpAPIFlightSource:
         max_stops: int | None,
         currency: str,
     ) -> dict:
+        # Use destination-country gl for better local pricing on international routes
+        dest_country = detect_destination_country(destination)
+        gl = _COUNTRY_GL_MAP.get(dest_country or "AU", "au")
+
         params: dict = {
             "engine": "google_flights",
             "departure_id": origin,
@@ -180,7 +401,7 @@ class SerpAPIFlightSource:
             "adults": 1,  # always 1 — get clean per-adult fare
             "currency": currency,
             "hl": "en",
-            "gl": "au",  # Australian Google — AUD pricing, AU carriers
+            "gl": gl,
             "api_key": self._api_key,
         }
 
