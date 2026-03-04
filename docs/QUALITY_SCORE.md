@@ -1,6 +1,6 @@
 # Quality Score — Fly-O-Myte
 
-Last Updated: 2026-03-04 — S16 complete (S01–S15 Phase 1 + S16 Phase 2 analytics)
+Last Updated: 2026-03-04 — S31 complete (Phase 3: top-3 airline shortlist in fom check)
 
 Updated by ralph after each phase. Grades: A (complete), B (mostly done), C (partial), D (minimal), F (not started).
 
@@ -29,7 +29,7 @@ Updated by ralph after each phase. Grades: A (complete), B (mostly done), C (par
 
 **Recommender (A)**: 10-rule decision matrix, confidence scaling by data richness, regret risk via Random Regret Minimisation, trend slope via pure-Python least-squares. 35+ passing unit tests — no mocking required.
 
-**Tracker (B)**: `poll_trip()` and `poll_all_active()` fully wired — fetch → true cost → family score → snapshot → recommendation → alert → analytics update. Deterministic `_StubTequilaSource` integration tests with exact cost assertions.
+**Tracker (B)**: `poll_trip()` and `poll_all_active()` fully wired — fetch → true cost → family score → snapshot (rank 1/2/3) → recommendation → alert → analytics update. S31: `_fetch_top_offers(n=3)` returns top-3 candidates by base fare; poll_trip ranks them by true family cost and saves each as a separate PriceSnapshot row. Deterministic integration tests including multi-offer ranking assertions.
 
 **CLI (B)**: All 15 commands implemented: setup, scout, watch, status, check, compare, history, refresh, insight, poll, analytics, pause, resume, remove, profile, data-version. Basic integration tests pass. Missing: Syrupy snapshot tests for Rich output.
 

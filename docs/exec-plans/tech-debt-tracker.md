@@ -1,6 +1,6 @@
 # Technical Debt Tracker
 
-Last reviewed: 2026-03-03
+Last reviewed: 2026-03-04 — S31 complete; TD-003 resolved S16
 
 | ID     | Description | Priority | Owner | Created | Resolved |
 |--------|-------------|----------|-------|---------|---------|
@@ -14,3 +14,4 @@ Last reviewed: 2026-03-03
 | TD-008 | `whenever` library not used — Python stdlib `date` arithmetic used for child age calculation. Review if timezone-aware date handling is needed for AWST routes. | low | ralph | 2026-03-03 | open |
 | TD-009 | Scout command (`fom scout`) not tested — `test_cli.py` does not cover the scout command and `scout.py` has no integration tests. | med | ralph | 2026-03-03 | open (S18) |
 | TD-010 | `insights.py` LLM golden fixture evaluation not implemented — only schema validation tested, no LLM-as-judge evaluation for insight quality. | med | ralph | 2026-03-03 | open (S17) |
+| TD-011 | `analytics.py` reads ALL snapshots (rank 1/2/3) when building Parquet — should filter rank==1 so route analytics tracks the best-offer price trend, not averages across alternatives. | low | ralph | 2026-03-04 | open |

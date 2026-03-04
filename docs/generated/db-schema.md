@@ -1,6 +1,6 @@
 # Database Schema — Fly-O-Myte
 
-Last reviewed: 2026-03-03 — schema stable, no changes since Phase 1 baseline.
+Last reviewed: 2026-03-04 — S31: added `rank` field to `pricesnapshot`; `get_snapshots_at_fetch()` CRUD added.
 
 Auto-generated from `fly_o_myte/db/sqlite.py`. Regenerate after schema changes with:
 ```bash
@@ -47,6 +47,7 @@ uv run python -c "from fly_o_myte.db.sqlite import *; import inspect; print(insp
 | duration_minutes | INTEGER | NULL | |
 | family_score | REAL | NULL | 0–100 composite |
 | offer_raw | TEXT | "{}" | JSON from price source |
+| rank | INTEGER | 1 | Offer rank by true family cost: 1=best, 2=second, 3=third (S31) |
 
 ### `recommendation`
 
