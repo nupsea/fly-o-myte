@@ -561,7 +561,7 @@
         "fom check <intl_trip_id>: school holiday flag appears when destination country calendar overlap detected",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S28",

@@ -371,3 +371,27 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
   - detect_destination_country is a module-level function (not class method) so it
     can be easily unit-tested and imported directly in tests.
 ---
+
+## 2026-03-04T06:00:00+10:00 - S27 - International school calendars -- NZ, GB, SG, JP, TH, US
+- Implemented: Populated school_holidays.yaml with 2026+2027 school holiday data
+  for NZ (4 breaks: autumn, winter, spring, summer), GB (4 breaks: easter,
+  summer, autumn half-term, christmas), SG (4 breaks: march, june, september,
+  year-end), JP (3 breaks: spring, summer, winter), TH (3 breaks: summer,
+  mid-semester, october), US (3 breaks: spring, summer, winter).
+  Used "GB" key (not "UK") to match acceptance criteria for ISO country codes.
+  Replaced TODO stubs with real approximate dates sourced from official calendars.
+  Added TestInternationalCalendar class to test_calendar.py with 8 tests.
+  Data check: 14 supported states (8 AU + 6 intl).
+- Files changed:
+  - fly_o_myte/data/school_holidays.yaml (NZ/GB/SG/JP/TH/US stubs replaced)
+  - tests/test_calendar.py (TestInternationalCalendar: 8 tests)
+  - scripts/ralph/prd.json (S27 passes:true)
+- make ci: 209 passed, 1 deselected. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - The UK stub in the YAML used "UK" key but the acceptance criteria requires "GB"
+    (ISO country code). Changed to GB. No existing tests reference "UK".
+  - NZ "summer" break spans Dec-Jan — put it under the year it STARTS (e.g. Dec 2026
+    under 2026 key). calendar.py parses `label` key to find breaks regardless of
+    whether end date is in the next year.
+  - ruff format also reformats test files — run ruff format before make ci.
+---

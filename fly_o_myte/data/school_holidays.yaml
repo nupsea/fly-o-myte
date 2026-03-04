@@ -800,30 +800,252 @@ ACT:
 NZ:
   country_name: New Zealand
   timezone: Pacific/Auckland
-  # TODO: Phase 3
+  department_url: https://www.education.govt.nz/school/administration/school-terms-and-holidays/
+  2026:
+    autumn_break:
+      start: "2026-04-11"
+      end: "2026-04-26"
+      label: Autumn holidays
+      weeks: 2
+    winter_break:
+      start: "2026-07-04"
+      end: "2026-07-19"
+      label: Winter holidays
+      weeks: 2
+    spring_break:
+      start: "2026-09-26"
+      end: "2026-10-11"
+      label: Spring holidays
+      weeks: 2
+    summer_break:
+      start: "2026-12-18"
+      end: "2027-01-29"
+      label: Summer holidays
+      weeks: 6
+  2027:
+    autumn_break:
+      start: "2027-04-10"
+      end: "2027-04-25"
+      label: Autumn holidays
+      weeks: 2
+    winter_break:
+      start: "2027-07-03"
+      end: "2027-07-18"
+      label: Winter holidays
+      weeks: 2
+    spring_break:
+      start: "2027-09-25"
+      end: "2027-10-10"
+      label: Spring holidays
+      weeks: 2
+    summer_break:
+      start: "2027-12-17"
+      end: "2028-01-28"
+      label: Summer holidays
+      weeks: 6
+
+GB:
+  country_name: United Kingdom
+  timezone: Europe/London
+  department_url: https://www.gov.uk/school-term-holiday-dates
+  notes: "England state school approximate dates — Scotland, Wales, Northern Ireland may vary."
+  2026:
+    easter_break:
+      start: "2026-04-04"
+      end: "2026-04-19"
+      label: Easter holidays
+      weeks: 2
+    summer_break:
+      start: "2026-07-23"
+      end: "2026-09-02"
+      label: Summer holidays
+      weeks: 6
+    autumn_half_term:
+      start: "2026-10-26"
+      end: "2026-10-30"
+      label: Autumn half-term
+      weeks: 1
+    christmas_break:
+      start: "2026-12-19"
+      end: "2027-01-04"
+      label: Christmas holidays
+      weeks: 2
+  2027:
+    easter_break:
+      start: "2027-03-27"
+      end: "2027-04-11"
+      label: Easter holidays
+      weeks: 2
+    summer_break:
+      start: "2027-07-22"
+      end: "2027-09-01"
+      label: Summer holidays
+      weeks: 6
+    autumn_half_term:
+      start: "2027-10-25"
+      end: "2027-10-29"
+      label: Autumn half-term
+      weeks: 1
+    christmas_break:
+      start: "2027-12-18"
+      end: "2028-01-03"
+      label: Christmas holidays
+      weeks: 2
 
 SG:
   country_name: Singapore
   timezone: Asia/Singapore
-  # TODO: Phase 3
+  department_url: https://www.moe.gov.sg/news/press-releases/school-terms-and-holidays
+  2026:
+    march_break:
+      start: "2026-03-14"
+      end: "2026-03-22"
+      label: March school holidays
+      weeks: 1
+    june_break:
+      start: "2026-05-30"
+      end: "2026-06-28"
+      label: June school holidays
+      weeks: 4
+    september_break:
+      start: "2026-09-05"
+      end: "2026-09-13"
+      label: September school holidays
+      weeks: 1
+    year_end_break:
+      start: "2026-11-21"
+      end: "2027-01-01"
+      label: Year-end school holidays
+      weeks: 6
+  2027:
+    march_break:
+      start: "2027-03-13"
+      end: "2027-03-21"
+      label: March school holidays
+      weeks: 1
+    june_break:
+      start: "2027-05-29"
+      end: "2027-06-27"
+      label: June school holidays
+      weeks: 4
+    september_break:
+      start: "2027-09-04"
+      end: "2027-09-12"
+      label: September school holidays
+      weeks: 1
+    year_end_break:
+      start: "2027-11-20"
+      end: "2028-01-01"
+      label: Year-end school holidays
+      weeks: 6
 
 JP:
   country_name: Japan
   timezone: Asia/Tokyo
-  # TODO: Phase 3
-
-UK:
-  country_name: United Kingdom
-  timezone: Europe/London
-  # TODO: Phase 3
+  notes: "Japanese public school approximate dates — private schools may vary."
+  2026:
+    spring_break:
+      start: "2026-03-21"
+      end: "2026-04-07"
+      label: Spring holidays
+      weeks: 2.5
+    summer_break:
+      start: "2026-07-20"
+      end: "2026-08-31"
+      label: Summer holidays
+      weeks: 6
+    winter_break:
+      start: "2026-12-25"
+      end: "2027-01-07"
+      label: Winter holidays
+      weeks: 2
+  2027:
+    spring_break:
+      start: "2027-03-20"
+      end: "2027-04-06"
+      label: Spring holidays
+      weeks: 2.5
+    summer_break:
+      start: "2027-07-20"
+      end: "2027-08-31"
+      label: Summer holidays
+      weeks: 6
+    winter_break:
+      start: "2027-12-25"
+      end: "2028-01-07"
+      label: Winter holidays
+      weeks: 2
 
 TH:
   country_name: Thailand
   timezone: Asia/Bangkok
-  # TODO: Phase 3
+  notes: "Thai state school approximate dates — semester system (May to March)."
+  2026:
+    summer_break:
+      start: "2026-03-21"
+      end: "2026-05-03"
+      label: Summer school holidays
+      weeks: 6
+    mid_semester_break:
+      start: "2026-07-01"
+      end: "2026-07-07"
+      label: Mid-semester break
+      weeks: 1
+    october_break:
+      start: "2026-10-01"
+      end: "2026-10-15"
+      label: October school holidays
+      weeks: 2
+  2027:
+    summer_break:
+      start: "2027-03-20"
+      end: "2027-05-02"
+      label: Summer school holidays
+      weeks: 6
+    mid_semester_break:
+      start: "2027-07-01"
+      end: "2027-07-07"
+      label: Mid-semester break
+      weeks: 1
+    october_break:
+      start: "2027-10-01"
+      end: "2027-10-15"
+      label: October school holidays
+      weeks: 2
 
 US:
   country_name: United States
   timezone: varies
-  notes: "US school holidays vary significantly by state and district. Use generalised public holidays only."
-  # TODO: Phase 3
+  notes: "Generalised US school holiday windows — dates vary significantly by state and district."
+  2026:
+    spring_break:
+      start: "2026-03-23"
+      end: "2026-03-27"
+      label: Spring break
+      weeks: 1
+    summer_break:
+      start: "2026-06-05"
+      end: "2026-08-21"
+      label: Summer holidays
+      weeks: 11
+    winter_break:
+      start: "2026-12-21"
+      end: "2027-01-08"
+      label: Winter holidays
+      weeks: 2.5
+  2027:
+    spring_break:
+      start: "2027-03-22"
+      end: "2027-03-26"
+      label: Spring break
+      weeks: 1
+    summer_break:
+      start: "2027-06-04"
+      end: "2027-08-20"
+      label: Summer holidays
+      weeks: 11
+    winter_break:
+      start: "2027-12-20"
+      end: "2028-01-07"
+      label: Winter holidays
+      weeks: 2.5

@@ -173,3 +173,78 @@ class TestMultiStateCalendar:
             assert len(periods) == 4, (
                 f"{state} 2026 has {len(periods)} breaks, expected 4"
             )
+
+
+class TestInternationalCalendar:
+    """Holiday overlap tests for the 6 international countries added in S27."""
+
+    def test_nz_summer_holidays_detected(self):
+        """NZ summer break 2026 (Dec 18 - Jan 29 2027) — trip Dec 21-28 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("NZ", date(2026, 12, 21), date(2026, 12, 28))
+        assert ctx is not None
+        assert "summer" in ctx.label.lower()
+
+    def test_gb_christmas_break_detected(self):
+        """GB Christmas break 2026 (Dec 19 - Jan 4 2027) — trip Dec 22-28 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("GB", date(2026, 12, 22), date(2026, 12, 28))
+        assert ctx is not None
+        assert "christmas" in ctx.label.lower() or "holiday" in ctx.label.lower()
+
+    def test_sg_june_break_detected(self):
+        """SG June school holidays 2026 (May 30 - Jun 28) — trip Jun 10-17 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("SG", date(2026, 6, 10), date(2026, 6, 17))
+        assert ctx is not None
+        assert ctx.overlap_days >= 1
+
+    def test_jp_summer_holidays_detected(self):
+        """JP summer holidays 2026 (Jul 20 - Aug 31) — trip Jul 25 - Aug 5 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("JP", date(2026, 7, 25), date(2026, 8, 5))
+        assert ctx is not None
+        assert "summer" in ctx.label.lower()
+
+    def test_th_summer_holidays_detected(self):
+        """TH summer school holidays 2026 (Mar 21 - May 3) — trip Apr 1-8 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("TH", date(2026, 4, 1), date(2026, 4, 8))
+        assert ctx is not None
+        assert "summer" in ctx.label.lower()
+
+    def test_us_summer_holidays_detected(self):
+        """US summer holidays 2026 (Jun 5 - Aug 21) — trip Jul 1-8 overlaps."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("US", date(2026, 7, 1), date(2026, 7, 8))
+        assert ctx is not None
+        assert "summer" in ctx.label.lower()
+
+    def test_all_14_codes_in_supported_states(self):
+        """All 8 AU + 6 international codes must be in supported_states()."""
+        cal = get_calendar()
+        states = cal.supported_states()
+        expected = (
+            "QLD",
+            "NSW",
+            "VIC",
+            "WA",
+            "SA",
+            "TAS",
+            "NT",
+            "ACT",
+            "NZ",
+            "GB",
+            "SG",
+            "JP",
+            "TH",
+            "US",
+        )
+        for code in expected:
+            assert code in states, f"{code} not in supported_states()"
+
+    def test_nz_outside_holidays_returns_none(self):
+        """NZ in a non-holiday period (e.g. mid-August) returns None."""
+        cal = get_calendar()
+        ctx = cal.check_overlap("NZ", date(2026, 8, 10), date(2026, 8, 17))
+        assert ctx is None
