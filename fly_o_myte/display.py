@@ -13,6 +13,8 @@ Decision colour coding:
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
+from datetime import date
 
 from rich import box
 from rich.console import Console
@@ -391,3 +393,81 @@ def print_route_context(ctx: RouteContext) -> None:
         line += f"  |  Holiday premium: {sign}{ctx.school_holiday_premium_pct:.1f}%"
     console.print(line, style="dim")
     console.print()
+
+
+# ─── Flex results ────────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class FlexResultRow:
+    """One date window from a flex-scouting run, prepared for display."""
+
+    depart_date: date
+    return_date: date
+    true_family_cost: float
+    airline_code: str
+    stops: int
+    departure_time: str
+    school_holiday_label: str | None
+
+
+def print_flex_results(
+    rows: list[FlexResultRow],
+    tracked_cost: float | None,
+    origin: str,
+    destination: str,
+) -> None:
+    """Print a ranked flex-results table.
+
+    Cheapest row is bold. Rows cheaper than tracked_cost are shown in green.
+    """
+    if not rows:
+        console.print("No flex results to display.")
+        return
+
+    table = Table(
+        title=f"Flex Windows: {origin} \u2192 {destination}",
+        box=box.SIMPLE,
+        show_lines=False,
+    )
+    table.add_column("Rank", justify="right", no_wrap=True)
+    table.add_column("Depart", no_wrap=True)
+    table.add_column("Return", no_wrap=True)
+    table.add_column("True cost", justify="right", no_wrap=True)
+    table.add_column("vs Tracked", justify="right", no_wrap=True)
+    table.add_column("Airline", no_wrap=True)
+    table.add_column("Stops", justify="right", no_wrap=True)
+    table.add_column("Holiday")
+
+    cheapest_cost = rows[0].true_family_cost
+
+    for rank, row in enumerate(rows, start=1):
+        is_cheapest = row.true_family_cost == cheapest_cost
+        is_cheaper = tracked_cost is not None and row.true_family_cost < tracked_cost
+
+        row_style = "bold" if is_cheapest else ("green" if is_cheaper else "")
+
+        if tracked_cost is not None:
+            delta = row.true_family_cost - tracked_cost
+            pct = delta / tracked_cost * 100
+            sign = "+" if delta >= 0 else ""
+            vs_tracked = f"{sign}${delta:,.0f} ({sign}{pct:.0f}%)"
+        else:
+            vs_tracked = "—"
+
+        holiday_text = row.school_holiday_label or "—"
+        stops_text = "nonstop" if row.stops == 0 else str(row.stops)
+
+        table.add_row(
+            str(rank),
+            str(row.depart_date),
+            str(row.return_date),
+            f"${row.true_family_cost:,.0f}",
+            vs_tracked,
+            row.airline_code,
+            stops_text,
+            holiday_text,
+            style=row_style,
+        )
+
+    console.print(table)

@@ -281,6 +281,115 @@ class TestSnapshotOutput:
         assert result.output == snapshot
 
 
+class TestFlexCommand:
+    """S33: fom flex command shows date alternatives ranked by true family cost."""
+
+    @pytest.fixture(autouse=True)
+    def fresh_db(self, tmp_path, monkeypatch):
+        from fly_o_myte.config import get_settings
+        from fly_o_myte.db.sqlite import create_db_engine, create_tables
+
+        db_path = tmp_path / "flex_test.db"
+        monkeypatch.setenv("FLY_O_MYTE_DB_PATH", str(db_path))
+        get_settings.cache_clear()
+        engine = create_db_engine(db_path)
+        create_tables(engine)
+        self._engine = engine  # type: ignore[attr-defined]
+        yield
+        get_settings.cache_clear()
+
+    def test_flex_nonexistent_trip(self):
+        result = runner.invoke(app, ["flex", "999"])
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower()
+
+    def test_flex_snapshot(self, snapshot: SnapshotAssertion):
+        """fom flex with pre-seeded FlexCache shows table and prompt."""
+        import json
+
+        from fly_o_myte.db.sqlite import (
+            FlexCache,
+            PriceSnapshot,
+            Trip,
+            get_session,
+            insert_snapshot,
+            insert_trip,
+        )
+
+        with get_session(self._engine) as session:  # type: ignore[attr-defined]
+            trip = insert_trip(
+                session,
+                Trip(
+                    label="BNE-SYD Flex test",
+                    origin="BNE",
+                    destination="SYD",
+                    depart_date="2026-09-20",
+                    return_date="2026-09-27",
+                    adults=2,
+                ),
+            )
+            assert trip.id is not None
+
+            # Seed a tracked snapshot (high cost = alternatives look cheap)
+            insert_snapshot(
+                session,
+                PriceSnapshot(
+                    trip_id=trip.id,
+                    fetched_at="2026-03-01T10:00:00",
+                    source="stub",
+                    airline_code="QF",
+                    true_family_cost=800.0,
+                    rank=1,
+                ),
+            )
+
+            # Pre-populate FlexCache (key must match fom flex defaults: flex=3, symmetric)
+            flex_key = "BNE_SYD_2026-09-20_2026-09-27_3_3"
+            cache_data = [
+                {
+                    "depart_date": "2026-09-17",
+                    "return_date": "2026-09-24",
+                    "true_family_cost": 300.0,
+                    "airline_code": "QF",
+                    "stops": 0,
+                    "departure_time": "10:30",
+                    "school_holiday_label": None,
+                },
+                {
+                    "depart_date": "2026-09-20",
+                    "return_date": "2026-09-27",
+                    "true_family_cost": 350.0,
+                    "airline_code": "QF",
+                    "stops": 0,
+                    "departure_time": "10:30",
+                    "school_holiday_label": None,
+                },
+                {
+                    "depart_date": "2026-09-23",
+                    "return_date": "2026-09-30",
+                    "true_family_cost": 400.0,
+                    "airline_code": "JQ",
+                    "stops": 1,
+                    "departure_time": "14:00",
+                    "school_holiday_label": None,
+                },
+            ]
+            session.add(
+                FlexCache(
+                    trip_id=trip.id,
+                    flex_key=flex_key,
+                    computed_at="2026-03-04T08:00:00+00:00",
+                    results_json=json.dumps(cache_data),
+                )
+            )
+            session.commit()
+
+        # Pass "n" to skip the interactive watch prompt
+        result = runner.invoke(app, ["flex", "1"], input="n\n")
+        assert result.exit_code == 0
+        assert result.output == snapshot
+
+
 class TestAirportsCommand:
     """S32: fom airports command resolves IATA codes by city/country name."""
 

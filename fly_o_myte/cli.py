@@ -804,6 +804,247 @@ def data_version() -> None:
     print_data_version(db.version, db.last_updated, db.all_codes())
 
 
+# ─── flex ──────────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def flex(
+    trip_id: int = typer.Argument(...),
+    flex_days: int = typer.Option(3, "--flex", help="Flex range in days"),
+    fix_return: bool = typer.Option(
+        False, "--fix-return", help="Fix return date, vary depart"
+    ),
+    fix_depart: bool = typer.Option(
+        False, "--fix-depart", help="Fix depart date, vary return"
+    ),
+    refresh: bool = typer.Option(
+        False, "--refresh", help="Bypass cache and fetch fresh prices"
+    ),
+) -> None:
+    """Show ±N day date alternatives ranked by true family cost."""
+    import json as _json
+    from datetime import UTC, datetime, timedelta
+
+    from rich.prompt import Prompt
+
+    from fly_o_myte.calendar import get_calendar
+    from fly_o_myte.db.sqlite import (
+        Trip,
+        delete_trip,
+        get_flex_cache,
+        get_latest_snapshot,
+        get_session,
+        get_trip,
+        insert_trip,
+        set_flex_cache,
+    )
+    from fly_o_myte.display import FlexResultRow, print_flex_results
+    from fly_o_myte.fees import get_airline_db
+    from fly_o_myte.scout import scout_flex
+
+    engine = _get_engine()
+    with get_session(engine) as session:
+        trip = get_trip(session, trip_id)
+        if not trip:
+            err_console.print(f"[red]Trip {trip_id} not found.[/red]")
+            raise typer.Exit(1)
+
+        # Determine flex mode
+        if fix_return:
+            depart_flex_val = flex_days
+            return_flex_val = 0
+        elif fix_depart:
+            depart_flex_val = 0
+            return_flex_val = flex_days
+        else:
+            depart_flex_val = flex_days
+            return_flex_val = flex_days
+
+        # Compute cache key
+        flex_key = f"{trip.origin}_{trip.destination}_{trip.depart_date}_{trip.return_date}_{depart_flex_val}_{return_flex_val}"
+
+        # Get tracked cost from latest rank-1 snapshot
+        latest_snap = get_latest_snapshot(session, trip_id)
+        tracked_cost: float | None = (
+            latest_snap.true_family_cost if latest_snap else None
+        )
+
+        # Check cache
+        rows: list[FlexResultRow] = []
+        cache_used = False
+
+        if not refresh:
+            cached = get_flex_cache(session, trip_id, flex_key)
+            if cached:
+                age = datetime.now(UTC) - datetime.fromisoformat(
+                    cached.computed_at
+                ).replace(tzinfo=UTC)
+                if age < timedelta(hours=24):
+                    data = _json.loads(cached.results_json)
+                    rows = [
+                        FlexResultRow(
+                            depart_date=date.fromisoformat(d["depart_date"]),
+                            return_date=date.fromisoformat(d["return_date"]),
+                            true_family_cost=d["true_family_cost"],
+                            airline_code=d["airline_code"],
+                            stops=d["stops"],
+                            departure_time=d["departure_time"],
+                            school_holiday_label=d.get("school_holiday_label"),
+                        )
+                        for d in data
+                    ]
+                    cache_used = True
+                    age_mins = int(age.total_seconds() // 60)
+                    if age_mins < 60:
+                        time_ago = f"{age_mins}m ago"
+                    else:
+                        time_ago = f"{int(age_mins // 60)}h ago"
+                    console.print(
+                        f"[dim]Using cached flex results from {time_ago}. "
+                        f"Run with --refresh to fetch live prices.[/dim]"
+                    )
+
+        if not cache_used:
+            # Fresh fetch
+            profile = _get_profile()
+            pm = _get_pm()
+            airline_db = get_airline_db()
+            cal = get_calendar()
+
+            depart = date.fromisoformat(trip.depart_date)
+            ret = date.fromisoformat(trip.return_date) if trip.return_date else depart
+
+            scout_results = scout_flex(
+                pm=pm,
+                profile=profile,
+                airline_db=airline_db,
+                calendar=cal,
+                origin=trip.origin,
+                destination=trip.destination,
+                depart_date=depart,
+                return_date=ret,
+                depart_flex=depart_flex_val,
+                return_flex=return_flex_val,
+            )
+
+            rows = [
+                FlexResultRow(
+                    depart_date=r.depart_date,
+                    return_date=r.return_date,
+                    true_family_cost=r.true_family_cost,
+                    airline_code=r.airline_code,
+                    stops=r.stops,
+                    departure_time=r.departure_time,
+                    school_holiday_label=r.school_holiday.label
+                    if r.school_holiday
+                    else None,
+                )
+                for r in scout_results
+            ]
+
+            # Store in cache
+            cache_data = [
+                {
+                    "depart_date": str(row.depart_date),
+                    "return_date": str(row.return_date),
+                    "true_family_cost": row.true_family_cost,
+                    "airline_code": row.airline_code,
+                    "stops": row.stops,
+                    "departure_time": row.departure_time,
+                    "school_holiday_label": row.school_holiday_label,
+                }
+                for row in rows
+            ]
+            set_flex_cache(session, trip_id, flex_key, _json.dumps(cache_data))
+
+        if not rows:
+            console.print(f"No cheaper windows found within \u00b1{flex_days} days.")
+            return
+
+        print_flex_results(rows, tracked_cost, trip.origin, trip.destination)
+
+        # Check if any are cheaper than tracked
+        cheaper = [
+            r
+            for r in rows
+            if tracked_cost is not None and r.true_family_cost < tracked_cost
+        ]
+        if not cheaper:
+            console.print(f"No cheaper windows found within \u00b1{flex_days} days.")
+            return
+
+        # Interactive: watch a cheaper alternative?
+        choices = [str(i) for i in range(1, len(rows) + 1)] + ["n"]
+        answer = Prompt.ask(
+            f"Watch a cheaper alternative instead? [1-{len(rows)}/n]",
+            choices=choices,
+            default="n",
+        )
+        if answer == "n":
+            return
+
+        selected_idx = int(answer) - 1
+        selected = rows[selected_idx]
+
+        action = Prompt.ask(
+            f"Replace trip #{trip_id} or add as new trip?",
+            choices=["replace", "add", "cancel"],
+            default="cancel",
+        )
+        if action == "cancel":
+            return
+
+        if action == "replace":
+            confirmed = Prompt.ask(
+                f"This will remove trip #{trip_id} ({trip.label}). Confirm?",
+                choices=["y", "n"],
+                default="n",
+            )
+            if confirmed != "y":
+                console.print("Cancelled.")
+                return
+            delete_trip(session, trip_id)
+            new_trip = insert_trip(
+                session,
+                Trip(
+                    label=f"{trip.origin}-{trip.destination} {selected.depart_date}",
+                    origin=trip.origin,
+                    destination=trip.destination,
+                    depart_date=str(selected.depart_date),
+                    return_date=str(selected.return_date),
+                    adults=trip.adults,
+                    children_json=trip.children_json,
+                    bags_per_person=trip.bags_per_person,
+                    max_stops=trip.max_stops,
+                    alert_email=trip.alert_email,
+                ),
+            )
+            assert new_trip.id is not None
+            console.print(
+                f"[green]Replaced trip #{trip_id} with new trip #{new_trip.id}.[/green]"
+            )
+        else:  # add
+            new_trip = insert_trip(
+                session,
+                Trip(
+                    label=f"{trip.origin}-{trip.destination} {selected.depart_date}",
+                    origin=trip.origin,
+                    destination=trip.destination,
+                    depart_date=str(selected.depart_date),
+                    return_date=str(selected.return_date),
+                    adults=trip.adults,
+                    children_json=trip.children_json,
+                    bags_per_person=trip.bags_per_person,
+                    max_stops=trip.max_stops,
+                    alert_email=trip.alert_email,
+                ),
+            )
+            assert new_trip.id is not None
+            console.print(
+                f"[green]Added new trip #{new_trip.id}: {selected.depart_date} \u2192 {selected.return_date}[/green]"
+            )
+
+
 # ─── airports ──────────────────────────────────────────────────────────────────
 
 

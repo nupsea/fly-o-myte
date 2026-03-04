@@ -102,32 +102,88 @@ def scout_flex(
     depart_date: date,
     return_date: date,
     flex_days: int = 3,
+    depart_flex: int | None = None,
+    return_flex: int | None = None,
 ) -> list[ScoutResult]:
     """
-    Scout ±flex_days around a specific date pair.
+    Scout around a specific date pair.
 
-    Returns all combinations sorted by true_family_cost.
+    Parameters
+    ----------
+    flex_days:    Symmetric flex for both ends (backward-compat default).
+    depart_flex:  Override flex for departure end only.
+    return_flex:  Override flex for return end only.
+
+    Modes (depart_flex/return_flex take precedence over flex_days):
+      - return_flex == 0: return_date is fixed; depart varies ±depart_flex.
+      - depart_flex == 0: depart_date is fixed; return varies ±return_flex.
+      - Otherwise: symmetric; return = depart + original trip length.
+
+    Returns all results sorted by true_family_cost.
     """
-    results: list[ScoutResult] = []
-    trip_length = (return_date - depart_date).days
+    effective_depart_flex = depart_flex if depart_flex is not None else flex_days
+    effective_return_flex = return_flex if return_flex is not None else flex_days
 
-    for d_offset in range(-flex_days, flex_days + 1):
-        candidate_depart = depart_date + timedelta(days=d_offset)
-        if candidate_depart < date.today():
-            continue
-        candidate_return = candidate_depart + timedelta(days=trip_length)
-        result = _scout_single(
-            pm=pm,
-            profile=profile,
-            airline_db=airline_db,
-            calendar=calendar,
-            origin=origin,
-            destination=destination,
-            depart_date=candidate_depart,
-            return_date=candidate_return,
-        )
-        if result:
-            results.append(result)
+    trip_length = (return_date - depart_date).days
+    results: list[ScoutResult] = []
+
+    if effective_return_flex == 0:
+        # Fix return_date; vary depart only
+        for d_offset in range(-effective_depart_flex, effective_depart_flex + 1):
+            candidate_depart = depart_date + timedelta(days=d_offset)
+            if candidate_depart < date.today():
+                continue
+            if candidate_depart >= return_date:
+                continue
+            result = _scout_single(
+                pm=pm,
+                profile=profile,
+                airline_db=airline_db,
+                calendar=calendar,
+                origin=origin,
+                destination=destination,
+                depart_date=candidate_depart,
+                return_date=return_date,
+            )
+            if result:
+                results.append(result)
+    elif effective_depart_flex == 0:
+        # Fix depart_date; vary return only
+        for r_offset in range(-effective_return_flex, effective_return_flex + 1):
+            candidate_return = return_date + timedelta(days=r_offset)
+            if candidate_return <= depart_date:
+                continue
+            result = _scout_single(
+                pm=pm,
+                profile=profile,
+                airline_db=airline_db,
+                calendar=calendar,
+                origin=origin,
+                destination=destination,
+                depart_date=depart_date,
+                return_date=candidate_return,
+            )
+            if result:
+                results.append(result)
+    else:
+        # Symmetric: shift depart; return = depart + trip_length
+        for d_offset in range(-effective_depart_flex, effective_depart_flex + 1):
+            candidate_depart = depart_date + timedelta(days=d_offset)
+            if candidate_depart < date.today():
+                continue
+            candidate_return = candidate_depart + timedelta(days=trip_length)
+            result = _scout_single(
+                pm=pm,
+                profile=profile,
+                airline_db=airline_db,
+                calendar=calendar,
+                origin=origin,
+                destination=destination,
+                depart_date=candidate_depart,
+                return_date=candidate_return,
+            )
+            if result:
+                results.append(result)
 
     return sorted(results, key=lambda r: r.true_family_cost)
 

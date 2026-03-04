@@ -1,3 +1,29 @@
+## S33 — fom flex date flexibility comparison (2026-03-04)
+- scout.py: Extended scout_flex() with depart_flex/return_flex params. When
+  return_flex=0: return_date fixed, depart varies ±depart_flex. When depart_flex=0:
+  depart_date fixed, return varies ±return_flex. Default (both None): symmetric
+  backward compat — existing tests unchanged.
+- db/sqlite.py: Added FlexCache table (trip_id, flex_key, computed_at, results_json).
+  Added get_flex_cache()/set_flex_cache() helpers. delete_trip() now deletes FlexCache.
+- display.py: Added FlexResultRow dataclass + print_flex_results(). Columns: Rank,
+  Depart, Return, True cost, vs Tracked, Airline, Stops, Holiday. Cheapest bold; cheaper
+  than tracked shown in green.
+- cli.py: Added fom flex with --flex/--fix-return/--fix-depart/--refresh. Cache hit
+  (< 24h): shows "Using cached flex results from {time_ago}." Interactive prompt:
+  "Watch a cheaper alternative instead? [1-N/n]" with replace/add/cancel.
+- tests: TestScoutFlexModes (3 tests), TestFlexCommand (2 tests + snapshot).
+- Files changed:
+  - fly_o_myte/scout.py, fly_o_myte/db/sqlite.py, fly_o_myte/display.py, fly_o_myte/cli.py
+  - tests/test_scout.py, tests/test_cli.py, tests/__snapshots__/test_cli.ambr
+  - scripts/ralph/prd.json (S33 passes:true)
+- make ci: 261 passed, 1 deselected. Smoke test: 22 passed, 0 failed.
+- Learnings:
+  - Pre-seed FlexCache in test with exact flex_key formula from CLI.
+    computed_at within 24h triggers cache hit path; snapshot is deterministic.
+  - FlexResultRow is a display-layer type in display.py. cli.py imports it from display.
+  - delete_trip() must clean up FlexCache rows manually (like snapshots/recommendations).
+---
+
 ## S32 — Airport name resolver -- fly_o_myte/airports.py (2026-03-04)
 - Implemented: fly_o_myte/airports.py at layer 2 with resolve_destination(query)
   returning list[tuple[str, str]] sorted by IATA code. Covers ~80 international

@@ -215,6 +215,76 @@ class TestScoutEmptySource:
         assert results == []
 
 
+@pytest.mark.integration
+class TestScoutFlexModes:
+    """Tests for the new depart_flex/return_flex mode parameters."""
+
+    def test_fix_return_all_results_have_same_return_date(self, stub_pm) -> None:
+        """scout_flex with depart_flex=3, return_flex=0 produces results with fixed return_date."""
+        anchor_depart = date(2026, 7, 20)
+        anchor_return = date(2026, 7, 27)
+
+        results = scout_flex(
+            pm=stub_pm,
+            profile=_make_profile(),
+            airline_db=get_airline_db(),
+            calendar=get_calendar(),
+            origin="BNE",
+            destination="SYD",
+            depart_date=anchor_depart,
+            return_date=anchor_return,
+            depart_flex=3,
+            return_flex=0,
+        )
+        assert len(results) > 0
+        # All results must have the same return_date (fixed)
+        return_dates = {r.return_date for r in results}
+        assert len(return_dates) == 1, "All results should have the same return_date"
+        assert list(return_dates)[0] == anchor_return
+
+        # Depart dates should vary
+        depart_dates = {r.depart_date for r in results}
+        assert len(depart_dates) > 1, "Depart dates should vary"
+
+    def test_fix_depart_all_results_have_same_depart_date(self, stub_pm) -> None:
+        """scout_flex with depart_flex=0, return_flex=3 produces results with fixed depart_date."""
+        anchor_depart = date(2026, 7, 20)
+        anchor_return = date(2026, 7, 27)
+
+        results = scout_flex(
+            pm=stub_pm,
+            profile=_make_profile(),
+            airline_db=get_airline_db(),
+            calendar=get_calendar(),
+            origin="BNE",
+            destination="SYD",
+            depart_date=anchor_depart,
+            return_date=anchor_return,
+            depart_flex=0,
+            return_flex=3,
+        )
+        assert len(results) > 0
+        # All results must have the same depart_date (fixed)
+        depart_dates = {r.depart_date for r in results}
+        assert len(depart_dates) == 1, "All results should have the same depart_date"
+        assert list(depart_dates)[0] == anchor_depart
+
+    def test_backward_compat_flex_days_still_works(self, stub_pm) -> None:
+        """Existing flex_days param still works unchanged (backward compat)."""
+        results = scout_flex(
+            pm=stub_pm,
+            profile=_make_profile(),
+            airline_db=get_airline_db(),
+            calendar=get_calendar(),
+            origin="BNE",
+            destination="SYD",
+            depart_date=date(2026, 7, 20),
+            return_date=date(2026, 7, 27),
+            flex_days=3,
+        )
+        assert len(results) == 7
+
+
 class TestScoutCLI:
     """Tests for the fom scout CLI command."""
 

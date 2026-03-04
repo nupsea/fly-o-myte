@@ -68,6 +68,16 @@ class PriceSnapshot(SQLModel, table=True):
     rank: int = Field(default=1)  # 1=best true cost, 2=second, 3=third (S31)
 
 
+class FlexCache(SQLModel, table=True):
+    """Cached flex-scouting results — avoids burning SerpAPI quota on repeated calls."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    trip_id: int = Field(index=True, foreign_key="trip.id")
+    flex_key: str = Field(index=True)  # deterministic string of search params
+    computed_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    results_json: str = "[]"  # JSON: list of FlexResultRow-compatible dicts
+
+
 class Recommendation(SQLModel, table=True):
     """Booking recommendation generated after each poll."""
 
@@ -169,7 +179,7 @@ def set_trip_active(session: Session, trip_id: int, active: bool) -> None:
 
 
 def delete_trip(session: Session, trip_id: int) -> bool:
-    """Delete trip and all related snapshots and recommendations."""
+    """Delete trip and all related snapshots, recommendations, and flex cache."""
     trip = session.get(Trip, trip_id)
     if not trip:
         return False
@@ -178,6 +188,8 @@ def delete_trip(session: Session, trip_id: int) -> bool:
         session.delete(snap)
     for rec in get_recommendations_for_trip(session, trip_id):
         session.delete(rec)
+    for fc in session.exec(select(FlexCache).where(FlexCache.trip_id == trip_id)):
+        session.delete(fc)
     session.delete(trip)
     session.commit()
     return True
@@ -272,3 +284,37 @@ def mark_email_sent(session: Session, rec_id: int) -> None:
     if rec:
         rec.email_sent = 1
         session.commit()
+
+
+# ─── FlexCache helpers ─────────────────────────────────────────────────────────
+
+
+def get_flex_cache(session: Session, trip_id: int, flex_key: str) -> FlexCache | None:
+    """Return cached flex results for a trip+key, or None if absent."""
+    result = session.exec(
+        select(FlexCache)
+        .where(FlexCache.trip_id == trip_id)
+        .where(FlexCache.flex_key == flex_key)
+        .limit(1)
+    )
+    return result.first()
+
+
+def set_flex_cache(
+    session: Session, trip_id: int, flex_key: str, results_json: str
+) -> FlexCache:
+    """Upsert a FlexCache entry, replacing any existing entry for the same key."""
+    existing = get_flex_cache(session, trip_id, flex_key)
+    if existing:
+        session.delete(existing)
+        session.flush()
+    cache = FlexCache(
+        trip_id=trip_id,
+        flex_key=flex_key,
+        computed_at=datetime.now(UTC).isoformat(),
+        results_json=results_json,
+    )
+    session.add(cache)
+    session.commit()
+    session.refresh(cache)
+    return cache

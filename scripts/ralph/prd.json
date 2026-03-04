@@ -708,7 +708,7 @@
         "tests/test_cli.py: fom flex with stub_pm -- snapshot test of output table",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S34",
