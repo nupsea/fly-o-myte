@@ -89,14 +89,14 @@ class AmadeusPriceSource:
     @hookimpl
     def supports_route(self, origin: str, destination: str) -> bool:
         """
-        Amadeus is used for international routes only.
-        Domestic Australian routes are handled by Tequila.
+        Return True for all routes.
+
+        Amadeus is used for price-level signal analysis on all route types.
+        Flight search is limited to international routes due to limited AU
+        domestic carrier coverage, but that restriction lives in the flight-
+        search path, not here.
         """
-        both_domestic = (
-            origin.upper() in _AUSTRALIAN_AIRPORTS
-            and destination.upper() in _AUSTRALIAN_AIRPORTS
-        )
-        return not both_domestic
+        return True
 
     @hookimpl
     @retry(

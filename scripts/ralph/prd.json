@@ -595,7 +595,7 @@
         "tests/test_tracker.py: correct signal source used per route type",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S30",

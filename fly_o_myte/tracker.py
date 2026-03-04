@@ -43,7 +43,7 @@ from fly_o_myte.price_sources.hookspecs import (
 )
 from fly_o_myte.price_sources.serpapi import SerpAPIFlightSource
 from fly_o_myte.price_sources.tequila import TequilaPriceSource
-from fly_o_myte.recommender import SnapshotPoint, compute
+from fly_o_myte.recommender import RouteType, SnapshotPoint, classify_route, compute
 from fly_o_myte.true_cost import compute_family_score, compute_true_cost
 
 logger = logging.getLogger(__name__)
@@ -107,8 +107,17 @@ def poll_trip(
         logger.warning("No offers found for trip %s (%s)", trip.id, trip.label)
         return None
 
-    # ─── 1b. Enrich price signal via Amadeus when SerpAPI returns None ─────
-    if offer.price_level_signal is None:
+    # ─── 1b. Route classification ───────────────────────────────────────────
+    route_type = classify_route(trip.origin, trip.destination)
+
+    # ─── 1c. Amadeus signal enrichment ─────────────────────────────────────
+    # ASIA_PACIFIC / LONG_HAUL: always call Amadeus for a reliable market signal.
+    # DOMESTIC / TRANS_TASMAN: Amadeus only as fallback when SerpAPI returned None.
+    _needs_amadeus = (
+        route_type in (RouteType.ASIA_PACIFIC, RouteType.LONG_HAUL)
+        or offer.price_level_signal is None
+    )
+    if _needs_amadeus:
         for plugin in pm.get_plugins():
             if isinstance(plugin, AmadeusPriceSource):
                 signal = plugin.get_price_level_signal(
@@ -198,6 +207,7 @@ def poll_trip(
         days_to_departure=max(0, days_to_departure),
         price_level_signal=offer.price_level_signal,
         school_holiday_context=holiday_ctx,
+        route_type=route_type,
     )
 
     rec = insert_recommendation(

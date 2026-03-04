@@ -142,6 +142,36 @@ def test_returns_none_on_empty_price_metrics(httpx_mock):
     assert _signal(src) is None
 
 
+# ─── BNE → SIN international route ───────────────────────────────────────────
+
+
+_PRICE_METRICS_BNE_SIN = {
+    "data": [
+        {
+            "type": "flight-price-analysis",
+            "origin": {"iataCode": "BNE"},
+            "destination": {"iataCode": "SIN"},
+            "priceMetrics": [
+                {"amount": "850.00", "quartileRanking": "LOW"},
+                {"amount": "1100.00", "quartileRanking": "MEDIUM_LOW"},
+                {"amount": "1400.00", "quartileRanking": "MEDIUM"},
+                {"amount": "1700.00", "quartileRanking": "MEDIUM_HIGH"},
+                {"amount": "2100.00", "quartileRanking": "HIGH"},
+            ],
+        }
+    ]
+}
+
+
+def test_bne_sin_price_analysis_returns_low(httpx_mock):
+    """BNE→SIN: price below LOW threshold returns 'LOW' signal."""
+    httpx_mock.add_response(json=_TOKEN_RESPONSE)
+    httpx_mock.add_response(json=_PRICE_METRICS_BNE_SIN)
+    src = _src()
+    result = src.get_price_level_signal("BNE", "SIN", date(2026, 9, 18), 700.0)
+    assert result == "LOW"
+
+
 # ─── token caching ────────────────────────────────────────────────────────────
 
 

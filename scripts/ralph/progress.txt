@@ -418,3 +418,30 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
   - _ASIA_PACIFIC_AIRPORTS mirrors the subset of _AIRPORT_COUNTRY from serpapi.py that
     covers the Asia-Pacific region (JP, TH, SG, MY, ID, HK, KR, CN, PH, VN, IN).
 ---
+
+### S29 — Amadeus price analysis -- international signal enrichment (2026-03-04)
+- amadeus.py: supports_route() now returns True for all routes (not just non-domestic).
+  Docstring clarifies: used for price analysis on all routes; flight search restriction
+  is in the search path, not in supports_route.
+- tracker.py: added route_type = classify_route() after fetching offer.
+  _needs_amadeus logic: ASIA_PACIFIC/LONG_HAUL always call Amadeus; DOMESTIC/TRANS_TASMAN
+  use Amadeus only as fallback when price_level_signal is None.
+  route_type is now passed to compute() for booking-window-aware decisions.
+- Imports updated: tracker.py now imports RouteType, classify_route from recommender.
+- 3 new tests: test_bne_sin_price_analysis_returns_low (test_amadeus.py) +
+  TestAmadeusSignalEnrichment class (test_tracker.py) with 2 integration tests.
+- Files changed:
+  - fly_o_myte/price_sources/amadeus.py (supports_route change)
+  - fly_o_myte/tracker.py (route classification + enrichment routing + route_type to compute)
+  - tests/test_amadeus.py (BNE→SIN test)
+  - tests/test_tracker.py (TestAmadeusSignalEnrichment with 2 tests)
+  - scripts/ralph/prd.json (S29 passes:true)
+- make ci: 221 passed, 1 deselected. Smoke test: 19 passed, 0 failed.
+- Learnings:
+  - Pyright catches signature mismatches in subclass method overrides — must match parent
+    positional params exactly even for stubs. Use explicit params not **kwargs.
+  - ruff I001 import-sort error: amadeus import must come before hookspecs alphabetically
+    in the test file. ruff --fix handles this automatically.
+  - _StubAmadeus must inherit from AmadeusPriceSource for isinstance() check to pass
+    in tracker.py. Don't call super().__init__() to avoid creating real httpx.Client.
+---

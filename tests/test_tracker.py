@@ -16,7 +16,12 @@ from fly_o_myte.db.sqlite import (
     get_snapshots_for_trip,
     insert_trip,
 )
-from fly_o_myte.price_sources.hookspecs import build_plugin_manager
+from fly_o_myte.price_sources.amadeus import AmadeusPriceSource
+from fly_o_myte.price_sources.hookspecs import (
+    FlightOffer,
+    build_plugin_manager,
+    hookimpl,
+)
 from fly_o_myte.tracker import poll_all_active, poll_trip
 
 
@@ -236,3 +241,144 @@ class TestPollAllActive:
         set_trip_active(db_session, trip.id, active=False)
         results = poll_all_active(db_session, profile, stub_pm, send_alerts=False)
         assert trip.id not in results
+
+
+# ─── Amadeus signal enrichment routing (S29) ──────────────────────────────────
+
+
+class _StubAmadeus(AmadeusPriceSource):
+    """Lightweight Amadeus stub — records calls to get_price_level_signal."""
+
+    def __init__(self, return_signal: str | None = "LOW") -> None:
+        # Skip real __init__ — no HTTP client needed
+        self._return_signal = return_signal
+        self.call_count = 0
+
+    @hookimpl
+    def source_name(self) -> str:
+        return "stub_amadeus"
+
+    @hookimpl
+    def supports_route(self, origin: str, destination: str) -> bool:
+        return True
+
+    @hookimpl
+    def search_flights(
+        self,
+        origin: str,
+        destination: str,
+        depart_date: object,
+        return_date: object,
+        adults: int,
+        children_ages: list,
+        max_stops: object,
+        currency: str,
+    ) -> list[FlightOffer]:
+        return []  # yield to other price sources
+
+    def get_price_level_signal(
+        self,
+        origin: str,
+        destination: str,
+        depart_date: object,
+        price_aud: float,
+    ) -> str | None:
+        self.call_count += 1
+        return self._return_signal
+
+
+class _StubSourceWithSignal:
+    """Price source that returns a FlightOffer with price_level_signal already set."""
+
+    def __init__(self, signal: str = "HIGH") -> None:
+        self._signal = signal
+
+    @hookimpl
+    def source_name(self) -> str:
+        return "stub_with_signal"
+
+    @hookimpl
+    def supports_route(self, origin: str, destination: str) -> bool:
+        return True
+
+    @hookimpl
+    def search_flights(
+        self,
+        origin: str,
+        destination: str,
+        depart_date: object,
+        return_date: object,
+        adults: int,
+        children_ages: list,
+        max_stops: object,
+        currency: str,
+    ) -> list[FlightOffer]:
+        return [
+            FlightOffer(
+                source="stub_with_signal",
+                airline_code="SQ",
+                flight_number="SQ223",
+                base_fare_per_adult=800.0,
+                currency="AUD",
+                stops=0,
+                departure_time="09:00",
+                arrival_time="13:30",
+                duration_minutes=270,
+                price_level_signal=self._signal,
+                offer_raw={},
+            )
+        ]
+
+
+@pytest.mark.integration
+class TestAmadeusSignalEnrichment:
+    """S29: Route-type-aware Amadeus signal enrichment."""
+
+    def test_asia_pacific_always_calls_amadeus(self, db_session):
+        """BNE→SIN (ASIA_PACIFIC): Amadeus called even when SerpAPI returned a signal."""
+        stub_amadeus = _StubAmadeus(return_signal="LOW")
+        pm = build_plugin_manager()
+        pm.register(_StubSourceWithSignal(signal="HIGH"))  # SerpAPI returned HIGH
+        pm.register(stub_amadeus)
+
+        trip = insert_trip(
+            db_session,
+            Trip(
+                label="BNE-SIN intl",
+                origin="BNE",
+                destination="SIN",
+                depart_date="2026-09-18",
+                return_date="2026-09-25",
+                adults=2,
+            ),
+        )
+        snap = poll_trip(db_session, trip, _make_profile(), pm, send_alerts=False)
+        assert snap is not None
+        assert stub_amadeus.call_count == 1, "Amadeus must be called for ASIA_PACIFIC"
+        # Amadeus signal ("LOW") should override SerpAPI signal ("HIGH")
+        assert snap.price_level_signal == "LOW"
+
+    def test_domestic_with_signal_skips_amadeus(self, db_session):
+        """BNE→SYD (DOMESTIC) + SerpAPI signal set: Amadeus NOT called."""
+        stub_amadeus = _StubAmadeus(return_signal="LOW")
+        pm = build_plugin_manager()
+        pm.register(_StubSourceWithSignal(signal="HIGH"))
+        pm.register(stub_amadeus)
+
+        trip = insert_trip(
+            db_session,
+            Trip(
+                label="BNE-SYD domestic",
+                origin="BNE",
+                destination="SYD",
+                depart_date="2026-09-18",
+                return_date="2026-09-25",
+                adults=2,
+            ),
+        )
+        snap = poll_trip(db_session, trip, _make_profile(), pm, send_alerts=False)
+        assert snap is not None
+        assert stub_amadeus.call_count == 0, (
+            "Amadeus must NOT be called for DOMESTIC with signal"
+        )
+        assert snap.price_level_signal == "HIGH"
