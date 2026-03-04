@@ -633,6 +633,29 @@
         "If satisfied: create scripts/ralph/demo-reviews/DR-P3-approved.md with APPROVED on line 1"
       ],
       "passes": false
+    },
+    {
+      "id": "S31",
+      "title": "fom check — top-3 airline shortlist ranked by true family cost",
+      "phase": 3,
+      "priority": 38,
+      "verifyFirst": "fly_o_myte/tracker.py _fetch_best_offer() exists and returns a single FlightOffer. fly_o_myte/display.py print_trip_detail() exists. Read both before changing anything.",
+      "description": "Currently _fetch_best_offer() returns one offer (cheapest base fare) and fom check shows only that airline. Extend to collect top 3 offers by true family cost and display them as a ranked shortlist in fom check. The primary recommendation (decision, confidence, rationale) still applies to offer #1.",
+      "smokeTestRequired": true,
+      "acceptanceCriteria": [
+        "tracker.py: rename _fetch_best_offer() to _fetch_top_offers(n=3) — returns list[FlightOffer] sorted by base_fare_per_adult ascending, capped at n",
+        "tracker.py: poll_trip() passes all top offers to compute_true_cost; stores each as a separate PriceSnapshot row with same fetched_at timestamp and a new 'rank' field (1=best true cost, 2=second, 3=third)",
+        "db/sqlite.py: PriceSnapshot gets optional rank: int = 1 field",
+        "display.py: print_trip_detail() shows a 'Alternatives' table below the main recommendation panel when rank-2 and rank-3 snapshots exist for the same fetched_at",
+        "Alternatives table columns: Rank, Airline, True cost, Stops, Depart time, Family score",
+        "Rank 1 row highlighted (bold) as the recommended option",
+        "fom check <id> with SerpAPI live data for BNE->SIN shows SQ, Scoot (TR), Jetstar Asia (3K) or similar alternatives in the shortlist",
+        "tests/test_tracker.py: stub_pm returning 3 different offers produces 3 PriceSnapshot rows with rank 1/2/3",
+        "tests/test_tracker.py: offers ranked by true family cost (lowest total first), not base fare",
+        "Syrupy snapshot updated for fom check output",
+        "uv run make ci passes"
+      ],
+      "passes": false
     }
   ]
 }
