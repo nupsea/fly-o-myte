@@ -41,7 +41,10 @@ from fly_o_myte.price_sources.hookspecs import (
     FlightOffer,
     build_plugin_manager,
 )
-from fly_o_myte.price_sources.serpapi import SerpAPIFlightSource
+from fly_o_myte.price_sources.serpapi import (
+    SerpAPIFlightSource,
+    detect_destination_country,
+)
 from fly_o_myte.price_sources.tequila import TequilaPriceSource
 from fly_o_myte.recommender import RouteType, SnapshotPoint, classify_route, compute
 from fly_o_myte.true_cost import compute_family_score, compute_true_cost
@@ -197,9 +200,19 @@ def poll_trip(
 
     days_to_departure = (depart - date.today()).days
 
-    # School holiday context
+    # School holiday context — check family's AU state first
     cal = get_calendar()
     holiday_ctx = cal.check_overlap(profile.state, depart, ret)
+
+    # For international routes also check the destination country's school calendar
+    if holiday_ctx is None and route_type != RouteType.DOMESTIC:
+        dest_country = detect_destination_country(trip.destination)
+        if (
+            dest_country
+            and dest_country != "AU"
+            and dest_country in cal.supported_states()
+        ):
+            holiday_ctx = cal.check_overlap(dest_country, depart, ret)
 
     result = compute(
         snapshots=snap_points,

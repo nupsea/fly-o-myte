@@ -279,3 +279,84 @@ class TestSnapshotOutput:
         result = runner.invoke(app, ["compare", "1", "1"])
         assert result.exit_code == 0
         assert result.output == snapshot
+
+
+class TestInternationalRouteCheck:
+    """S30: fom check on an international trip shows 'International route' context."""
+
+    @pytest.fixture(autouse=True)
+    def fresh_db(self, tmp_path, monkeypatch):
+        from fly_o_myte.config import get_settings
+        from fly_o_myte.db.sqlite import create_db_engine, create_tables
+
+        db_path = tmp_path / "intl_test.db"
+        monkeypatch.setenv("FLY_O_MYTE_DB_PATH", str(db_path))
+        get_settings.cache_clear()
+        engine = create_db_engine(db_path)
+        create_tables(engine)
+        self._engine = engine  # type: ignore[attr-defined]
+        yield
+        get_settings.cache_clear()
+
+    def test_check_shows_international_route_context(self):
+        """fom check on BNE→SIN trip shows 'International route' in output."""
+        from fly_o_myte.db.sqlite import (
+            PriceSnapshot,
+            Recommendation,
+            Trip,
+            get_session,
+            insert_recommendation,
+            insert_snapshot,
+            insert_trip,
+        )
+
+        with get_session(self._engine) as session:  # type: ignore[attr-defined]
+            trip = insert_trip(
+                session,
+                Trip(
+                    label="BNE-SIN Intl",
+                    origin="BNE",
+                    destination="SIN",
+                    depart_date="2026-09-18",
+                    return_date="2026-09-25",
+                    adults=2,
+                ),
+            )
+            assert trip.id is not None
+            insert_snapshot(
+                session,
+                PriceSnapshot(
+                    trip_id=trip.id,
+                    fetched_at="2026-03-01T10:00:00",
+                    source="stub",
+                    airline_code="SQ",
+                    base_fare_per_adult=800.0,
+                    true_family_cost=1600.0,
+                    true_cost_breakdown='{"base_adults": 1600.0, "base_children": 0.0, "bags": 0.0, "seats": 0.0, "infant": 0.0, "total": 1600.0}',
+                    price_level_signal="LOW",
+                    stops=0,
+                    departure_time="09:00",
+                    family_score=85.0,
+                ),
+            )
+            insert_recommendation(
+                session,
+                Recommendation(
+                    trip_id=trip.id,
+                    generated_at="2026-03-01T10:00:00",
+                    decision="monitor",
+                    confidence=0.50,
+                    regret_risk="medium",
+                    true_family_cost=1600.0,
+                    rolling_avg_cost=1600.0,
+                    trend_slope=0.0,
+                    days_to_departure=200,
+                    price_level_signal="LOW",
+                    rationale="Building history for BNE-SIN route.",
+                ),
+            )
+
+        result = runner.invoke(app, ["check", "1"])
+        assert result.exit_code == 0
+        assert "International route" in result.output
+        assert "1,600" in result.output  # AUD total visible

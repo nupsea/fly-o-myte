@@ -445,3 +445,34 @@ These patterns are maintained here and updated after each story. Read BEFORE imp
   - _StubAmadeus must inherit from AmadeusPriceSource for isinstance() check to pass
     in tracker.py. Don't call super().__init__() to avoid creating real httpx.Client.
 ---
+
+## S30 — International route -- end-to-end integration tests (2026-03-04)
+- tracker.py: Added destination country calendar check for non-DOMESTIC routes.
+  After checking family's AU state, if no overlap found, detect destination country
+  via detect_destination_country() from serpapi.py and check that country's calendar.
+- cli.py: fom check now shows "International route: <RouteType>" label for non-DOMESTIC
+  routes (TRANS_TASMAN, ASIA_PACIFIC, LONG_HAUL). DOMESTIC routes unchanged.
+- 5 new tests:
+  - test_tracker.py: TestInternationalRouteIntegration (4 tests):
+    BNE→SIN non-zero AUD cost; SGD→AUD currency conversion; SG school holiday
+    overlap detected; ASIA_PACIFIC booking window → BOOK_NOW.
+  - test_cli.py: TestInternationalRouteCheck (1 test): fom check shows "International route"
+    for BNE→SIN.
+- smoke_test.sh: Added 3 BNE→SIN checks (watch/check/remove). 22 total, 0 failed.
+- Files changed:
+  - fly_o_myte/tracker.py (destination country calendar fallback)
+  - fly_o_myte/cli.py (International route label in check command)
+  - tests/test_tracker.py (TestInternationalRouteIntegration, 4 tests)
+  - tests/test_cli.py (TestInternationalRouteCheck, 1 test)
+  - scripts/ralph/smoke_test.sh (3 new BNE→SIN checks)
+  - scripts/ralph/prd.json (S30 passes:true)
+- make ci: 226 passed, 1 deselected. Smoke test: 22 passed, 0 failed.
+- Learnings:
+  - _group_by_day collapses multiple polls on the same day to n=1. Pre-insert historical
+    snapshots with different fetched_at ISO timestamps to build sufficient history (n>=3)
+    for booking window tests.
+  - _StubSourceWithSignal signal field must be str | None (not str) for pyright to accept
+    None as a valid argument.
+  - Syrupy snapshot tests unaffected by "International route" label since those tests use
+    BNE→SYD (DOMESTIC), not international routes.
+---

@@ -93,6 +93,12 @@ check "resume trip 1" 0 "" $FOM resume 1
 check "check nonexistent trip" 1 "not found" $FOM check 9999
 check "remove nonexistent trip" 1 "not found" $FOM remove 9999 --yes
 
+# ── International trip lifecycle (S30) ────────────────────────────────────────
+check "watch BNE→SIN"  0 "" \
+    $FOM watch BNE SIN 2026-09-18 2026-09-28 --label "Intl smoke test"
+check "check trip 2 (intl, no snapshots)" 0 "" $FOM check 2
+check "remove trip 2" 0 "" $FOM remove 2 --yes
+
 # ── Remove ────────────────────────────────────────────────────────────────────
 check "remove trip 1"        0 "" $FOM remove 1 --yes
 check "status (empty again)" 0 "" $FOM status

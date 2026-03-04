@@ -290,7 +290,7 @@ class _StubAmadeus(AmadeusPriceSource):
 class _StubSourceWithSignal:
     """Price source that returns a FlightOffer with price_level_signal already set."""
 
-    def __init__(self, signal: str = "HIGH") -> None:
+    def __init__(self, signal: str | None = "HIGH") -> None:
         self._signal = signal
 
     @hookimpl
@@ -382,3 +382,181 @@ class TestAmadeusSignalEnrichment:
             "Amadeus must NOT be called for DOMESTIC with signal"
         )
         assert snap.price_level_signal == "HIGH"
+
+
+# ─── International route integration (S30) ───────────────────────────────────
+
+
+@pytest.mark.integration
+class TestInternationalRouteIntegration:
+    """S30: End-to-end integration for BNE→SIN international route."""
+
+    def test_bne_sin_produces_non_zero_aud_cost(self, db_session):
+        """poll_trip for BNE→SIN (SQ, AUD) returns PriceSnapshot with non-zero cost."""
+        pm = build_plugin_manager()
+        pm.register(_StubSourceWithSignal(signal=None))
+
+        trip = insert_trip(
+            db_session,
+            Trip(
+                label="BNE-SIN basic",
+                origin="BNE",
+                destination="SIN",
+                depart_date="2026-09-18",
+                return_date="2026-09-25",
+                adults=2,
+            ),
+        )
+        snap = poll_trip(db_session, trip, _make_profile(), pm, send_alerts=False)
+        assert snap is not None
+        assert snap.true_family_cost > 0
+
+    def test_sgd_offer_converted_to_aud(self, db_session, httpx_mock):
+        """SQ offer in SGD is converted to AUD (via Frankfurter) before fee calculation."""
+        # Mock Frankfurter: 1 SGD = 1.10 AUD
+        httpx_mock.add_response(json={"rates": {"AUD": 1.10}})
+
+        class _SGDSource:
+            @hookimpl
+            def source_name(self) -> str:
+                return "sgd_stub"
+
+            @hookimpl
+            def supports_route(self, origin: str, destination: str) -> bool:
+                return True
+
+            @hookimpl
+            def search_flights(
+                self,
+                origin: str,
+                destination: str,
+                depart_date: object,
+                return_date: object,
+                adults: int,
+                children_ages: list,
+                max_stops: object,
+                currency: str,
+            ) -> list[FlightOffer]:
+                return [
+                    FlightOffer(
+                        source="sgd_stub",
+                        airline_code="SQ",
+                        flight_number="SQ223",
+                        base_fare_per_adult=500.0,
+                        currency="SGD",
+                        stops=0,
+                        departure_time="09:00",
+                        arrival_time="13:30",
+                        duration_minutes=270,
+                        price_level_signal=None,
+                        offer_raw={},
+                    )
+                ]
+
+        pm = build_plugin_manager()
+        pm.register(_SGDSource())
+
+        trip = insert_trip(
+            db_session,
+            Trip(
+                label="BNE-SIN SGD",
+                origin="BNE",
+                destination="SIN",
+                depart_date="2026-09-18",
+                return_date="2026-09-25",
+                adults=2,
+            ),
+        )
+        snap = poll_trip(db_session, trip, _make_profile(), pm, send_alerts=False)
+        assert snap is not None
+        # SGD 500 × 1.10 = AUD 550/adult; 2 adults; SQ bags included → AUD 1100
+        assert snap.true_family_cost == pytest.approx(1100.0)
+
+    def test_sg_school_holiday_overlap_detected(self, db_session):
+        """BNE→SIN during SG June school break detects holiday overlap for destination."""
+        pm = build_plugin_manager()
+        pm.register(_StubSourceWithSignal(signal=None))
+
+        # SG June 2026 break: ~May 30 - Jun 28
+        trip = insert_trip(
+            db_session,
+            Trip(
+                label="BNE-SIN June",
+                origin="BNE",
+                destination="SIN",
+                depart_date="2026-06-10",
+                return_date="2026-06-17",
+                adults=2,
+            ),
+        )
+        poll_trip(db_session, trip, _make_profile(), pm, send_alerts=False)
+
+        assert trip.id is not None
+        rec = get_latest_recommendation(db_session, trip.id)
+        assert rec is not None
+        assert rec.school_holiday_flag is not None, (
+            "SG school holiday should be detected for BNE→SIN in June"
+        )
+
+    def test_asia_pacific_booking_window_applied(self, db_session):
+        """BNE→SIN (ASIA_PACIFIC) + LOW signal + 100 days → BOOK_NOW.
+
+        ASIA_PACIFIC optimal booking window is 120 days. At 100 days with LOW
+        signal, the route-type-aware rule in compute() fires before the generic
+        "LOW + days > 45 → MONITOR" rule.
+
+        Pre-insert snapshots across different days so _group_by_day sees ≥ 3
+        distinct day buckets and compute() proceeds past the "insufficient data"
+        early return.
+        """
+        from datetime import date, timedelta
+
+        from fly_o_myte.db.sqlite import PriceSnapshot, insert_snapshot
+
+        pm = build_plugin_manager()
+        pm.register(_StubSourceWithSignal(signal="LOW"))
+
+        depart = date.today() + timedelta(days=100)
+        return_d = depart + timedelta(days=7)
+
+        trip = insert_trip(
+            db_session,
+            Trip(
+                label="BNE-SIN window",
+                origin="BNE",
+                destination="SIN",
+                depart_date=depart.isoformat(),
+                return_date=return_d.isoformat(),
+                adults=2,
+            ),
+        )
+        assert trip.id is not None
+
+        # Pre-insert 5 snapshots on different days so history is rich enough
+        base_date = date.today() - timedelta(days=5)
+        for i in range(5):
+            insert_snapshot(
+                db_session,
+                PriceSnapshot(
+                    trip_id=trip.id,
+                    fetched_at=f"{(base_date + timedelta(days=i)).isoformat()}T10:00:00",
+                    source="stub",
+                    airline_code="SQ",
+                    base_fare_per_adult=800.0,
+                    true_family_cost=1600.0,
+                    price_level_signal="LOW",
+                    stops=0,
+                    departure_time="09:00",
+                    family_score=85.0,
+                ),
+            )
+
+        # One live poll to generate the recommendation with route_type context
+        snap = poll_trip(db_session, trip, _make_profile(), pm, send_alerts=False)
+        assert snap is not None
+
+        rec = get_latest_recommendation(db_session, trip.id)
+        assert rec is not None
+        assert rec.decision == "book_now", (
+            f"Expected BOOK_NOW via ASIA_PACIFIC booking window, got {rec.decision}"
+        )

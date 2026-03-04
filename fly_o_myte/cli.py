@@ -440,6 +440,15 @@ def check(
 
         print_trip_detail(trip, rec, snap, breakdown)
 
+        # International route context label
+        from fly_o_myte.recommender import RouteType, classify_route
+
+        route_type = classify_route(trip.origin, trip.destination)
+        if route_type != RouteType.DOMESTIC:
+            route_label = route_type.value.replace("_", " ").title()
+            console.print(f"  International route: {route_label}", style="dim")
+            console.print()
+
         # Market context — Phase 2 analytics (skip gracefully when no data)
         from fly_o_myte.db.duckdb import query_route_context
         from fly_o_myte.display import print_route_context

@@ -613,7 +613,7 @@
         "fom check <id> on international trip shows 'International route' context and correct AUD total",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "DR-P3",
