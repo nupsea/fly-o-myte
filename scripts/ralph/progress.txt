@@ -1,3 +1,34 @@
+## S32 — Airport name resolver -- fly_o_myte/airports.py (2026-03-04)
+- Implemented: fly_o_myte/airports.py at layer 2 with resolve_destination(query)
+  returning list[tuple[str, str]] sorted by IATA code. Covers ~80 international
+  airports across 30+ countries (Japan, Thailand, Sri Lanka, Indonesia, UK, France,
+  Italy, Spain, Germany, UAE, India, NZ, USA, South Korea, Malaysia, Philippines,
+  Vietnam, China, Maldives, Fiji, Mauritius, South Africa, Canada, etc.).
+  AU domestic airports excluded (handled by serpapi._AU_AIRPORTS).
+  Added "airports": 2 to tools/layer_linter.py LAYER_MAP.
+  Added fom airports <query> command to cli.py printing a Rich table.
+  Created tests/test_airports.py with 24 tests (unit tests + parametrized key destination
+  tests). Added TestAirportsCommand to test_cli.py (4 tests including snapshot).
+  Fixed pre-existing pyright errors in cli.py (snap.stops > 1 on Optional[int]).
+- Files changed:
+  - fly_o_myte/airports.py (new)
+  - fly_o_myte/cli.py (airports command + pyright fixes for snap.stops)
+  - tools/layer_linter.py ("airports": 2 added)
+  - tests/test_airports.py (new — 24 tests)
+  - tests/test_cli.py (TestAirportsCommand — 4 tests)
+  - tests/__snapshots__/test_cli.ambr (airports snapshot added)
+  - scripts/ralph/prd.json (S32 passes:true)
+- make ci: 256 passed, 1 deselected. Smoke test: 22 passed, 0 failed.
+- Learnings:
+  - ruff format reformats long list literals to multi-line when they exceed line limits.
+    Always run ruff format before make ci when adding data-heavy modules.
+  - Pyright can surface pre-existing Optional issues in files that get reformatted.
+    The snap.stops field is int | None — use `n_stops = snap.stops or 0` before
+    comparison operators.
+  - Syrupy snapshot for CLI commands with no DB dependency can live in a plain test
+    class (no fresh_db fixture needed) — the airports command reads no DB.
+---
+
 ## S31 — fom check top-3 airline shortlist (2026-03-04)
 - Renamed `_fetch_best_offer()` → `_fetch_top_offers(n=3)` in tracker.py.
   Returns list[FlightOffer] sorted by base_fare_per_adult, capped at n.

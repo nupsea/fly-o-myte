@@ -1,4 +1,15 @@
 # serializer version: 1
+# name: TestAirportsCommand.test_airports_snapshot
+  '''
+         Airports matching 'sri lanka'       
+                                             
+    IATA   Airport / City                    
+   ───────────────────────────────────────── 
+    CMB    Colombo Bandaranaike (Sri Lanka)  
+                                             
+  
+  '''
+# ---
 # name: TestSnapshotOutput.test_check_snapshot
   '''
   

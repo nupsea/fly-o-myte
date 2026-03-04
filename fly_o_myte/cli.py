@@ -366,8 +366,11 @@ def watch(
         console.print("Fetching initial price...")
         snap = poll_trip(session, trip, profile, pm, send_alerts=False)
         if snap:
+            n_stops = snap.stops or 0
             stops_label = (
-                "nonstop" if snap.stops == 0 else f"{snap.stops} stop{'s' if snap.stops > 1 else ''}"
+                "nonstop"
+                if n_stops == 0
+                else f"{n_stops} stop{'s' if n_stops > 1 else ''}"
             )
             details = f"  {snap.airline_code or '?'} · {stops_label}"
             if snap.departure_time:
@@ -574,13 +577,18 @@ def refresh(
         snap = poll_trip(session, trip, profile, pm, send_alerts=not no_email)
 
         if snap:
+            n_stops = snap.stops or 0
             stops_label = (
-                "nonstop" if snap.stops == 0 else f"{snap.stops} stop{'s' if snap.stops > 1 else ''}"
+                "nonstop"
+                if n_stops == 0
+                else f"{n_stops} stop{'s' if n_stops > 1 else ''}"
             )
             details = f"  {snap.airline_code or '?'} · {stops_label}"
             if snap.departure_time:
                 details += f" · departs {snap.departure_time}"
-            console.print(f"[green]Updated: ${snap.true_family_cost:,.0f} AUD[/green]{details}")
+            console.print(
+                f"[green]Updated: ${snap.true_family_cost:,.0f} AUD[/green]{details}"
+            )
         else:
             console.print("[yellow]No offers found.[/yellow]")
 
@@ -794,6 +802,34 @@ def data_version() -> None:
 
     db = get_airline_db()
     print_data_version(db.version, db.last_updated, db.all_codes())
+
+
+# ─── airports ──────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def airports(
+    query: str = typer.Argument(
+        ..., help="City name, country name, or IATA code to search"
+    ),
+) -> None:
+    """Look up international airport IATA codes by city or country name."""
+    from rich import box
+    from rich.table import Table
+
+    from fly_o_myte.airports import resolve_destination
+
+    matches = resolve_destination(query)
+    if not matches:
+        console.print("No matches found.")
+        return
+
+    table = Table(title=f"Airports matching '{query}'", box=box.SIMPLE)
+    table.add_column("IATA", style="bold")
+    table.add_column("Airport / City")
+    for iata, display_name in matches:
+        table.add_row(iata, display_name)
+    console.print(table)
 
 
 if __name__ == "__main__":

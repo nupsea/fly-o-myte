@@ -682,7 +682,7 @@
         "tools/layer_linter.py recognises airports.py as layer 2 -- uv run python tools/layer_linter.py passes",
         "uv run make ci passes"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "S33",

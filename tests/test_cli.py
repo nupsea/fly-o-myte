@@ -281,6 +281,32 @@ class TestSnapshotOutput:
         assert result.output == snapshot
 
 
+class TestAirportsCommand:
+    """S32: fom airports command resolves IATA codes by city/country name."""
+
+    def test_airports_sri_lanka(self):
+        result = runner.invoke(app, ["airports", "sri lanka"])
+        assert result.exit_code == 0
+        assert "CMB" in result.output
+
+    def test_airports_japan(self):
+        result = runner.invoke(app, ["airports", "japan"])
+        assert result.exit_code == 0
+        assert "NRT" in result.output
+        assert "HND" in result.output
+        assert "KIX" in result.output
+
+    def test_airports_no_match(self):
+        result = runner.invoke(app, ["airports", "zzz"])
+        assert result.exit_code == 0
+        assert "No matches found" in result.output
+
+    def test_airports_snapshot(self, snapshot: SnapshotAssertion):
+        result = runner.invoke(app, ["airports", "sri lanka"])
+        assert result.exit_code == 0
+        assert result.output == snapshot
+
+
 class TestInternationalRouteCheck:
     """S30: fom check on an international trip shows 'International route' context."""
 
