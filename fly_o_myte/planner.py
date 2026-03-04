@@ -177,16 +177,40 @@ def _extract_with_wizard(text: str) -> TripIntent:
             con.print(f"  [dim]{destination_iata} \u2014 {destination_display}[/dim]")
 
     # --- Month ---
-    month_raw = Prompt.ask("Departure month (e.g. dec-2026)")
-    month, year = _parse_month_year(month_raw)
+    month, year = 0, 0
+    while not month:
+        month_raw = Prompt.ask("Departure month (e.g. dec-2026)")
+        if not month_raw.strip():
+            con.print("[dim]Please enter a month, e.g. dec-2026.[/dim]")
+            continue
+        try:
+            month, year = _parse_month_year(month_raw)
+        except ValueError:
+            con.print(
+                f"[dim]Could not parse '{month_raw}'. Try formats like: dec-2026, 12-2026, december 2026.[/dim]"
+            )
 
     # --- Nights ---
-    nights_raw = Prompt.ask("Trip length (nights)", default="7")
-    nights = int(nights_raw)
+    nights = 0
+    while nights <= 0:
+        nights_raw = Prompt.ask("Trip length (nights)", default="7")
+        try:
+            nights = int(nights_raw)
+            if nights <= 0:
+                con.print("[dim]Nights must be a positive number.[/dim]")
+        except ValueError:
+            con.print("[dim]Please enter a number, e.g. 7.[/dim]")
 
     # --- Flex ---
-    flex_raw = Prompt.ask("Date flexibility (\u00b1days)", default="3")
-    flex_days = int(flex_raw)
+    flex_days = -1
+    while flex_days < 0:
+        flex_raw = Prompt.ask("Date flexibility (\u00b1days)", default="3")
+        try:
+            flex_days = int(flex_raw)
+            if flex_days < 0:
+                con.print("[dim]Flexibility must be 0 or more days.[/dim]")
+        except ValueError:
+            con.print("[dim]Please enter a number, e.g. 3.[/dim]")
 
     return TripIntent(
         destination_iata=destination_iata,

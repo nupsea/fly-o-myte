@@ -202,23 +202,39 @@ fom setup                                    first-run wizard
 fom profile                                  view/edit family profile
 fom data-version                             show embedded data freshness
 
+fom airports <query>                         look up IATA codes by city or country name
+
 fom scout BNE SYD --month jul-2026           cheapest date windows across a month
 fom scout BNE SYD --depart 2026-07-20        flex ±N days around specific dates
   --return 2026-07-27 --flex 3
 
+fom plan "Sri Lanka in December"             plan a trip from a natural language idea
+fom plan                                     guided structured prompts (no LLM key needed)
+  --budget 10000                             filter windows to this AUD ceiling
+  --group "Sri Lanka Dec"                    tag for group tracking
+
 fom watch BNE SYD 2026-07-20 2026-07-27     start tracking, immediate price fetch
   --label "Winter SYD" --adults 2
+  --group "Winter trips"                     tag trip for group filtering
 fom status                                   morning digest (actionable trips only)
 fom status --all                             all trips including MONITOR
-fom check <id>                               full recommendation + breakdown
+fom status --group "Winter trips"            filter digest to one group
+fom check <id>                               full recommendation + alternatives table
 fom history <id>                             price history + sparkline
 fom compare <id1> <id2> [id3]               side-by-side comparison
+
+fom flex <id>                                ±3 day date alternatives vs tracked price
+fom flex <id> --flex 5                       widen the comparison window
+fom flex <id> --fix-return                   vary depart only (return date locked)
+fom flex <id> --fix-depart                   vary return only (depart date locked)
+fom flex <id> --month                        scan the full departure month
 
 fom refresh <id>                             immediate price re-fetch
 fom poll                                     cron target: refresh all active trips
 fom poll --dry-run                           show which trips would be polled
 
-fom pause <id> / resume <id>                 pause/resume tracking
+fom pause <id>                               pause tracking (skipped by poll)
+fom resume <id>                              resume a paused trip
 fom remove <id>                              delete trip and all history
 fom remove <id> --yes                        skip confirmation
 
@@ -261,5 +277,6 @@ and price history. Back it up with your home directory.
 | Phase | Features | Status |
 |---|---|---|
 | 1 — Domestic Core | True cost, recommendations, school holidays (QLD), domestic airlines, CLI | Complete |
-| 2 — Analytics & LLM | DuckDB route stats, LLM insights, multi-state calendars, SerpAPI tests | In progress |
-| 3 — International | International routes, multi-currency, international calendars, Amadeus | Planned |
+| 2 — Analytics & LLM | DuckDB route stats, LLM insights, multi-state calendars, SerpAPI | Complete |
+| 3 — International | International routes, multi-currency, Amadeus signal, top-3 alternatives | Complete |
+| 4 — Planning & Flex | `fom plan` NL planner, `fom flex` date comparison, airport resolver, group tagging | In progress |

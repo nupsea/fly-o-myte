@@ -1,6 +1,6 @@
 # Database Schema — Fly-O-Myte
 
-Last reviewed: 2026-03-04 — S31: added `rank` field to `pricesnapshot`; `get_snapshots_at_fetch()` CRUD added.
+Last reviewed: 2026-03-04 — S33: added `FlexCache` table; S36: added `group_tag` to `trip`.
 
 Auto-generated from `fly_o_myte/db/sqlite.py`. Regenerate after schema changes with:
 ```bash
@@ -27,6 +27,7 @@ uv run python -c "from fly_o_myte.db.sqlite import *; import inspect; print(insp
 | created_at | TEXT | now | ISO 8601 |
 | alert_threshold_aud | REAL | NULL | alert if price drops below |
 | alert_email | TEXT | NULL | override profile email |
+| group_tag | TEXT | NULL | group label for multi-option sets (e.g. "Sri Lanka Dec") |
 
 ### `pricesnapshot`
 
@@ -69,6 +70,18 @@ uv run python -c "from fly_o_myte.db.sqlite import *; import inspect; print(insp
 | school_holiday_flag | TEXT | NULL | holiday label if overlap |
 | rationale | TEXT | required | human-readable explanation |
 | email_sent | INTEGER | 0 | 1 if alert was sent |
+
+### `flexcache`
+
+Caches `fom flex` results for 24 hours to avoid burning SerpAPI quota on repeated calls.
+
+| Column | Type | Default | Description |
+|--------|------|---------|-------------|
+| id | INTEGER PK | autoincrement | |
+| trip_id | INTEGER FK | required | → trip.id |
+| flex_key | TEXT | required | Hash of (origin, dest, dates, flex params, mode) |
+| computed_at | TEXT | required | ISO 8601 — cache invalidated after 24h |
+| results_json | TEXT | required | Serialised list of FlexResultRow dicts |
 
 ## DuckDB / Parquet (Phase 2)
 
