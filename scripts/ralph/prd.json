@@ -616,25 +616,6 @@
       "passes": true
     },
     {
-      "id": "DR-P3",
-      "title": "Phase 3 demo review gate -- international routes end-to-end",
-      "phase": 3,
-      "priority": 37,
-      "type": "demo-review",
-      "description": "Human verifies international trip tracking: correct AUD pricing, destination school holiday overlay, international booking window recommendation, and SerpAPI returning real international results.",
-      "reviewInstructions": [
-        "Run: bash scripts/ralph/smoke_test.sh -- 0 failures",
-        "Run: fom watch BNE SIN 2026-09-18 2026-09-28 --label 'Singapore trip'",
-        "Run: uv run python scripts/ralph/insert_stub_snapshot.py 1 --airline SQ --price 650",
-        "Run: fom check 1 -- verify: AUD total shown, SQ family_score visible, Singapore holiday flag if applicable, ASIA_PACIFIC booking window context",
-        "Run: fom data-version -- should list 16 airlines including SQ and EK",
-        "Optional live test (requires SERPAPI_API_KEY in .env): fom poll -- verify real SerpAPI results for BNE->SIN include Singapore Airlines, Scoot, Jetstar Asia",
-        "Run: fom remove 1 --yes",
-        "If satisfied: create scripts/ralph/demo-reviews/DR-P3-approved.md with APPROVED on line 1"
-      ],
-      "passes": false
-    },
-    {
       "id": "S31",
       "title": "fom check — top-3 airline shortlist ranked by true family cost",
       "phase": 3,
@@ -654,6 +635,31 @@
         "tests/test_tracker.py: offers ranked by true family cost (lowest total first), not base fare",
         "Syrupy snapshot updated for fom check output",
         "uv run make ci passes"
+      ],
+      "passes": false
+    },
+    {
+      "id": "DR-P3",
+      "title": "Phase 3 complete -- end-of-phase human review",
+      "phase": 3,
+      "priority": 39,
+      "type": "demo-review",
+      "description": "Single end-of-phase gate for Phase 3. Human verifies international routes, multi-currency AUD pricing, destination school holiday overlay, ASIA_PACIFIC booking window recommendation, and the top-3 airline shortlist in fom check.",
+      "reviewInstructions": [
+        "Run: bash scripts/ralph/smoke_test.sh -- 0 failures",
+        "Run: fom data-version -- lists 16+ airlines including SQ and EK",
+        "Run: fom watch BNE SIN 2026-09-18 2026-09-28 --label 'Singapore trip'",
+        "Run: uv run python scripts/ralph/insert_stub_snapshot.py 1 --airline SQ --price 650 --count 10",
+        "Run: fom refresh 1",
+        "Run: fom check 1 -- verify ALL of:",
+        "  - True cost shown in AUD",
+        "  - SQ family_score visible",
+        "  - Singapore school holiday flag if dates overlap",
+        "  - ASIA_PACIFIC booking window context in rationale",
+        "  - Alternatives table shows at least 2 ranked options (SQ + one other)",
+        "Optional live test (SERPAPI_API_KEY in .env): fom poll -- SerpAPI results for BNE->SIN show Singapore Airlines, Scoot or Jetstar Asia as alternatives",
+        "Run: fom remove 1 --yes",
+        "If all correct: create scripts/ralph/demo-reviews/DR-P3-approved.md with APPROVED on line 1"
       ],
       "passes": false
     }
