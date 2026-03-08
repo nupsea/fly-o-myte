@@ -12,7 +12,7 @@
 # ---
 # name: TestFlexCommand.test_flex_month_snapshot
   '''
-  Using cached flex results from 4h ago. Run with --refresh to fetch live prices.
+  Using cached flex results from 17h ago. Run with --refresh to fetch live prices.
                  Full month view: July 2026 -- all sampled windows                
                                                                                   
     Rank   Depart       Return       True cost    vs Tracked   Airline    Stops   
@@ -26,7 +26,7 @@
 # ---
 # name: TestFlexCommand.test_flex_snapshot
   '''
-  Using cached flex results from 4h ago. Run with --refresh to fetch live prices.
+  Using cached flex results from 17h ago. Run with --refresh to fetch live prices.
                               Flex Windows: BNE → SYD                             
                                                                                   
     Rank   Depart       Return       True cost    vs Tracked   Airline    Stops   

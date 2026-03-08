@@ -364,7 +364,7 @@
         "Results ordered by true_family_cost ascending",
         "scout_flex() with flex=3 covers +/-3 day range around anchor dates",
         "Empty price source returns [] without crashing",
-        "fom scout BNE SYD --month jul-2026 with empty SERPAPI_API_KEY exits 0 with 'No results' message",
+        "fom scout BNE SYD --months jul-2026 with empty SERPAPI_API_KEY exits 0 with 'No results' message",
         "uv run make ci passes"
       ],
       "passes": true

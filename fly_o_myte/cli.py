@@ -24,6 +24,8 @@ Commands:
 
 from __future__ import annotations
 
+import os
+import sys
 from datetime import date, datetime
 from typing import Annotated
 
@@ -136,6 +138,12 @@ def setup() -> None:
             "Max stops (0=nonstop, 1=one stop)", default=str(fam.get("max_stops", 1))
         )
     )
+    trip_length = int(
+        Prompt.ask(
+            "Default holiday period (days) for scouting",
+            default=str(fam.get("default_trip_length", 14)),
+        )
+    )
 
     children_raw = fam.get("children", [])
     console.print(f"\nCurrently {len(children_raw)} child(ren) in profile.")
@@ -172,6 +180,7 @@ def setup() -> None:
             "school_type": school_type,
             "bags_per_person": bags,
             "max_stops": max_stops,
+            "default_trip_length": trip_length,
             "preferred_departure_window": {"earliest_hour": 8, "latest_hour": 18},
             "blocked_airlines": fam.get("blocked_airlines", []),
             "budget_threshold_aud": budget_val,
@@ -186,13 +195,90 @@ def setup() -> None:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
     console.print(f"\n[green]Config saved to {DEFAULT_CONFIG_PATH}[/green]")
+
     console.print("\nNext steps:")
-    console.print("  1. Add API keys to [dim].env[/dim] in your working directory:")
-    console.print("     TEQUILA_API_KEY=your_key_here")
+    console.print("  1. Add your API key to [dim].env[/dim] in this directory:")
+    console.print("     [bold]SERPAPI_API_KEY[/bold]=your_key_here")
     console.print(
-        "  2. Run [bold]fom watch BNE SYD 2026-07-20 2026-07-27[/bold] to start tracking a trip"
+        "  2. Find the cheapest window: [bold]fom scout BNE SYD --months jul-2026,aug-2026[/bold]"
     )
-    console.print("  3. Add to crontab: [dim]0 7 * * * fom poll[/dim]\n")
+    console.print(
+        "  3. Start tracking your chosen dates: [bold]fom watch BNE SYD 2026-07-20 2026-07-27[/bold]\n"
+    )
+
+
+def _setup_cron() -> None:
+    """Interactively add a cron job for `fom poll` if not already present."""
+    if sys.platform == "win32":
+        return
+
+    # Skip if running in non-interactive environment (e.g. smoke tests)
+    if os.environ.get("FLY_O_MYTE_NO_PROMPT"):
+        return
+
+    import subprocess
+    from pathlib import Path
+
+    from fly_o_myte.config import APP_DIR
+
+    # 1. Check if it already exists
+    try:
+        result = subprocess.run(
+            ["crontab", "-l"], capture_output=True, text=True, check=False
+        )
+        current_cron = result.stdout if result.returncode == 0 else ""
+        if "fom poll" in current_cron:
+            return  # Already configured
+    except Exception:
+        return  # Crontab might not be available
+
+    console.print("\n[bold]Automatic Tracking[/bold]")
+    console.print(
+        "You don't have automatic daily price tracking enabled yet.\n"
+        "We can add a cron job to run [dim]fom poll[/dim] for you every morning."
+    )
+
+    if not Confirm.ask("Would you like to enable automatic daily tracking?"):
+        return
+
+    cron_time = Prompt.ask(
+        "Cron schedule (minute hour day month weekday)",
+        default="0 7 * * *",
+    )
+
+    project_dir = Path.cwd()
+    fom_log = APP_DIR / "fom.log"
+    uv_cmd = "uv"
+    cron_line = (
+        f"{cron_time} cd {project_dir} && {uv_cmd} run fom poll >> {fom_log} 2>&1"
+    )
+
+    try:
+        # Check if already exists (again, in case of race)
+        if "fom poll" in current_cron:
+            if not Confirm.ask("A `fom poll` entry already exists. Overwrite it?"):
+                return
+            lines = [
+                line for line in current_cron.splitlines() if "fom poll" not in line
+            ]
+            current_cron = "\n".join(lines) + "\n"
+
+        new_cron = current_cron.rstrip() + "\n" + cron_line + "\n"
+
+        process = subprocess.Popen(
+            ["crontab", "-"], stdin=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        _, stderr = process.communicate(input=new_cron)
+
+        if process.returncode == 0:
+            console.print(
+                f"[green]Cron job added: {cron_time} (Logs at {fom_log})[/green]\n"
+            )
+        else:
+            console.print(f"[red]Failed to update crontab: {stderr.strip()}[/red]\n")
+
+    except Exception as e:
+        console.print(f"[red]Error setting up cron: {e}[/red]\n")
 
 
 # ─── scout ─────────────────────────────────────────────────────────────────────
@@ -204,8 +290,9 @@ def scout(
     destination: Annotated[
         str, typer.Argument(help="Destination IATA code (e.g. SYD)")
     ],
-    month: Annotated[
-        str | None, typer.Option(help="Month to scout, e.g. jul-2026")
+    months: Annotated[
+        str | None,
+        typer.Option(help="Month(s) to scout, e.g. --months dec-2026,jan-2027"),
     ] = None,
     depart: Annotated[
         str | None, typer.Option(help="Specific departure date YYYY-MM-DD")
@@ -214,7 +301,9 @@ def scout(
         str | None, typer.Option("--return", help="Specific return date YYYY-MM-DD")
     ] = None,
     flex: int = typer.Option(0, help="Flex ±days around specific dates"),
-    trip_length: int = typer.Option(7, help="Trip length in days (for month scouting)"),
+    trip_length: Annotated[
+        int | None, typer.Option(help="Trip length in days (for month scouting)")
+    ] = None,
 ) -> None:
     """Explore date windows across a month before committing to a trip."""
 
@@ -234,33 +323,40 @@ def scout(
 
     cal = get_calendar()
 
-    if month:
-        try:
-            parts = month.split("-")
+    if trip_length is None:
+        trip_length = profile.default_trip_length
 
-            month_num = datetime.strptime(parts[0], "%b").month
+    if months:
+        all_results = []
+        month_list = [m.strip() for m in months.split(",")]
+        for m_str in month_list:
+            try:
+                parts = m_str.split("-")
+                month_num = datetime.strptime(parts[0], "%b").month
+                year_num = int(parts[1])
+            except (ValueError, IndexError):
+                err_console.print(
+                    f"[red]Invalid month format '{m_str}'. Use e.g. jul-2026[/red]"
+                )
+                continue
 
-            year_num = int(parts[1])
-
-        except (ValueError, IndexError):
-            err_console.print(
-                f"[red]Invalid month format '{month}'. Use e.g. jul-2026[/red]"
+            results = scout_month(
+                pm,
+                profile,
+                airline_db,
+                cal,
+                origin,
+                destination,
+                year_num,
+                month_num,
+                trip_length,
             )
+            all_results.extend(results)
 
-            raise typer.Exit(1) from None
-
-        console.print(f"\nScouting {origin} → {destination} for {month}...\n")
-
-        results = scout_month(
-            pm,
-            profile,
-            airline_db,
-            cal,
-            origin,
-            destination,
-            year_num,
-            month_num,
-            trip_length,
+        # Sort aggregated results by cost
+        results = sorted(all_results, key=lambda r: r.true_family_cost)
+        console.print(
+            f"\nScouting {origin} -> {destination} across {len(month_list)} months...\n"
         )
     elif depart and ret:
         d = date.fromisoformat(depart)
@@ -274,7 +370,7 @@ def scout(
                 pm, profile, airline_db, cal, origin, destination, d, r, 0
             )
     else:
-        err_console.print("[red]Provide --month OR --depart + --return[/red]")
+        err_console.print("[red]Provide --months OR --depart + --return[/red]")
         raise typer.Exit(1)
 
     if not results:
@@ -387,6 +483,9 @@ def watch(
             )
         else:
             console.print("[yellow]No offers found — will retry on next poll.[/yellow]")
+
+    # Optional cron setup - only if not already present
+    _setup_cron()
 
 
 # ─── status ────────────────────────────────────────────────────────────────────
@@ -792,6 +891,7 @@ def profile() -> None:
     table.add_row("School type", p.school_type)
     table.add_row("Bags/person", str(p.bags_per_person))
     table.add_row("Max stops", str(p.max_stops))
+    table.add_row("Scout period", f"{p.default_trip_length} days")
     table.add_row("Blocked airlines", ", ".join(p.blocked_airlines) or "None")
     if p.budget_threshold_aud:
         table.add_row("Budget threshold", f"${p.budget_threshold_aud:,.0f} AUD")
@@ -1314,6 +1414,9 @@ def plan(
             )
         else:
             console.print("[yellow]No offers found — will retry on next poll.[/yellow]")
+
+    # Optional cron setup - only if not already present
+    _setup_cron()
 
 
 if __name__ == "__main__":

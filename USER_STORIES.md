@@ -160,7 +160,7 @@ As a user, I want to know when the airline fee database and school holiday data 
 As a user, I want to explore flight prices across a month before choosing specific dates so that I can pick the cheapest window for my family.
 
 **Acceptance criteria:**
-- `fom scout BNE SYD --month jul-2026` searches a sample of dates across July 2026
+- `fom scout BNE SYD --months jul-2026` searches a sample of dates across July 2026
 - Output shows a table: date range, true family cost, airline, stops, departure time, school holiday flag
 - Rows are sorted by true family cost ascending
 - School holiday periods are highlighted in the table

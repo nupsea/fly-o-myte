@@ -322,13 +322,13 @@ class TestScoutCLI:
     """Tests for the fom scout CLI command."""
 
     def test_scout_no_api_key_exits_0_no_results(self) -> None:
-        """fom scout BNE SYD --month jul-2026 with no API key exits 0 with 'No results'."""
+        """fom scout BNE SYD --months jul-2026 with no API key exits 0 with 'No results'."""
         from typer.testing import CliRunner
 
         from fly_o_myte.cli import app
 
         runner = CliRunner()
         # isolated_travo_dir already sets SERPAPI_API_KEY='' and TEQUILA_API_KEY=''
-        result = runner.invoke(app, ["scout", "BNE", "SYD", "--month", "jul-2026"])
+        result = runner.invoke(app, ["scout", "BNE", "SYD", "--months", "jul-2026"])
         assert result.exit_code == 0
         assert "No results" in result.output

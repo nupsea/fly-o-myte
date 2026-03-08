@@ -19,7 +19,7 @@ fom setup
 echo "SERPAPI_API_KEY=your_key_here" >> .env
 
 # Scout date windows before committing
-fom scout BNE SYD --month jul-2026
+fom scout BNE SYD --months jul-2026
 
 # Start tracking a trip
 fom watch BNE SYD 2026-07-20 2026-07-27 --label "Winter SYD"
@@ -204,7 +204,7 @@ fom data-version                             show embedded data freshness
 
 fom airports <query>                         look up IATA codes by city or country name
 
-fom scout BNE SYD --month jul-2026           cheapest date windows across a month
+fom scout BNE SYD --months jul-2026          cheapest date windows across a month
 fom scout BNE SYD --depart 2026-07-20        flex ±N days around specific dates
   --return 2026-07-27 --flex 3
 

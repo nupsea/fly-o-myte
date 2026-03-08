@@ -55,6 +55,7 @@ class FamilyProfile:
     bags_per_person: int = 1
     max_stops: int = 1
     preferred_departure_window: DepartureWindow = field(default_factory=DepartureWindow)
+    default_trip_length: int = 7
     blocked_airlines: list[str] = field(default_factory=list)
     budget_threshold_aud: float | None = None
 
@@ -197,6 +198,7 @@ def load_family_profile(config_path: Path | None = None) -> FamilyProfile:
         bags_per_person=fam.get("bags_per_person", 1),
         max_stops=fam.get("max_stops", 1),
         preferred_departure_window=window,
+        default_trip_length=fam.get("default_trip_length", 7),
         blocked_airlines=fam.get("blocked_airlines", []),
         budget_threshold_aud=fam.get("budget_threshold_aud"),
     )

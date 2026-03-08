@@ -35,13 +35,17 @@ def was_modified_recently(filepath: str, n_commits: int = 10) -> bool:
     """Return True if the file was modified in the last n_commits commits."""
     result = subprocess.run(
         ["git", "log", "--oneline", f"HEAD~{n_commits}..HEAD", "--", filepath],
-        capture_output=True, text=True, cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
     )
     if result.returncode == 0:
         return bool(result.stdout.strip())
     result = subprocess.run(
         ["git", "log", "--oneline", "--", filepath],
-        capture_output=True, text=True, cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
     )
     return bool(result.stdout.strip())
 
@@ -89,15 +93,13 @@ def check_modules_in_architecture() -> None:
 
     # Top-level modules only (not subpackages or __init__)
     skip = {"__init__", "tui"}
-    modules = [
-        p.stem for p in PKG.glob("*.py")
-        if p.stem not in skip
-    ]
+    modules = [p.stem for p in PKG.glob("*.py") if p.stem not in skip]
     # Also check price_sources/ plugins
     ps_dir = PKG / "price_sources"
     if ps_dir.exists():
         modules += [
-            f"price_sources/{p.stem}" for p in ps_dir.glob("*.py")
+            f"price_sources/{p.stem}"
+            for p in ps_dir.glob("*.py")
             if p.stem != "__init__"
         ]
 
@@ -113,6 +115,7 @@ def check_modules_in_architecture() -> None:
 def check_phase_status_in_readme() -> None:
     """Phase status table in README.md should not list completed phases as 'Planned'."""
     import json
+
     prd_path = REPO_ROOT / "scripts" / "ralph" / "prd.json"
     if not prd_path.exists():
         return
@@ -138,7 +141,9 @@ def check_phase_status_in_readme() -> None:
             # Phase fully done — check README doesn't still say "Planned" or "In progress"
             # Find the line mentioning this phase
             for line in readme.splitlines():
-                if f"Phase {ph}" in line and ("Planned" in line or "In progress" in line):
+                if f"Phase {ph}" in line and (
+                    "Planned" in line or "In progress" in line
+                ):
                     warnings.append(
                         f"README.md: Phase {ph} is fully complete in prd.json "
                         f"but still marked '{('Planned' if 'Planned' in line else 'In progress')}' — update the phase status table"

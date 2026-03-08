@@ -23,6 +23,7 @@ export FLY_O_MYTE_DB_PATH="$SMOKE_DIR/smoke.db"
 export FLY_O_MYTE_ANALYTICS_DIR="$SMOKE_DIR/analytics"
 export FLY_O_MYTE_CONFIG_PATH="$SMOKE_DIR/config.yaml"
 export FLY_O_MYTE_LOG_PATH="$SMOKE_DIR/fom.log"
+export FLY_O_MYTE_NO_PROMPT=1
 export SERPAPI_API_KEY=""
 export TEQUILA_API_KEY=""
 export ANTHROPIC_API_KEY=""

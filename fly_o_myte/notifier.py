@@ -52,7 +52,7 @@ def send_book_now_alert(
 
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"] = cfg.smtp_user
+    msg["From"] = cfg.default_alert_email or cfg.smtp_user
     msg["To"] = recipient
     msg.set_content(body)
 
