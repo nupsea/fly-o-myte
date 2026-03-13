@@ -88,6 +88,18 @@ def main(
     ),
 ) -> None:
     """Fly-O-Myte — your family travel advisor."""
+    import logging
+
+    settings = _get_settings()
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[
+            logging.FileHandler(settings.log_path),
+            logging.StreamHandler(sys.stderr),
+        ] if not os.environ.get("FLY_O_MYTE_NO_PROMPT") else [logging.FileHandler(settings.log_path)],
+    )
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # too noisy
 
 
 # ─── setup ─────────────────────────────────────────────────────────────────────

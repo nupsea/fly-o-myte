@@ -1,3 +1,24 @@
+## S37 — Notification Reliability & Threshold Alerts (2026-03-13)
+- Implemented:
+  - tracker.py: added `alert_threshold_aud` check to `poll_trip`. Now sends email
+    if `true_family_cost <= alert_threshold_aud` (trip-specific) or falls back to
+    `profile.budget_threshold_aud` (global family budget).
+  - tracker.py: fixed logging format string `%,.0f` -> `%.0f` (unsupported by % operator).
+  - cli.py: added `logging.basicConfig` to `main()` entry point. Logs now write to
+    `~/.fly-o-myte/fom.log` (via settings.log_path) and `stderr`.
+  - cli.py: added `alert_threshold` (mapped to `alert_threshold_aud`) to `fom watch`.
+- Verified:
+  - `fom refresh 1` correctly triggered and sent an email alert when price was
+    below the manually set threshold.
+  - Manual `test_smtp.py` confirms end-to-end SMTP connectivity to Brevo.
+- Files changed:
+  - fly_o_myte/tracker.py (alert logic + log format fix)
+  - fly_o_myte/cli.py (logging init + alert_threshold param)
+  - README.md (docs updated)
+  - docs/ARCHITECTURE.md (data flow updated)
+  - docs/RELIABILITY.md (cron path + log path updated)
+  - docs/QUALITY_SCORE.md (notifier status updated)
+
 ## S36 — fom plan enhancements -- trip group tagging and budget enforcement (2026-03-04)
 - Implemented:
   - db/sqlite.py: added group_tag: str | None = None field to Trip model.

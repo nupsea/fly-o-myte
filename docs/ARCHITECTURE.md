@@ -93,7 +93,7 @@ fom poll
       → insert_snapshot() × top-3 offers → SQLite (rank 1/2/3 by true family cost)
       → compute() — recommendation engine (pure functions)
       → insert_recommendation() → SQLite
-      → send alert if decision == "book_now" and threshold crossed
+      → send alert if decision == "book_now" OR price <= alert_threshold
       → update_after_snapshot() → DuckDB + Parquet
 ```
 

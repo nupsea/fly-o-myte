@@ -50,7 +50,7 @@ This creates `~/.fly-o-myte/config.yaml` interactively. It asks for:
 | School type | `state`, `independent`, or `catholic` | `state` |
 | Bags per person | Checked bags each person travels with | `1` |
 | Max stops | Maximum layovers acceptable | `1` |
-| Budget threshold | Optional AUD ceiling — alerts when price falls below | `2000` |
+| Budget threshold | AUD ceiling — alerts when price falls below (global fallback) | `2000` |
 | Alert email | Where to send booking alerts | `you@gmail.com` |
 
 > Child ages are computed at the **travel date**, not today. A child who turns
@@ -215,6 +215,7 @@ fom plan                                     guided structured prompts (no LLM k
 
 fom watch BNE SYD 2026-07-20 2026-07-27     start tracking, immediate price fetch
   --label "Winter SYD" --adults 2
+  --alert-threshold 1500                     alert if price falls below this AUD
   --group "Winter trips"                     tag trip for group filtering
 fom status                                   morning digest (actionable trips only)
 fom status --all                             all trips including MONITOR

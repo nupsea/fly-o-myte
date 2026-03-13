@@ -785,12 +785,31 @@
       "passes": true
     },
     {
+      "id": "S37",
+      "title": "Notification Reliability: Budget thresholds and Logging",
+      "phase": 4,
+      "priority": 46,
+      "verifyFirst": "notifier.py and tracker.py exist. Read both before extending alert logic.",
+      "description": "Implement budget threshold alerts in tracker.py (respecting both per-trip and global family budget) and fix CLI logging to ensure a reliable audit trail.",
+      "smokeTestRequired": true,
+      "acceptanceCriteria": [
+        "tracker.py: poll_trip sends email if true_family_cost <= alert_threshold_aud (per-trip override)",
+        "tracker.py: poll_trip falls back to profile.budget_threshold_aud if trip threshold is None",
+        "tracker.py: fixed logging format string %%,.0f -> %%.0f (fix ValueError)",
+        "cli.py: logging.basicConfig added to main() -- logs to settings.log_path (~/.fly-o-myte/fom.log) and stderr",
+        "cli.py: fom watch accepts --alert-threshold option",
+        "test_smtp.py verified to work with Brevo SMTP credentials",
+        "uv run make ci passes"
+      ],
+      "passes": true
+    },
+    {
       "id": "DR-P4",
       "title": "Phase 4 complete -- end-of-phase human review",
       "phase": 4,
-      "priority": 46,
+      "priority": 47,
       "type": "demo-review",
-      "description": "Single end-of-phase gate for Phase 4. Human verifies airport resolution, date flexibility comparison, natural language trip planning (structured fallback), and trip group tagging all work end-to-end.",
+      "description": "Single end-of-phase gate for Phase 4. Human verifies airport resolution, date flexibility comparison, natural language trip planning, threshold alerts, and trip group tagging all work end-to-end.",
       "reviewInstructions": [
         "Run: bash scripts/ralph/smoke_test.sh -- 0 failures",
         "--- Airport resolver ---",
@@ -805,6 +824,10 @@
         "Run: fom flex 1 --flex 3 (again within 24h) -- verify 'Using cached flex results' message shown",
         "Run: fom flex 1 --flex 3 --refresh -- verify fresh fetch, cache message absent",
         "Run: fom flex 1 --month -- verify full September 2026 windows shown with month header",
+        "--- Notifications & Thresholds ---",
+        "Set budget_threshold_aud: 8000.0 in ~/.fly-o-myte/config.yaml",
+        "Run: fom refresh 1 -- verify 'Alert sent' logged to stderr if price <= 8000",
+        "Run: fom watch BNE SYD 2026-12-20 2026-12-27 --alert-threshold 100 -- verify NO alert sent (price > 100)",
         "--- fom plan (structured fallback, no LLM key) ---",
         "Ensure ANTHROPIC_API_KEY is not set (or set to empty string in .env)",
         "Run: fom plan -- verify 'ANTHROPIC_API_KEY not set' note printed, then structured prompts appear",

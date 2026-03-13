@@ -41,7 +41,7 @@ Updated by ralph after each phase. Grades: A (complete), B (mostly done), C (par
 
 **Scout (C)**: `scout_month()` and `scout_flex()` implemented, not yet tested. CLI `scout` command wired.
 
-**Notifier (B)**: `send_book_now_alert()` fully implemented — SMTP via stdlib smtplib, graceful degradation (returns False on missing credentials/recipient/SMTP error). S14: 8 tests covering happy path, credential checks, recipient check, exception handling, subject/body content, and tracker integration (email_sent wiring via mark_email_sent).
+**Notifier (B)**: `send_book_now_alert()` fully implemented — SMTP via stdlib smtplib, graceful degradation (returns False on missing credentials/recipient/SMTP error). S14: 8 tests covering happy path, credential checks, recipient check, exception handling, subject/body content, and tracker integration (email_sent wiring via mark_email_sent). S37: implemented `alert_threshold_aud` check with global budget fallback.
 
 **Display (C)**: Rich rendering helpers implemented. Not yet tested with Syrupy snapshots.
 

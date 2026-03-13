@@ -270,7 +270,7 @@ def poll_trip(
     )
 
     logger.info(
-        "Trip %s — %s: $%,.0f — %s (%.0f%% confident)",
+        "Trip %s — %s: $%.0f — %s (%.0f%% confident)",
         trip.id,
         trip.label,
         primary_breakdown.total,
@@ -279,7 +279,17 @@ def poll_trip(
     )
 
     # ─── 5. Send alerts ────────────────────────────────────────────────────
-    if send_alerts and result.decision == "book_now":
+    # Trigger if it's a "book_now" OR if price is below the user's manual threshold
+    is_book_now = result.decision == "book_now"
+    
+    # Check threshold: trip-specific first, then fallback to family profile
+    threshold = trip.alert_threshold_aud if trip.alert_threshold_aud is not None else profile.budget_threshold_aud
+    is_below_threshold = (
+        threshold is not None
+        and primary_breakdown.total <= threshold
+    )
+
+    if send_alerts and (is_book_now or is_below_threshold):
         sent = send_book_now_alert(trip, rec)
         if sent:
             assert rec.id is not None  # guaranteed after insert

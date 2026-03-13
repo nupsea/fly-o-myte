@@ -24,7 +24,7 @@
 
 ```bash
 # Recommended crontab entry — polls all active trips at 07:00 daily
-0 7 * * * /Users/$USER/.local/bin/fom poll >> ~/.fly-o-myte/fom.log 2>&1
+0 7 * * * cd /path/to/project && uv run fom poll >> ~/.fly-o-myte/fom.log 2>&1
 ```
 
 ## Failure Modes
