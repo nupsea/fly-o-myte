@@ -51,3 +51,30 @@ logs/
 
 # Flowchart node_modules
 scripts/ralph/flowchart/node_modules/
+
+# UI
+ui/node_modules/
+ui/.npm-cache/
+ui/dist/
+node_modules/
+
+# Runtime DBs
+*.db
+*.db-journal
+
+# AI helpers
+.claude/
+
+# Temporary files
+.gemini/
+.last-branch
+progress.txt
+
+# Scratch/test scripts
+debug_scout.py
+test_flex.py
+test_flex2.py
+test_flex3.py
+test_serpapi_raw.py
+test_smtp.py
+fom_test.db

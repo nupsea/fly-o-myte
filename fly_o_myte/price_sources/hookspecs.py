@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from datetime import date
 
 import pluggy
+from pydantic import Field
 
 APP_NAME = "fly_o_myte"
 hookspec = pluggy.HookspecMarker(APP_NAME)
@@ -34,11 +35,15 @@ class FlightOffer:
     base_fare_per_adult: float  # AUD (base fare only, no ancillary fees)
     currency: str  # "AUD"
     stops: int
-    departure_time: str  # "HH:MM"
-    arrival_time: str  # "HH:MM"
-    duration_minutes: int
-    price_level_signal: str | None  # "LOW" | "TYPICAL" | "HIGH" if API provides it
-    offer_raw: dict  # full API response for debugging
+    departure_time: str  # "HH:MM" (local)
+    arrival_time: str  # "HH:MM" (local)
+    return_departure_time: str | None = None  # "HH:MM" (local)
+    return_arrival_time: str | None = None  # "HH:MM" (local)
+    duration_minutes: int = 0
+    price_level_signal: str | None = (
+        None  # "LOW" | "TYPICAL" | "HIGH" if API provides it
+    )
+    offer_raw: dict = Field(default_factory=dict)  # full API response for debugging
 
 
 class PriceSourceSpec:

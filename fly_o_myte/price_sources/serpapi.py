@@ -21,7 +21,7 @@ Notes:
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, datetime, timedelta
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -300,9 +300,11 @@ class SerpAPIFlightSource:
     Searches for 1 adult to get a clean per-adult base fare.
     """
 
-    def __init__(self, api_key: str) -> None:
+    def __init__(self, api_key: str, cache_ttl_hours: int = 0) -> None:
         self._api_key = api_key
         self._client = httpx.Client(timeout=30.0)
+        self._cache: dict[str, tuple[datetime, list[FlightOffer]]] = {}
+        self._cache_ttl = timedelta(hours=cache_ttl_hours)
 
     # ─── hookspec implementations ──────────────────────────────────────────
 
@@ -339,6 +341,20 @@ class SerpAPIFlightSource:
         Returns a list of FlightOffer objects ordered cheapest first.
         Raises PriceSourceError on HTTP or API errors.
         """
+        cache_key = f"{origin}|{destination}|{depart_date}|{return_date}|{max_stops}"
+
+        if self._cache_ttl.total_seconds() > 0:
+            entry = self._cache.get(cache_key)
+            if entry and (datetime.now() - entry[0]) < self._cache_ttl:
+                logger.debug(
+                    "SerpAPI cache HIT: %s → %s on %s (age %.0fm)",
+                    origin,
+                    destination,
+                    depart_date,
+                    (datetime.now() - entry[0]).total_seconds() / 60,
+                )
+                return entry[1]
+
         params = self._build_params(
             origin, destination, depart_date, return_date, max_stops, currency
         )
@@ -376,7 +392,7 @@ class SerpAPIFlightSource:
                         destination,
                     )
                     return self._search_without_stops_filter(
-                        params, max_stops, origin, destination, depart_date
+                        params, max_stops, origin, destination, depart_date, cache_key
                     )
                 logger.debug("SerpAPI: No results found for this query")
                 return []
@@ -386,6 +402,9 @@ class SerpAPIFlightSource:
             )
 
         offers = self._extract_offers(data)
+
+        if self._cache_ttl.total_seconds() > 0:
+            self._cache[cache_key] = (datetime.now(), offers)
 
         logger.debug(
             "SerpAPI: %s → %s on %s — %d offer(s) found",
@@ -441,6 +460,7 @@ class SerpAPIFlightSource:
         origin: str,
         destination: str,
         depart_date: date,
+        cache_key: str,
     ) -> list[FlightOffer]:
         """Retry a search without the stops server filter, enforcing max_stops client-side."""
         params_no_stops = {k: v for k, v in params.items() if k != "stops"}
@@ -462,6 +482,10 @@ class SerpAPIFlightSource:
 
         offers = self._extract_offers(data)
         filtered = [o for o in offers if o.stops <= max_stops]
+
+        if self._cache_ttl.total_seconds() > 0:
+            self._cache[cache_key] = (datetime.now(), filtered)
+
         logger.debug(
             "SerpAPI: %s→%s retry without stops filter — %d raw / %d after client-side filter (max_stops=%d)",
             origin,

@@ -40,9 +40,13 @@ class ScoutResult:
     airline_code: str
     stops: int
     departure_time: str
+    arrival_time: str
+    return_departure_time: str | None
+    return_arrival_time: str | None
     duration_minutes: int
     school_holiday: HolidayContext | None
     breakdown: TrueCostBreakdown
+    offer_raw: dict | None = None
 
 
 def scout_month(
@@ -120,70 +124,62 @@ def scout_flex(
       - Otherwise: symmetric; return = depart + original trip length.
 
     Returns all results sorted by true_family_cost.
+    Raises PriceSourceError if every attempted date fails with an API error
+    (e.g. quota exhausted), so callers can distinguish that from genuine no-results.
     """
     effective_depart_flex = depart_flex if depart_flex is not None else flex_days
     effective_return_flex = return_flex if return_flex is not None else flex_days
 
     trip_length = (return_date - depart_date).days
     results: list[ScoutResult] = []
+    last_error: PriceSourceError | None = None
+    attempted = 0
+
+    def _try(dep: date, ret: date) -> None:
+        nonlocal last_error, attempted
+        attempted += 1
+        try:
+            r = _scout_single(
+                pm=pm,
+                profile=profile,
+                airline_db=airline_db,
+                calendar=calendar,
+                origin=origin,
+                destination=destination,
+                depart_date=dep,
+                return_date=ret,
+            )
+            if r:
+                results.append(r)
+        except PriceSourceError as exc:
+            last_error = exc
+            logger.warning("Scout fetch failed for %s: %s", dep, exc)
 
     if effective_return_flex == 0:
-        # Fix return_date; vary depart only
         for d_offset in range(-effective_depart_flex, effective_depart_flex + 1):
             candidate_depart = depart_date + timedelta(days=d_offset)
             if candidate_depart < date.today():
                 continue
             if candidate_depart >= return_date:
                 continue
-            result = _scout_single(
-                pm=pm,
-                profile=profile,
-                airline_db=airline_db,
-                calendar=calendar,
-                origin=origin,
-                destination=destination,
-                depart_date=candidate_depart,
-                return_date=return_date,
-            )
-            if result:
-                results.append(result)
+            _try(candidate_depart, return_date)
     elif effective_depart_flex == 0:
-        # Fix depart_date; vary return only
         for r_offset in range(-effective_return_flex, effective_return_flex + 1):
             candidate_return = return_date + timedelta(days=r_offset)
             if candidate_return <= depart_date:
                 continue
-            result = _scout_single(
-                pm=pm,
-                profile=profile,
-                airline_db=airline_db,
-                calendar=calendar,
-                origin=origin,
-                destination=destination,
-                depart_date=depart_date,
-                return_date=candidate_return,
-            )
-            if result:
-                results.append(result)
+            _try(depart_date, candidate_return)
     else:
-        # Symmetric: shift depart; return = depart + trip_length
         for d_offset in range(-effective_depart_flex, effective_depart_flex + 1):
             candidate_depart = depart_date + timedelta(days=d_offset)
             if candidate_depart < date.today():
                 continue
-            candidate_return = candidate_depart + timedelta(days=trip_length)
-            result = _scout_single(
-                pm=pm,
-                profile=profile,
-                airline_db=airline_db,
-                calendar=calendar,
-                origin=origin,
-                destination=destination,
-                depart_date=candidate_depart,
-                return_date=candidate_return,
-            )
-            if result:
-                results.append(result)
+            _try(candidate_depart, candidate_depart + timedelta(days=trip_length))
+
+    # If every attempted call raised an API error and we have nothing to show,
+    # re-raise so the caller can surface the real reason (e.g. quota exhausted).
+    if not results and attempted > 0 and last_error is not None:
+        raise last_error
 
     return sorted(results, key=lambda r: r.true_family_cost)
 
@@ -201,21 +197,18 @@ def _scout_single(
     """Fetch and price a single date window. Returns None on failure."""
     child_ages = profile.child_ages_at(depart_date)
 
-    offers: list[list[FlightOffer]] = []
-    try:
-        offers = pm.hook.search_flights(
-            origin=origin,
-            destination=destination,
-            depart_date=depart_date,
-            return_date=return_date,
-            adults=profile.adults,
-            children_ages=child_ages,
-            max_stops=profile.max_stops,
-            currency="AUD",
-        )
-    except PriceSourceError as exc:
-        logger.warning("Scout fetch failed for %s: %s", depart_date, exc)
-        return None
+    # PriceSourceError intentionally not caught here — propagates to scout_flex
+    # so it can distinguish quota/network errors from genuine no-results.
+    offers: list[list[FlightOffer]] = pm.hook.search_flights(
+        origin=origin,
+        destination=destination,
+        depart_date=depart_date,
+        return_date=return_date,
+        adults=profile.adults,
+        children_ages=child_ages,
+        max_stops=profile.max_stops,
+        currency="AUD",
+    )
 
     all_offers = [o for offer_list in offers for o in offer_list]
     if not all_offers:
@@ -248,9 +241,13 @@ def _scout_single(
         airline_code=best.airline_code,
         stops=best.stops,
         departure_time=best.departure_time,
+        arrival_time=best.arrival_time,
+        return_departure_time=best.return_departure_time,
+        return_arrival_time=best.return_arrival_time,
         duration_minutes=best.duration_minutes,
         school_holiday=holiday_ctx,
         breakdown=breakdown,
+        offer_raw=best.offer_raw,
     )
 
 

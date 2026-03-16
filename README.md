@@ -1,283 +1,97 @@
-# fly-o-myte
+# Fly-O-Myte ✈️
 
-Family flight advisor for Australian families. Tracks the specific trips you are
-considering, builds its own price history, and tells you one thing: **Book Now,
-Wait, or Monitor** — with a real explanation of why.
+The smart travel expense optimizer for Australian families. Tracks the specific trips you are considering, builds its own price history, and tells you one thing: **Book Now, Wait, or Monitor** — with a real explanation of why.
+
+Fly-O-Myte calculates the **True Family Cost** including bags, seat selection, and infant fees, ensuring you never get surprised by "budget" airline add-ons.
 
 ---
 
-## Quick start
+## 🚀 Quick Start (Web UI)
+
+The recommended way to use Fly-O-Myte is via the modern Web UI.
+
+1. **Install Dependencies**
+   ```bash
+   make install
+   ```
+
+2. **Configure Your Family**
+   The first time you run the app, visit the **Family Profile** tab to set up your passengers, origin airport, and school holiday state.
+
+3. **Set API Keys**
+   Create a `.env` file and add your SerpAPI key (required for live prices):
+   ```bash
+   echo "SERPAPI_API_KEY=your_key_here" >> .env
+   ```
+
+4. **Launch the App**
+   ```bash
+   make app
+   ```
+   Visit **[http://localhost:5173](http://localhost:5173)** to start scouting and tracking journeys.
+
+---
+
+## ✨ Key Features
+
+### 📊 Command Center (Dashboard)
+Visual cards for all your tracked trips. High-signal "Buy/Wait/Monitor" badges use vibrant gradients to show urgency. The **Family Savings Gauge** shows exactly how good the current price is compared to historical data.
+
+### 🔍 Smart Scout
+Interactive heatmap showing prices across entire months. Features a **Holiday Shield** overlay that highlights school holiday periods (QLD/NSW/VIC/etc.) so you can avoid the peak-pricing traps.
+
+### 🤖 AI Planner
+Just tell Fly-O-Myte what you're thinking: *"Bangalore in December to Jan for 25 days"* or *"Japan for cherry blossoms"*. The natural language engine extracts your intent and generates scouting windows instantly.
+
+### ⏱️ Monitoring & Cron
+View and manage your automated daily price checks directly from the UI. See system health and trigger manual "Poll All" refreshes with one click.
+
+---
+
+## 💻 CLI Reference
+
+For power users, the `fom` CLI remains fully supported:
 
 ```bash
-# Install
-uv tool install -e .
-
-# First-run wizard — creates ~/.fly-o-myte/config.yaml
-fom setup
-
-# Add your API key (required for live prices)
-echo "SERPAPI_API_KEY=your_key_here" >> .env
-
-# Scout date windows before committing
-fom scout BNE SYD --months jul-2026
-
-# Start tracking a trip
-fom watch BNE SYD 2026-07-20 2026-07-27 --label "Winter SYD"
-
-# Morning check
-fom status
-fom check 1
+fom setup                                    First-run wizard
+fom scout BNE SYD --months jul-2026          Interactive month scouting
+fom watch BNE SYD 2026-07-20 2026-07-27     Start tracking a journey
+fom status                                   Morning check of all trips
+fom flex <id>                                Find ±3 day alternatives
+fom plan "Sri Lanka in July"                 Natural language planning
 ```
 
 ---
 
-## Family configuration
+## 🧮 True Family Cost Calculation
 
-### Step 1 — Run the setup wizard
-
-```bash
-fom setup
-```
-
-This creates `~/.fly-o-myte/config.yaml` interactively. It asks for:
-
-| Field | Description | Example |
-|---|---|---|
-| Adults | Number of adult passengers | `2` |
-| Children | Each child's name and date of birth | `Mia, 2019-06-15` |
-| Origin airport | Your home airport (IATA code) | `BNE` |
-| State | For school holiday calendar | `QLD` |
-| School type | `state`, `independent`, or `catholic` | `state` |
-| Bags per person | Checked bags each person travels with | `1` |
-| Max stops | Maximum layovers acceptable | `1` |
-| Budget threshold | AUD ceiling — alerts when price falls below (global fallback) | `2000` |
-| Alert email | Where to send booking alerts | `you@gmail.com` |
-
-> Child ages are computed at the **travel date**, not today. A child who turns
-> 2 between now and the trip is correctly treated as an infant for that flight.
-
-### Step 2 — Set API keys in `.env`
-
-Create a `.env` file in the project root (never commit this):
-
-```bash
-cp .env.example .env
-```
-
-Then fill in:
+Fly-O-Myte never shows just the base fare. Every price shown is the **True Family Cost**:
 
 ```
-# Required — live flight prices via Google Flights
-SERPAPI_API_KEY=your_serpapi_key_here
-
-# Optional — AI-generated insights explaining why prices are at their current level
-ANTHROPIC_API_KEY=sk-ant-your-key-here
-
-# Optional — email alerts when a booking window opens
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your.alerts@gmail.com
-SMTP_PASS=your_app_password
-DEFAULT_ALERT_EMAIL=you@gmail.com
-
-# Optional — Phase 2/3: Amadeus price level signal enrichment
-AMADEUS_CLIENT_ID=
-AMADEUS_CLIENT_SECRET=
+  Base fare per adult  ×  adults
++ Child fares (estimated based on age)
++ Checked bags  ×  total passengers
++ Seat selection  ×  total passengers
++ Infant lap fees ×  sectors
+──────────────────────────────────────
+= TRUE FAMILY COST (AUD)
 ```
 
-Get a SerpAPI key at [serpapi.com](https://serpapi.com) (100 free searches/month on
-the free tier).
-
-### Step 3 — Verify your profile
-
-```bash
-fom profile       # shows family members, ages as of today, preferences
-fom data-version  # shows airline DB version and which airlines + state calendars are loaded
-```
+The fee rates come from an embedded database of 15+ major airlines including Qantas, Virgin, Jetstar, Singapore Airlines, and Emirates.
 
 ---
 
-## What gets configured where
+## 🛠️ Data & Privacy
 
-### `~/.fly-o-myte/config.yaml` — your family profile
+All data lives locally on your machine in `~/.fly-o-myte/`:
+- `config.yaml`: Your family profile.
+- `fly-o-myte.db`: SQLite database of trip history.
+- `analytics/`: DuckDB store for route statistics.
 
-Created and updated by `fom setup`. Edit it directly if needed:
-
-```yaml
-family:
-  adults: 2
-  children:
-    - name: "Mia"
-      dob: "2019-06-15"
-    - name: "Leo"
-      dob: "2022-11-03"
-  origin_airport: BNE
-  state: QLD
-  school_type: state
-  bags_per_person: 1
-  max_stops: 1
-  blocked_airlines: []        # IATA codes to never show, e.g. ["TL"]
-  budget_threshold_aud: null  # set a number to get alerts when price drops below
-
-alerts:
-  email: you@family.com
-  notify_on: book_now         # "book_now" or "any_change"
-
-llm:
-  provider: claude            # "claude" or "ollama"
-  claude_model: claude-haiku-4-5-20251001
-```
-
-### `fly_o_myte/data/airlines.json` — airline fee database (embedded, read-only)
-
-Stores bag fees, seat selection fees, infant fees, and family scores for each airline.
-**You do not edit this file** — it ships with the package and is updated with releases.
-
-Current version: `2026-02`. Airlines covered:
-
-| Region | Carriers |
-|---|---|
-| Australian domestic | QF (Qantas), VA (Virgin Australia), JQ (Jetstar), ZL (Rex), TL (Tigerair) |
-| International | SQ (Singapore Airlines), EK (Emirates), CX (Cathay Pacific), NZ (Air New Zealand), QR (Qatar Airways), TG (Thai Airways), NH (ANA), JL (JAL), BA (British Airways), MH (Malaysia Airlines), GA (Garuda), AI (Air India) |
-
-Run `fom data-version` to see the version currently loaded.
-
-### `fly_o_myte/data/school_holidays.yaml` — school holiday calendar (embedded, read-only)
-
-Covers Queensland 2025–2027. More Australian states added in Phase 2.
-**You do not edit this file.**
+No personal payment data is ever stored.
 
 ---
 
-## How the true family cost is calculated
+## 📜 License
 
-fly-o-myte never shows just the base fare. Every price shown is the **true family cost**:
-
-```
-Base fare per adult  ×  adults
-+ Child fares (estimated as % of adult fare)
-+ Checked bags  ×  bags per person  ×  total passengers
-+ Seat selection  ×  total passengers     (where applicable)
-+ Infant lap fees  ×  sectors  ×  infants (where applicable)
-─────────────────────────────────────────────────────────────
-TRUE FAMILY COST  (AUD)
-```
-
-The fee rates come from `airlines.json`. For example:
-
-- **Qantas domestic**: bags included on most fares, seat selection free → zero add-ons
-- **Jetstar**: $55/bag, $8/seat, **$35 infant fee per sector** (not per journey)
-- **Singapore Airlines international**: bags included in Economy, no seat selection fee
-
-This is why a $99 Jetstar fare is often more expensive than a $149 Qantas fare for a
-family of four with checked bags.
-
----
-
-## Recommendation logic
-
-The engine evaluates each trip against 10 rules in priority order:
-
-| Signal | Decision |
-|---|---|
-| < 7 days to departure | BOOK NOW |
-| Price level = LOW and trend rising | BOOK NOW |
-| Price level = LOW and ≤ 45 days out | BOOK NOW |
-| > 15% below rolling average and trend rising | BOOK NOW |
-| Price level = HIGH and trend falling and > 21 days | WAIT |
-| Trend falling and > 30 days and not school holiday | WAIT |
-| School holiday and not LOW and > 60 days | WAIT |
-| > 90 days and no strong signal | MONITOR |
-
-Confidence scales with data richness: 1 snapshot ≈ 25% confidence; 10+ snapshots = full
-confidence. With fewer than 3 snapshots the recommendation is always MONITOR while
-history is being built.
-
----
-
-## CLI reference
-
-```
-fom setup                                    first-run wizard
-fom profile                                  view/edit family profile
-fom data-version                             show embedded data freshness
-
-fom airports <query>                         look up IATA codes by city or country name
-
-fom scout BNE SYD --months jul-2026          cheapest date windows across a month
-fom scout BNE SYD --depart 2026-07-20        flex ±N days around specific dates
-  --return 2026-07-27 --flex 3
-
-fom plan "Sri Lanka in December"             plan a trip from a natural language idea
-fom plan                                     guided structured prompts (no LLM key needed)
-  --budget 10000                             filter windows to this AUD ceiling
-  --group "Sri Lanka Dec"                    tag for group tracking
-
-fom watch BNE SYD 2026-07-20 2026-07-27     start tracking, immediate price fetch
-  --label "Winter SYD" --adults 2
-  --alert-threshold 1500                     alert if price falls below this AUD
-  --group "Winter trips"                     tag trip for group filtering
-fom status                                   morning digest (actionable trips only)
-fom status --all                             all trips including MONITOR
-fom status --group "Winter trips"            filter digest to one group
-fom check <id>                               full recommendation + alternatives table
-fom history <id>                             price history + sparkline
-fom compare <id1> <id2> [id3]               side-by-side comparison
-
-fom flex <id>                                ±3 day date alternatives vs tracked price
-fom flex <id> --flex 5                       widen the comparison window
-fom flex <id> --fix-return                   vary depart only (return date locked)
-fom flex <id> --fix-depart                   vary return only (depart date locked)
-fom flex <id> --month                        scan the full departure month
-
-fom refresh <id>                             immediate price re-fetch
-fom poll                                     cron target: refresh all active trips
-fom poll --dry-run                           show which trips would be polled
-
-fom pause <id>                               pause tracking (skipped by poll)
-fom resume <id>                              resume a paused trip
-fom remove <id>                              delete trip and all history
-fom remove <id> --yes                        skip confirmation
-
-fom insight <id>                             force fresh LLM insight (Phase 2)
-fom analytics                                show route stats (Phase 2)
-fom report                                   generate HTML report (Phase 2)
-fom ui                                       interactive TUI (Phase 2)
-```
-
----
-
-## Cron setup
-
-```bash
-# Poll all active trips daily at 7am
-0 7 * * * fom poll >> ~/.fly-o-myte/fly-o-myte.log 2>&1
-```
-
----
-
-## Data stored
-
-All data lives in `~/.fly-o-myte/`:
-
-```
-~/.fly-o-myte/
-├── config.yaml          family profile and preferences
-├── fly-o-myte.db        SQLite: trips, price snapshots, recommendations
-├── analytics/           DuckDB + Parquet: route stats (Phase 2)
-└── fly-o-myte.log       poll and error log
-```
-
-The SQLite database contains no personal payment data — only trip routes, dates,
-and price history. Back it up with your home directory.
-
----
-
-## Phase status
-
-| Phase | Features | Status |
-|---|---|---|
-| 1 — Domestic Core | True cost, recommendations, school holidays (QLD), domestic airlines, CLI | Complete |
-| 2 — Analytics & LLM | DuckDB route stats, LLM insights, multi-state calendars, SerpAPI | Complete |
-| 3 — International | International routes, multi-currency, Amadeus signal, top-3 alternatives | Complete |
-| 4 — Planning & Flex | `fom plan` NL planner, `fom flex` date comparison, airport resolver, group tagging | In progress |
+MIT License. See [LICENSE](LICENSE) for details.

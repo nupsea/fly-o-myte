@@ -97,7 +97,9 @@ def main(
         handlers=[
             logging.FileHandler(settings.log_path),
             logging.StreamHandler(sys.stderr),
-        ] if not os.environ.get("FLY_O_MYTE_NO_PROMPT") else [logging.FileHandler(settings.log_path)],
+        ]
+        if not os.environ.get("FLY_O_MYTE_NO_PROMPT")
+        else [logging.FileHandler(settings.log_path)],
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)  # too noisy
 

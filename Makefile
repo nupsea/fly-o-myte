@@ -8,7 +8,18 @@ install:
 # ─── Development ──────────────────────────────────────────────────────────────
 
 dev:
-	@echo "No server to start — fly-o-myte is a CLI. Run: fom --help"
+	@echo "Starting Fly-O-Myte development services..."
+	@$(MAKE) app
+
+app:
+	@echo "Clearing port 8001 and starting Fly-O-Myte UI..."
+	@lsof -ti:8001 | xargs kill -9 2>/dev/null || true
+	@echo "Backend: http://localhost:8001"
+	@echo "Frontend: http://localhost:5173"
+	@(trap 'kill 0' SIGINT; \
+	  uv run uvicorn fly_o_myte.api:app --host 0.0.0.0 --port 8001 & \
+	  cd ui && npm run dev & \
+	  wait)
 
 # ─── Tests ────────────────────────────────────────────────────────────────────
 

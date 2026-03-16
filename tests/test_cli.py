@@ -374,11 +374,14 @@ class TestFlexCommand:
                     "school_holiday_label": None,
                 },
             ]
+            from datetime import UTC, datetime
+
+            now_iso = datetime.now(UTC).isoformat()
             session.add(
                 FlexCache(
                     trip_id=trip.id,
                     flex_key=flex_key,
-                    computed_at="2026-03-04T08:00:00+00:00",
+                    computed_at=now_iso,
                     results_json=json.dumps(cache_data),
                 )
             )
@@ -459,11 +462,14 @@ class TestFlexCommand:
                     "school_holiday_label": None,
                 },
             ]
+            from datetime import UTC, datetime
+
+            now_iso = datetime.now(UTC).isoformat()
             session.add(
                 FlexCache(
                     trip_id=trip.id,
                     flex_key=flex_key,
-                    computed_at="2026-03-04T08:00:00+00:00",
+                    computed_at=now_iso,
                     results_json=json.dumps(cache_data),
                 )
             )

@@ -119,6 +119,9 @@ class Settings(BaseSettings):
     smtp_pass: str = ""
     default_alert_email: str = ""
 
+    # SerpAPI response cache TTL in hours (set to 0 to disable, 24 for light testing)
+    serpapi_cache_ttl_hours: int = 6
+
     # Storage (override only if needed)
     fly_o_myte_db_path: str = str(DEFAULT_DB_PATH)
     fly_o_myte_analytics_dir: str = str(DEFAULT_ANALYTICS_DIR)

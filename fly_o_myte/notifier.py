@@ -25,12 +25,12 @@ def send_book_now_alert(
     trip: Trip,
     rec: Recommendation,
     settings: Settings | None = None,
+    is_initial: bool = False,
 ) -> bool:
     """
-    Send a book_now email alert for a trip.
+    Send an email alert for a trip (either Book Now or Initial Tracking).
 
     Returns True if the email was sent successfully, False otherwise.
-    Does not raise — failures are logged as warnings only.
     """
     cfg = settings or get_settings()
 
@@ -47,8 +47,13 @@ def send_book_now_alert(
         )
         return False
 
-    subject = f"[fly-o-myte] Book Now — {trip.label}"
-    body = _build_email_body(trip, rec)
+    decision_label = rec.decision.replace("_", " ").upper()
+    if is_initial:
+        subject = f"[fly-o-myte] Tracking Started: {decision_label} — {trip.label}"
+    else:
+        subject = f"[fly-o-myte] Price Alert: {decision_label} — {trip.label}"
+
+    body = _build_email_body(trip, rec, is_initial)
 
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -68,10 +73,12 @@ def send_book_now_alert(
         return False
 
 
-def _build_email_body(trip: Trip, rec: Recommendation) -> str:
+def _build_email_body(trip: Trip, rec: Recommendation, is_initial: bool = False) -> str:
     generated = rec.generated_at[:16].replace("T", " ")
+    header = "Initial Tracking Report" if is_initial else "Price Alert"
+
     lines = [
-        f"fly-o-myte Booking Alert — {datetime.now(UTC).strftime('%d %b %Y')}",
+        f"fly-o-myte {header} — {datetime.now(UTC).strftime('%d %b %Y')}",
         "=" * 50,
         "",
         f"Trip:        {trip.label}",
@@ -83,12 +90,12 @@ def _build_email_body(trip: Trip, rec: Recommendation) -> str:
 
     lines += [
         "",
-        "Decision:    BOOK NOW",
+        f"Decision:    {rec.decision.replace('_', ' ').upper()}",
         f"Confidence:  {rec.confidence:.0%}",
         f"True cost:   ${rec.true_family_cost:,.0f} AUD (family total)",
         f"Regret risk: {rec.regret_risk.upper()}",
         "",
-        "Why:",
+        "Rationale:",
         rec.rationale,
         "",
         f"Generated:   {generated} UTC",

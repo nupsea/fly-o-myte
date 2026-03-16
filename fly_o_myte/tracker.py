@@ -62,8 +62,16 @@ def build_plugin_manager_from_settings() -> pluggy.PluginManager:
     pm = build_plugin_manager()
 
     if settings.serpapi_api_key:
-        pm.register(SerpAPIFlightSource(api_key=settings.serpapi_api_key))
-        logger.debug("Registered SerpAPI (Google Flights) price source")
+        pm.register(
+            SerpAPIFlightSource(
+                api_key=settings.serpapi_api_key,
+                cache_ttl_hours=settings.serpapi_cache_ttl_hours,
+            )
+        )
+        logger.debug(
+            "Registered SerpAPI (Google Flights) price source (cache TTL: %dh)",
+            settings.serpapi_cache_ttl_hours,
+        )
     elif settings.tequila_api_key:
         pm.register(TequilaPriceSource(api_key=settings.tequila_api_key))
         logger.debug("Registered Tequila price source")
@@ -279,18 +287,26 @@ def poll_trip(
     )
 
     # ─── 5. Send alerts ────────────────────────────────────────────────────
-    # Trigger if it's a "book_now" OR if price is below the user's manual threshold
+    # Identify if this is the first primary snapshot for this trip
+    is_initial_poll = len([s for s in snapshots if s.rank == 1]) <= 1
+
+    # Trigger if it's a "book_now", below user's threshold, OR if it's the first poll
     is_book_now = result.decision == "book_now"
-    
+
     # Check threshold: trip-specific first, then fallback to family profile
-    threshold = trip.alert_threshold_aud if trip.alert_threshold_aud is not None else profile.budget_threshold_aud
-    is_below_threshold = (
-        threshold is not None
-        and primary_breakdown.total <= threshold
+    threshold = (
+        trip.alert_threshold_aud
+        if trip.alert_threshold_aud is not None
+        else profile.budget_threshold_aud
+    )
+    is_below_threshold = threshold is not None and primary_breakdown.total <= threshold
+
+    should_alert = send_alerts and (
+        is_book_now or is_below_threshold or is_initial_poll
     )
 
-    if send_alerts and (is_book_now or is_below_threshold):
-        sent = send_book_now_alert(trip, rec)
+    if should_alert:
+        sent = send_book_now_alert(trip, rec, is_initial=is_initial_poll)
         if sent:
             assert rec.id is not None  # guaranteed after insert
             mark_email_sent(session, rec.id)
