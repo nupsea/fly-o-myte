@@ -227,13 +227,14 @@ class AmadeusPriceSource:
             if not itineraries:
                 return None
 
-            first_itin = itineraries[0]
-            segments = first_itin.get("segments", [])
-            if not segments:
+            # Outbound
+            outbound_itin = itineraries[0]
+            outbound_segments = outbound_itin.get("segments", [])
+            if not outbound_segments:
                 return None
 
-            first_seg = segments[0]
-            last_seg = segments[-1]
+            first_seg = outbound_segments[0]
+            last_seg = outbound_segments[-1]
 
             airline_code = first_seg.get("carrierCode", "")
             flight_number = first_seg.get("number")
@@ -243,10 +244,49 @@ class AmadeusPriceSource:
             departure_time = dep_str[11:16] if len(dep_str) >= 16 else ""
             arrival_time = arr_str[11:16] if len(arr_str) >= 16 else ""
 
-            duration_str = first_itin.get("duration", "")
+            duration_str = outbound_itin.get("duration", "")
             duration_minutes = _parse_iso_duration(duration_str)
 
-            stops = len(segments) - 1
+            # Return
+            return_departure_time = None
+            return_arrival_time = None
+            return_segments = []
+            if len(itineraries) > 1:
+                return_itin = itineraries[1]
+                return_segments = return_itin.get("segments", [])
+                if return_segments:
+                    r_first = return_segments[0]
+                    r_last = return_segments[-1]
+                    r_dep_str = r_first.get("departure", {}).get("at", "")
+                    r_arr_str = r_last.get("arrival", {}).get("at", "")
+                    return_departure_time = (
+                        r_dep_str[11:16] if len(r_dep_str) >= 16 else ""
+                    )
+                    return_arrival_time = (
+                        r_arr_str[11:16] if len(r_arr_str) >= 16 else ""
+                    )
+
+                    r_dur_str = return_itin.get("duration", "")
+                    duration_minutes += _parse_iso_duration(r_dur_str)
+
+            stops = len(outbound_segments) - 1
+
+            # Normalised legs for UI
+            def _map_segment(seg: dict) -> dict:
+                return {
+                    "airline_code": seg.get("carrierCode", ""),
+                    "flight_number": f"{seg.get('carrierCode', '')}{seg.get('number', '')}",
+                    "departure_time": seg.get("departure", {}).get("at", ""),
+                    "departure_airport": seg.get("departure", {}).get("iataCode", ""),
+                    "arrival_time": seg.get("arrival", {}).get("at", ""),
+                    "arrival_airport": seg.get("arrival", {}).get("iataCode", ""),
+                    "duration_minutes": _parse_iso_duration(seg.get("duration", "")),
+                }
+
+            fly_o_myte_legs = {
+                "onward": [_map_segment(s) for s in outbound_segments],
+                "return": [_map_segment(s) for s in return_segments],
+            }
 
             return FlightOffer(
                 source="amadeus",
@@ -257,8 +297,11 @@ class AmadeusPriceSource:
                 stops=stops,
                 departure_time=departure_time,
                 arrival_time=arrival_time,
+                return_departure_time=return_departure_time,
+                return_arrival_time=return_arrival_time,
                 duration_minutes=duration_minutes,
                 price_level_signal=None,
+                fly_o_myte_legs=fly_o_myte_legs,
                 offer_raw=raw,
             )
         except (KeyError, ValueError, TypeError) as exc:

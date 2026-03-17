@@ -43,6 +43,9 @@ class FlightOffer:
     price_level_signal: str | None = (
         None  # "LOW" | "TYPICAL" | "HIGH" if API provides it
     )
+    fly_o_myte_legs: dict[str, list[dict]] = Field(
+        default_factory=lambda: {"onward": [], "return": []}
+    )
     offer_raw: dict = Field(default_factory=dict)  # full API response for debugging
 
 

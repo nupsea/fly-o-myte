@@ -15,17 +15,18 @@
 
 | Data | Freshness Target | Mechanism |
 |------|-----------------|-----------|
-| Price snapshots | Daily (cron) | `fom poll` at 07:00 via crontab |
+| Price snapshots | Per-trip schedule | Internal APScheduler (managed via UI/API) |
 | Airline fee DB | 3–4× per year | Manual update to `airlines.json` + `make data-check` |
 | School holiday calendar | Annual | Manual update to `school_holidays.yaml` for new year |
 | LLM insights | 7 days or price change > 10% | Cache TTL in `insights.py` |
 
-## Cron Setup
+## Automated Scheduling
 
-```bash
-# Recommended crontab entry — polls all active trips at 07:00 daily
-0 7 * * * cd /path/to/project && uv run fom poll >> ~/.fly-o-myte/fom.log 2>&1
-```
+Fly-O-Myte uses an internal **APScheduler** background worker (running within the API process) to handle automated polling. This replaces traditional OS-level crontabs, making the application cross-platform and easier to host.
+
+- **Schedule storage:** Stored per-trip in the SQLite database.
+- **Persistence:** Survives app restarts; jobs are re-synced from DB on startup.
+- **Misfire grace:** If the machine is asleep during a scheduled run, the scheduler will attempt to trigger the poll within a 1-hour window after wake.
 
 ## Failure Modes
 

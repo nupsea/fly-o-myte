@@ -13,6 +13,7 @@ No data is saved to the database — scouting is read-only.
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -46,6 +47,7 @@ class ScoutResult:
     duration_minutes: int
     school_holiday: HolidayContext | None
     breakdown: TrueCostBreakdown
+    fly_o_myte_legs: dict | None = None
     offer_raw: dict | None = None
 
 
@@ -77,21 +79,28 @@ def scout_month(
     else:
         end_of_month = date(year, month + 1, 1) - timedelta(days=1)
 
+    tasks = []
     while current <= end_of_month:
         ret = current + timedelta(days=trip_length_days)
-        result = _scout_single(
+        tasks.append((current, ret))
+        current += timedelta(days=sample_every_n_days)
+
+    def _scout_task(pair: tuple[date, date]) -> ScoutResult | None:
+        return _scout_single(
             pm=pm,
             profile=profile,
             airline_db=airline_db,
             calendar=calendar,
             origin=origin,
             destination=destination,
-            depart_date=current,
-            return_date=ret,
+            depart_date=pair[0],
+            return_date=pair[1],
         )
-        if result:
-            results.append(result)
-        current += timedelta(days=sample_every_n_days)
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        for res in executor.map(_scout_task, tasks):
+            if res:
+                results.append(res)
 
     return sorted(results, key=lambda r: r.true_family_cost)
 
@@ -132,28 +141,9 @@ def scout_flex(
 
     trip_length = (return_date - depart_date).days
     results: list[ScoutResult] = []
-    last_error: PriceSourceError | None = None
-    attempted = 0
+    last_error: Exception | None = None
 
-    def _try(dep: date, ret: date) -> None:
-        nonlocal last_error, attempted
-        attempted += 1
-        try:
-            r = _scout_single(
-                pm=pm,
-                profile=profile,
-                airline_db=airline_db,
-                calendar=calendar,
-                origin=origin,
-                destination=destination,
-                depart_date=dep,
-                return_date=ret,
-            )
-            if r:
-                results.append(r)
-        except PriceSourceError as exc:
-            last_error = exc
-            logger.warning("Scout fetch failed for %s: %s", dep, exc)
+    tasks: list[tuple[date, date]] = []
 
     if effective_return_flex == 0:
         for d_offset in range(-effective_depart_flex, effective_depart_flex + 1):
@@ -162,19 +152,45 @@ def scout_flex(
                 continue
             if candidate_depart >= return_date:
                 continue
-            _try(candidate_depart, return_date)
+            tasks.append((candidate_depart, return_date))
     elif effective_depart_flex == 0:
         for r_offset in range(-effective_return_flex, effective_return_flex + 1):
             candidate_return = return_date + timedelta(days=r_offset)
             if candidate_return <= depart_date:
                 continue
-            _try(depart_date, candidate_return)
+            tasks.append((depart_date, candidate_return))
     else:
         for d_offset in range(-effective_depart_flex, effective_depart_flex + 1):
             candidate_depart = depart_date + timedelta(days=d_offset)
             if candidate_depart < date.today():
                 continue
-            _try(candidate_depart, candidate_depart + timedelta(days=trip_length))
+            tasks.append(
+                (candidate_depart, candidate_depart + timedelta(days=trip_length))
+            )
+
+    def _scout_task(pair: tuple[date, date]) -> ScoutResult | None:
+        nonlocal last_error
+        try:
+            return _scout_single(
+                pm=pm,
+                profile=profile,
+                airline_db=airline_db,
+                calendar=calendar,
+                origin=origin,
+                destination=destination,
+                depart_date=pair[0],
+                return_date=pair[1],
+            )
+        except PriceSourceError as exc:
+            last_error = exc
+            logger.warning("Scout fetch failed for %s: %s", pair[0], exc)
+            return None
+
+    attempted = len(tasks)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        for res in executor.map(_scout_task, tasks):
+            if res:
+                results.append(res)
 
     # If every attempted call raised an API error and we have nothing to show,
     # re-raise so the caller can surface the real reason (e.g. quota exhausted).
@@ -214,7 +230,23 @@ def _scout_single(
     if not all_offers:
         return None
 
-    best = min(all_offers, key=lambda o: o.base_fare_per_adult)
+    # Sort all offers by base fare to find the absolute cheapest
+    all_offers.sort(key=lambda o: o.base_fare_per_adult)
+    cheapest = all_offers[0]
+
+    # Preference Logic: If we have multiple providers, prefer the one that
+    # provides return journey details (e.g. Tequila) if its price is within 5%
+    # of the absolute cheapest (e.g. SerpAPI which might only have outbound).
+    best = cheapest
+    if return_date:
+        for offer in all_offers:
+            # Check if this offer has return details
+            if offer.return_departure_time and offer.return_arrival_time:
+                # Is it within 5% of the absolute cheapest?
+                if offer.base_fare_per_adult <= cheapest.base_fare_per_adult * 1.05:
+                    best = offer
+                    break
+
     bundle = airline_db.get_or_default(best.airline_code)
     route_type = classify_route(origin, destination)
 
@@ -247,6 +279,7 @@ def _scout_single(
         duration_minutes=best.duration_minutes,
         school_holiday=holiday_ctx,
         breakdown=breakdown,
+        fly_o_myte_legs=best.fly_o_myte_legs,
         offer_raw=best.offer_raw,
     )
 

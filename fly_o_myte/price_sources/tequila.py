@@ -177,29 +177,56 @@ class TequilaPriceSource:
             if not routes:
                 return None
 
-            first_leg = routes[0]
+            outbound_segments = [r for r in routes if not r.get("return", 0)]
+            return_segments = [r for r in routes if r.get("return", 0)]
+
+            if not outbound_segments:
+                return None
+
+            first_leg = outbound_segments[0]
+            last_leg = outbound_segments[-1]
             airline_code = first_leg.get("airline", "")
             flight_number = first_leg.get("flight_no")
 
-            # Departure / arrival times
+            # Outbound times
             dep_utc = first_leg.get("local_departure", "")
-            arr_utc = first_leg.get("local_arrival", "")
-            departure_time = dep_utc[11:16] if len(dep_utc) >= 16 else None
-            arrival_time = arr_utc[11:16] if len(arr_utc) >= 16 else None
+            arr_utc = last_leg.get("local_arrival", "")
+            departure_time = dep_utc[11:16] if len(dep_utc) >= 16 else ""
+            arrival_time = arr_utc[11:16] if len(arr_utc) >= 16 else ""
+
+            # Return times
+            return_departure_time = None
+            return_arrival_time = None
+            if return_segments:
+                r_first = return_segments[0]
+                r_last = return_segments[-1]
+                r_dep_utc = r_first.get("local_departure", "")
+                r_arr_utc = r_last.get("local_arrival", "")
+                return_departure_time = r_dep_utc[11:16] if len(r_dep_utc) >= 16 else ""
+                return_arrival_time = r_arr_utc[11:16] if len(r_arr_utc) >= 16 else ""
 
             duration_sec = raw.get("duration", {}).get("total", 0)
             duration_minutes = int(duration_sec / 60) if duration_sec else 0
 
-            # Stops = number of route segments minus 1 per direction
-            # For return trips, count only outbound stops
-            stops = max(0, len(routes) - 1)
-            if raw.get("return_duration"):
-                # It's a return trip; route list includes inbound legs
-                # Tequila interleaves or appends — use stopovers field if present
-                stops = raw.get("stopovers", stops)
+            # Stops = number of outbound segments minus 1
+            stops = max(0, len(outbound_segments) - 1)
 
-            # Tequila doesn't provide LOW/TYPICAL/HIGH signals
-            # (that's Amadeus Flight Price Analysis)
+            # Normalised legs for UI
+            def _map_segment(seg: dict) -> dict:
+                return {
+                    "airline_code": seg.get("airline", ""),
+                    "flight_number": f"{seg.get('airline', '')}{seg.get('flight_no', '')}",
+                    "departure_time": seg.get("local_departure", ""),
+                    "departure_airport": seg.get("flyFrom", ""),
+                    "arrival_time": seg.get("local_arrival", ""),
+                    "arrival_airport": seg.get("flyTo", ""),
+                    "duration_minutes": 0,  # Tequila provides duration per leg in some nested fields but not consistently
+                }
+
+            fly_o_myte_legs = {
+                "onward": [_map_segment(s) for s in outbound_segments],
+                "return": [_map_segment(s) for s in return_segments],
+            }
 
             return FlightOffer(
                 source="tequila",
@@ -208,10 +235,13 @@ class TequilaPriceSource:
                 base_fare_per_adult=price,
                 currency=currency,
                 stops=stops,
-                departure_time=departure_time or "",
-                arrival_time=arrival_time or "",
+                departure_time=departure_time,
+                arrival_time=arrival_time,
+                return_departure_time=return_departure_time,
+                return_arrival_time=return_arrival_time,
                 duration_minutes=duration_minutes,
                 price_level_signal=None,
+                fly_o_myte_legs=fly_o_myte_legs,
                 offer_raw=raw,
             )
         except (KeyError, ValueError, TypeError) as exc:

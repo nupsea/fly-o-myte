@@ -72,11 +72,15 @@ def build_plugin_manager_from_settings() -> pluggy.PluginManager:
             "Registered SerpAPI (Google Flights) price source (cache TTL: %dh)",
             settings.serpapi_cache_ttl_hours,
         )
-    elif settings.tequila_api_key:
+
+    if settings.tequila_api_key:
         pm.register(TequilaPriceSource(api_key=settings.tequila_api_key))
         logger.debug("Registered Tequila price source")
-    else:
-        logger.warning("No price source API key set — set SERPAPI_API_KEY in .env")
+
+    if not settings.serpapi_api_key and not settings.tequila_api_key:
+        logger.warning(
+            "No price source API key set — set SERPAPI_API_KEY or TEQUILA_API_KEY in .env"
+        )
 
     if settings.amadeus_client_id and settings.amadeus_client_secret:
         pm.register(
@@ -197,6 +201,8 @@ def poll_trip(
                 price_level_signal=offer.price_level_signal,
                 stops=offer.stops,
                 departure_time=offer.departure_time,
+                return_departure_time=offer.return_departure_time,
+                return_arrival_time=offer.return_arrival_time,
                 duration_minutes=offer.duration_minutes,
                 family_score=fs,
                 offer_raw=json.dumps(offer.offer_raw),

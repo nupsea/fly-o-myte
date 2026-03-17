@@ -41,6 +41,9 @@ class Trip(SQLModel, table=True):
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     alert_threshold_aud: float | None = None
     alert_email: str | None = None
+    cron_schedule: str = Field(
+        default="0 7 * * *"
+    )  # cron string for per-trip polling (S44)
 
     group_tag: str | None = (
         None  # optional group label for multi-option trip sets (S36)
@@ -66,6 +69,8 @@ class PriceSnapshot(SQLModel, table=True):
     price_level_signal: str | None = None  # "LOW" | "TYPICAL" | "HIGH"
     stops: int | None = None
     departure_time: str | None = None  # HH:MM
+    return_departure_time: str | None = None  # HH:MM
+    return_arrival_time: str | None = None  # HH:MM
     duration_minutes: int | None = None
     family_score: float | None = None  # 0–100
     offer_raw: str = "{}"  # JSON blob for debugging
@@ -154,6 +159,34 @@ def create_tables(engine) -> None:
             conn.execute(sqlalchemy.text("ALTER TABLE trip ADD COLUMN group_tag TEXT"))
             conn.commit()
             _logger.debug("Migrated trip table: added group_tag column")
+
+        # Migration S44: cron_schedule column on trip
+        res3 = conn.execute(sqlalchemy.text("PRAGMA table_info(trip)"))
+        if "cron_schedule" not in [row[1] for row in res3]:
+            conn.execute(
+                sqlalchemy.text(
+                    "ALTER TABLE trip ADD COLUMN cron_schedule TEXT DEFAULT '0 7 * * *'"
+                )
+            )
+            conn.commit()
+            _logger.debug("Migrated trip table: added cron_schedule column")
+
+        # Migration S100: return journey times on pricesnapshot
+        res4 = conn.execute(sqlalchemy.text("PRAGMA table_info(pricesnapshot)"))
+        columns = [row[1] for row in res4]
+        if "return_departure_time" not in columns:
+            conn.execute(
+                sqlalchemy.text(
+                    "ALTER TABLE pricesnapshot ADD COLUMN return_departure_time TEXT"
+                )
+            )
+        if "return_arrival_time" not in columns:
+            conn.execute(
+                sqlalchemy.text(
+                    "ALTER TABLE pricesnapshot ADD COLUMN return_arrival_time TEXT"
+                )
+            )
+        conn.commit()
 
 
 @contextmanager

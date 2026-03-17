@@ -16,12 +16,13 @@ The recommended way to use Fly-O-Myte is via the modern Web UI.
    ```
 
 2. **Configure Your Family**
-   The first time you run the app, visit the **Family Profile** tab to set up your passengers, origin airport, and school holiday state.
+   Set up your passengers, origin airport, and school holiday state in the **Family Profile** tab.
 
 3. **Set API Keys**
-   Create a `.env` file and add your SerpAPI key (required for live prices):
+   Create a `.env` file with your credentials:
    ```bash
    echo "SERPAPI_API_KEY=your_key_here" >> .env
+   echo "ANTHROPIC_API_KEY=your_key_here" >> .env # Optional for AI Planner
    ```
 
 4. **Launch the App**
@@ -34,17 +35,20 @@ The recommended way to use Fly-O-Myte is via the modern Web UI.
 
 ## ✨ Key Features
 
-### 📊 Command Center (Dashboard)
-Visual cards for all your tracked trips. High-signal "Buy/Wait/Monitor" badges use vibrant gradients to show urgency. The **Family Savings Gauge** shows exactly how good the current price is compared to historical data.
+### 📊 Dashboard (Command Center)
+Real-time tracking of your watchlisted trips. High-signal **Book Now / Wait / Monitor** badges with vibrant gradients indicate urgency based on historical trends and current price signals.
 
 ### 🔍 Smart Scout
-Interactive heatmap showing prices across entire months. Features a **Holiday Shield** overlay that highlights school holiday periods (QLD/NSW/VIC/etc.) so you can avoid the peak-pricing traps.
+Interactive month-at-a-glance heatmaps. Features a **Holiday Shield** overlay that highlights school holiday periods (QLD/NSW/VIC/etc.) so you can identify the cheapest travel windows before prices spike.
 
 ### 🤖 AI Planner
-Just tell Fly-O-Myte what you're thinking: *"Bangalore in December to Jan for 25 days"* or *"Japan for cherry blossoms"*. The natural language engine extracts your intent and generates scouting windows instantly.
+Natural language trip planning: *"Bangalore in December for 25 days"* or *"Japan for cherry blossoms"*. The engine extracts intent and generates scouting windows instantly.
 
-### ⏱️ Monitoring & Cron
-View and manage your automated daily price checks directly from the UI. See system health and trigger manual "Poll All" refreshes with one click.
+### 🔌 Extensible Price Sources
+Pluggable architecture (via `pluggy`) supporting multiple providers:
+- **SerpAPI (Google Flights)**: Primary source for comprehensive global coverage.
+- **Amadeus**: Advanced flight price analysis and market signals.
+- **Tequila (Kiwi.com)**: Broad search capabilities across hundreds of airlines.
 
 ---
 
@@ -53,12 +57,13 @@ View and manage your automated daily price checks directly from the UI. See syst
 For power users, the `fom` CLI remains fully supported:
 
 ```bash
-fom setup                                    First-run wizard
-fom scout BNE SYD --months jul-2026          Interactive month scouting
-fom watch BNE SYD 2026-07-20 2026-07-27     Start tracking a journey
-fom status                                   Morning check of all trips
-fom flex <id>                                Find ±3 day alternatives
-fom plan "Sri Lanka in July"                 Natural language planning
+fom setup                                   First-run wizard
+fom scout BNE SYD --months jul-2026         Interactive month scouting
+fom watch BNE SYD 2026-07-20 2026-07-27    Start tracking a journey
+fom status                                  Morning check of all trips
+fom flex <id>                               Find ±3 day alternatives
+fom plan "Sri Lanka in July"                Natural language planning
+fom poll                                    Update all tracked prices
 ```
 
 ---
@@ -77,18 +82,18 @@ Fly-O-Myte never shows just the base fare. Every price shown is the **True Famil
 = TRUE FAMILY COST (AUD)
 ```
 
-The fee rates come from an embedded database of 15+ major airlines including Qantas, Virgin, Jetstar, Singapore Airlines, and Emirates.
+Pricing logic accounts for airline-specific rules across 15+ major carriers (Qantas, Virgin, Jetstar, Singapore Airlines, Emirates, etc.).
 
 ---
 
-## 🛠️ Data & Privacy
+## 🛠️ Architecture & Data
 
-All data lives locally on your machine in `~/.fly-o-myte/`:
-- `config.yaml`: Your family profile.
-- `fly-o-myte.db`: SQLite database of trip history.
-- `analytics/`: DuckDB store for route statistics.
+- **Backend**: FastAPI (Python 3.11+) with SQLModel (SQLite) for persistence.
+- **Frontend**: React (TypeScript) with Vite and interactive data visualizations.
+- **Analytics**: DuckDB for high-performance route context and statistical analysis.
+- **CI/CD**: Rigorous quality gates with `ruff`, `pyright`, and `pytest`.
 
-No personal payment data is ever stored.
+All data lives locally in `~/.fly-o-myte/` to ensure your travel plans remain private.
 
 ---
 

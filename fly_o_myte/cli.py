@@ -221,80 +221,6 @@ def setup() -> None:
     )
 
 
-def _setup_cron() -> None:
-    """Interactively add a cron job for `fom poll` if not already present."""
-    if sys.platform == "win32":
-        return
-
-    # Skip if running in non-interactive environment (e.g. smoke tests)
-    if os.environ.get("FLY_O_MYTE_NO_PROMPT"):
-        return
-
-    import subprocess
-    from pathlib import Path
-
-    from fly_o_myte.config import APP_DIR
-
-    # 1. Check if it already exists
-    try:
-        result = subprocess.run(
-            ["crontab", "-l"], capture_output=True, text=True, check=False
-        )
-        current_cron = result.stdout if result.returncode == 0 else ""
-        if "fom poll" in current_cron:
-            return  # Already configured
-    except Exception:
-        return  # Crontab might not be available
-
-    console.print("\n[bold]Automatic Tracking[/bold]")
-    console.print(
-        "You don't have automatic daily price tracking enabled yet.\n"
-        "We can add a cron job to run [dim]fom poll[/dim] for you every morning."
-    )
-
-    if not Confirm.ask("Would you like to enable automatic daily tracking?"):
-        return
-
-    cron_time = Prompt.ask(
-        "Cron schedule (minute hour day month weekday)",
-        default="0 7 * * *",
-    )
-
-    project_dir = Path.cwd()
-    fom_log = APP_DIR / "fom.log"
-    uv_cmd = "uv"
-    cron_line = (
-        f"{cron_time} cd {project_dir} && {uv_cmd} run fom poll >> {fom_log} 2>&1"
-    )
-
-    try:
-        # Check if already exists (again, in case of race)
-        if "fom poll" in current_cron:
-            if not Confirm.ask("A `fom poll` entry already exists. Overwrite it?"):
-                return
-            lines = [
-                line for line in current_cron.splitlines() if "fom poll" not in line
-            ]
-            current_cron = "\n".join(lines) + "\n"
-
-        new_cron = current_cron.rstrip() + "\n" + cron_line + "\n"
-
-        process = subprocess.Popen(
-            ["crontab", "-"], stdin=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        _, stderr = process.communicate(input=new_cron)
-
-        if process.returncode == 0:
-            console.print(
-                f"[green]Cron job added: {cron_time} (Logs at {fom_log})[/green]\n"
-            )
-        else:
-            console.print(f"[red]Failed to update crontab: {stderr.strip()}[/red]\n")
-
-    except Exception as e:
-        console.print(f"[red]Error setting up cron: {e}[/red]\n")
-
-
 # ─── scout ─────────────────────────────────────────────────────────────────────
 
 
@@ -497,9 +423,6 @@ def watch(
             )
         else:
             console.print("[yellow]No offers found — will retry on next poll.[/yellow]")
-
-    # Optional cron setup - only if not already present
-    _setup_cron()
 
 
 # ─── status ────────────────────────────────────────────────────────────────────
@@ -1428,9 +1351,6 @@ def plan(
             )
         else:
             console.print("[yellow]No offers found — will retry on next poll.[/yellow]")
-
-    # Optional cron setup - only if not already present
-    _setup_cron()
 
 
 if __name__ == "__main__":

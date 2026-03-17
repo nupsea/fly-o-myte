@@ -517,38 +517,101 @@ class SerpAPIFlightSource:
         """Parse a single Google Flights result container into a FlightOffer."""
         try:
             price = float(container["price"])
-            flights = container.get("flights", [])
-            if not flights:
+
+            # Google Flights (SerpAPI) results for round trips can have multiple itineraries
+            # 'flights' usually corresponds to the first itinerary (outbound)
+            # Some results have a top-level 'itinerary' list containing both directions
+            itineraries = container.get("itinerary", [])
+            if not itineraries:
+                # Fallback: if no 'itinerary' list, treat 'flights' as the outbound
+                outbound_flights = container.get("flights", [])
+                if not outbound_flights:
+                    return None
+                itineraries = [{"flights": outbound_flights}]
+
+            outbound = itineraries[0]
+            outbound_flights = outbound.get("flights", [])
+            if not outbound_flights:
                 return None
 
-            first_leg = flights[0]
+            first_leg = outbound_flights[0]
+            last_leg = outbound_flights[-1]
 
             # Airline name → IATA code
             airline_name = first_leg.get("airline", "")
             airline_code: str = _AIRLINE_IATA.get(airline_name.lower()) or "XX"
 
-            # Fallback for unknown airlines: use first 2 chars ONLY if not colliding with known codes
+            # Fallback for unknown airlines
             if airline_code == "XX" and airline_name:
                 code_candidate = airline_name[:2].upper()
                 if code_candidate not in _AIRLINE_IATA.values():
                     airline_code = code_candidate
 
-            # Flight number — Google returns "QF 500", normalise to "QF500"
             raw_fn = first_leg.get("flight_number", "")
             flight_number = raw_fn.replace(" ", "") if raw_fn else None
 
-            # Departure time from "YYYY-MM-DD HH:MM"
+            # Departure/Arrival times
             dep_raw = first_leg.get("departure_airport", {}).get("time", "")
             departure_time = dep_raw[11:16] if len(dep_raw) >= 16 else ""
 
-            arr_raw = first_leg.get("arrival_airport", {}).get("time", "")
+            arr_raw = last_leg.get("arrival_airport", {}).get("time", "")
             arrival_time = arr_raw[11:16] if len(arr_raw) >= 16 else ""
+
+            # Return details
+            return_departure_time = None
+            return_arrival_time = None
+            if len(itineraries) > 1:
+                return_itin = itineraries[1]
+                return_flights = return_itin.get("flights", [])
+                if return_flights:
+                    r_first = return_flights[0]
+                    r_last = return_flights[-1]
+
+                    r_dep_raw = r_first.get("departure_airport", {}).get("time", "")
+                    return_departure_time = (
+                        r_dep_raw[11:16] if len(r_dep_raw) >= 16 else ""
+                    )
+
+                    r_arr_raw = r_last.get("arrival_airport", {}).get("time", "")
+                    return_arrival_time = (
+                        r_arr_raw[11:16] if len(r_arr_raw) >= 16 else ""
+                    )
 
             # Total duration in minutes across all legs
             duration_minutes = int(container.get("total_duration", 0))
 
-            # Stops = number of layovers
-            stops = len(container.get("layovers", []))
+            # Stops = number of layovers in outbound
+            stops = (
+                len(outbound.get("layovers", []))
+                if "layovers" in outbound
+                else len(container.get("layovers", []))
+            )
+
+            # Normalised legs for UI
+            def _map_leg(leg: dict) -> dict:
+                l_airline_name = leg.get("airline", "")
+                l_airline_code = (
+                    _AIRLINE_IATA.get(l_airline_name.lower())
+                    or l_airline_name[:2].upper()
+                )
+                return {
+                    "airline_code": l_airline_code,
+                    "flight_number": leg.get("flight_number", "").replace(" ", ""),
+                    "departure_time": leg.get("departure_airport", {}).get("time", ""),
+                    "departure_airport": leg.get("departure_airport", {}).get("id", ""),
+                    "arrival_time": leg.get("arrival_airport", {}).get("time", ""),
+                    "arrival_airport": leg.get("arrival_airport", {}).get("id", ""),
+                    "duration_minutes": leg.get("duration", 0),
+                }
+
+            fly_o_myte_legs = {
+                "onward": [_map_leg(leg) for leg in outbound_flights],
+                "return": [],
+            }
+            if len(itineraries) > 1:
+                fly_o_myte_legs["return"] = [
+                    _map_leg(leg) for leg in itineraries[1].get("flights", [])
+                ]
 
             return FlightOffer(
                 source="serpapi",
@@ -559,8 +622,11 @@ class SerpAPIFlightSource:
                 stops=stops,
                 departure_time=departure_time,
                 arrival_time=arrival_time,
+                return_departure_time=return_departure_time,
+                return_arrival_time=return_arrival_time,
                 duration_minutes=duration_minutes,
                 price_level_signal=price_level_signal,
+                fly_o_myte_legs=fly_o_myte_legs,
                 offer_raw=container,
             )
         except (KeyError, ValueError, TypeError) as exc:

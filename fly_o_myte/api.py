@@ -6,6 +6,7 @@ Exposes core services for scouting, tracking, and profile management.
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
 
@@ -34,8 +35,23 @@ from fly_o_myte.db.sqlite import (
     set_flex_cache,
     set_trip_active,
 )
+from fly_o_myte.scheduler import start_scheduler, stop_scheduler, update_trip_schedule
 
-app = FastAPI(title="Fly-O-Myte API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start the background scheduler on startup and stop it on shutdown."""
+    # Ensure tables and migrations are applied before scheduler starts
+    settings = get_settings()
+    engine = create_db_engine(settings.db_path)
+    create_tables(engine)
+
+    start_scheduler()
+    yield
+    stop_scheduler()
+
+
+app = FastAPI(title="Fly-O-Myte API", lifespan=lifespan)
 logger = logging.getLogger(__name__)
 
 # CORS setup for React frontend
@@ -83,12 +99,14 @@ class ProfileUpdate(BaseModel):
 class TripUpdate(BaseModel):
     label: str | None = None
     adults: int | None = None
+    children: list[ChildModel] | None = None
     bags_per_person: int | None = None
     max_stops: int | None = None
     is_active: bool | None = None
     group_tag: str | None = None
     alert_threshold_aud: float | None = None
     alert_email: str | None = None
+    cron_schedule: str | None = None
 
 
 class OfferSeed(BaseModel):
@@ -102,6 +120,8 @@ class OfferSeed(BaseModel):
     airline_code: str
     stops: int
     departure_time: str | None = None
+    return_departure_time: str | None = None
+    return_arrival_time: str | None = None
     duration_minutes: int | None = None
     offer_raw: dict | None = None
 
@@ -113,6 +133,7 @@ class TripCreate(BaseModel):
     return_date: str | None = None
     label: str | None = None
     group_tag: str | None = None
+    cron_schedule: str | None = "0 7 * * *"
     offer_seed: OfferSeed | None = None  # if provided, skip SerpAPI poll
 
 
@@ -176,6 +197,7 @@ def search_airports(q: str):
 @app.get("/profile")
 def get_profile():
     profile = load_family_profile()
+    settings = get_settings()
     # Flatten window for easier UI binding
     res = {
         "adults": profile.adults,
@@ -190,6 +212,7 @@ def get_profile():
         "latest_hour": profile.preferred_departure_window.latest_hour,
         "blocked_airlines": profile.blocked_airlines,
         "budget_threshold_aud": profile.budget_threshold_aud,
+        "alert_email": settings.default_alert_email,
     }
     return res
 
@@ -252,12 +275,16 @@ def get_trips(session: Annotated[Session, Depends(get_db)]):
                 "depart_date": trip.depart_date,
                 "return_date": trip.return_date,
                 "adults": trip.adults,
+                "children": trip.children,
                 "bags_per_person": trip.bags_per_person,
                 "max_stops": trip.max_stops,
                 "is_active": bool(trip.is_active),
                 "recommendation": rec,
                 "latest_snapshot": snap,
                 "group_tag": trip.group_tag,
+                "alert_threshold_aud": trip.alert_threshold_aud,
+                "alert_email": trip.alert_email,
+                "cron_schedule": trip.cron_schedule,
             }
         )
     return result
@@ -277,13 +304,20 @@ def watch_trip(data: TripCreate, session: Annotated[Session, Depends(get_db)]):
         depart_date=data.depart_date,
         return_date=data.return_date,
         adults=profile.adults,
+        children_json=_json.dumps(
+            [{"name": c.name, "dob": str(c.dob)} for c in profile.children]
+        ),
         bags_per_person=profile.bags_per_person,
         max_stops=profile.max_stops,
         group_tag=data.group_tag,
+        alert_threshold_aud=profile.budget_threshold_aud,
+        alert_email=None,  # will use system default if null
+        cron_schedule=data.cron_schedule or "0 7 * * *",
     )
 
     inserted = insert_trip(session, trip)
     assert inserted.id is not None
+    update_trip_schedule(inserted)
 
     if data.offer_seed:
         # Seed snapshot directly from scout data — no SerpAPI call, same price as Scout
@@ -299,6 +333,8 @@ def watch_trip(data: TripCreate, session: Annotated[Session, Depends(get_db)]):
                 true_cost_breakdown=_json.dumps(seed.true_cost_breakdown),
                 stops=seed.stops,
                 departure_time=seed.departure_time,
+                return_departure_time=seed.return_departure_time,
+                return_arrival_time=seed.return_arrival_time,
                 duration_minutes=seed.duration_minutes or 0,
                 offer_raw=_json.dumps(seed.offer_raw) if seed.offer_raw else "{}",
                 rank=1,
@@ -332,6 +368,12 @@ def update_trip_endpoint(
         trip.label = update.label
     if update.adults is not None:
         trip.adults = update.adults
+    if update.children is not None:
+        import json as _json
+
+        trip.children_json = _json.dumps(
+            [{"name": c.name, "dob": str(c.dob)} for c in update.children]
+        )
     if update.bags_per_person is not None:
         trip.bags_per_person = update.bags_per_person
     if update.max_stops is not None:
@@ -344,18 +386,30 @@ def update_trip_endpoint(
         trip.alert_threshold_aud = update.alert_threshold_aud
     if update.alert_email is not None:
         trip.alert_email = update.alert_email
+    if update.cron_schedule is not None:
+        trip.cron_schedule = update.cron_schedule
 
     session.add(trip)
     session.commit()
     session.refresh(trip)
+
+    # Sync scheduler with updated trip
+    update_trip_schedule(trip)
+
     return trip
 
 
 @app.delete("/trips/{trip_id}")
 def remove_trip(trip_id: int, session: Annotated[Session, Depends(get_db)]):
+    trip = session.get(Trip, trip_id)
     success = delete_trip(session, trip_id)
     if not success:
         raise HTTPException(status_code=404, detail="Trip not found")
+
+    if trip:
+        trip.is_active = 0  # set to inactive so scheduler removes it
+        update_trip_schedule(trip)
+
     return {"status": "deleted"}
 
 
@@ -389,6 +443,8 @@ def toggle_trip(trip_id: int, session: Annotated[Session, Depends(get_db)]):
         raise HTTPException(status_code=404, detail="Trip not found")
     new_state = not bool(trip.is_active)
     set_trip_active(session, trip_id, active=new_state)
+    trip.is_active = 1 if new_state else 0
+    update_trip_schedule(trip)
     return {"status": "updated", "is_active": new_state}
 
 
@@ -463,55 +519,30 @@ def poll_trips():
 
 @app.get("/cron")
 def get_cron():
-    import subprocess
+    from fly_o_myte.scheduler import _scheduler
 
-    try:
-        result = subprocess.run(
-            ["crontab", "-l"], capture_output=True, text=True, check=False
+    jobs = []
+    for job in _scheduler.get_jobs():
+        jobs.append(
+            {
+                "id": job.id,
+                "next_run": job.next_run_time.isoformat()
+                if job.next_run_time
+                else None,
+                "trigger": str(job.trigger),
+            }
         )
-        current_cron = result.stdout if result.returncode == 0 else ""
-        lines = [line for line in current_cron.splitlines() if "fom poll" in line]
-        return {"cron_lines": lines, "active": len(lines) > 0}
-    except Exception:
-        return {"cron_lines": [], "active": False, "error": "Crontab not available"}
+
+    return {"active": _scheduler.running, "jobs": jobs, "job_count": len(jobs)}
 
 
 @app.post("/cron")
-def update_cron(schedule: str = "0 7 * * *"):
-    import subprocess
-    from pathlib import Path
+def update_cron_global():
+    # This is now handled per-trip, but we can keep it as a 'sync all' trigger
+    from fly_o_myte.scheduler import sync_scheduler_from_db
 
-    project_dir = Path.cwd()
-    fom_log = Path.home() / ".fly-o-myte" / "fom.log"
-    uv_cmd = "uv"
-    cron_line = (
-        f"{schedule} cd {project_dir} && {uv_cmd} run fom poll >> {fom_log} 2>&1"
-    )
-
-    try:
-        # Get current
-        result = subprocess.run(
-            ["crontab", "-l"], capture_output=True, text=True, check=False
-        )
-        current_cron = result.stdout if result.returncode == 0 else ""
-
-        # Remove existing fom poll
-        lines = [line for line in current_cron.splitlines() if "fom poll" not in line]
-        new_cron = "\n".join(lines).rstrip() + "\n" + cron_line + "\n"
-
-        process = subprocess.Popen(
-            ["crontab", "-"], stdin=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        _, stderr = process.communicate(input=new_cron)
-
-        if process.returncode == 0:
-            return {"status": "success", "line": cron_line}
-        else:
-            raise HTTPException(
-                status_code=500, detail=f"Failed to update crontab: {stderr.strip()}"
-            )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    sync_scheduler_from_db()
+    return {"status": "synced"}
 
 
 class ScoutRequest(BaseModel):
@@ -522,6 +553,28 @@ class ScoutRequest(BaseModel):
     depart_date: str | None = None
     return_date: str | None = None
     flex_days: int = 0
+
+
+def _map_scout_result(r):
+    """Normalise ScoutResult to dict for API response."""
+    return {
+        "depart_date": str(r.depart_date),
+        "return_date": str(r.return_date),
+        "trip_length_days": r.trip_length_days,
+        "true_family_cost": r.true_family_cost,
+        "base_fare_per_adult": r.base_fare_per_adult,
+        "airline_code": r.airline_code,
+        "stops": r.stops,
+        "departure_time": r.departure_time,
+        "arrival_time": r.arrival_time,
+        "return_departure_time": r.return_departure_time,
+        "return_arrival_time": r.return_arrival_time,
+        "duration_minutes": r.duration_minutes,
+        "school_holiday": r.school_holiday,
+        "breakdown": r.breakdown.as_dict() if r.breakdown else {},
+        "fly_o_myte_legs": r.fly_o_myte_legs,
+        "offer_raw": r.offer_raw,
+    }
 
 
 @app.post("/scout")
@@ -605,7 +658,11 @@ def scout_flights(req: ScoutRequest):
                 status_code=502, detail=f"All price sources failed: {'; '.join(errors)}"
             )
 
-        return sorted(all_results, key=lambda r: r.true_family_cost)
+        # Explicitly map ScoutResult to dict to ensure all fields reach the UI
+        return [
+            _map_scout_result(r)
+            for r in sorted(all_results, key=lambda res: res.true_family_cost)
+        ]
 
     elif req.depart_date and req.return_date:
         try:
@@ -627,7 +684,7 @@ def scout_flights(req: ScoutRequest):
                 r,
                 req.flex_days,
             )
-            return results
+            return [_map_scout_result(r) for r in results]
         except PriceSourceError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
     else:
@@ -693,17 +750,17 @@ def get_trip_flex(
     except PriceSourceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    if settings.serpapi_cache_ttl_hours > 0 and results:
-        import dataclasses
+    mapped_results = [_map_scout_result(r) for r in results]
 
+    if settings.serpapi_cache_ttl_hours > 0 and results:
         set_flex_cache(
             session,
             trip.id,
             flex_key,
-            _json.dumps([dataclasses.asdict(r) for r in results], default=str),
+            _json.dumps(mapped_results),
         )
 
-    return results
+    return mapped_results
 
 
 @app.post("/planner")
@@ -730,10 +787,7 @@ def plan_trip(intent_text: str):
 def recompute_costs(session: Annotated[Session, Depends(get_db)]):
     """
     Recompute true_family_cost for all snapshots using the current family profile.
-
-    No API calls are made — existing base_fare_per_adult values are re-priced
-    against the current profile (adults, child ages, bags). Call this after
-    changing child DOBs or bags in the family profile.
+    Also updates the trip's own adults/children/bags metadata to match profile.
     """
     import json as _json
 
@@ -751,6 +805,15 @@ def recompute_costs(session: Annotated[Session, Depends(get_db)]):
     updated_snaps = 0
 
     for trip in trips:
+        # Update trip metadata from profile
+        trip.adults = profile.adults
+        trip.children_json = _json.dumps(
+            [{"name": c.name, "dob": str(c.dob)} for c in profile.children]
+        )
+        trip.bags_per_person = profile.bags_per_person
+        trip.max_stops = profile.max_stops
+        session.add(trip)
+
         depart = date.fromisoformat(trip.depart_date)
         ret = date.fromisoformat(trip.return_date) if trip.return_date else None
         child_ages = profile.child_ages_at(depart)

@@ -46,15 +46,37 @@ const Modal = ({ title, children, onClose, wide }: { title: string; children: Re
   </div>
 );
 
-const JourneyDetails = ({ snapshot, returnDate }: { snapshot: any; returnDate?: string }) => {
-  if (!snapshot || !snapshot.offer_raw) return null;
-  let raw: any;
-  try {
-    // Check if it's already an object or needs parsing
-    raw = typeof snapshot.offer_raw === 'string' ? JSON.parse(snapshot.offer_raw) : snapshot.offer_raw;
-  } catch { return null; }
+const cronToHuman = (cron: string) => {
+  if (!cron) return 'Manual';
+  if (cron === '0 7 * * *') return 'Daily at 7am';
+  if (cron === '0 20 * * *') return 'Daily at 8pm';
+  if (cron === '0 0 * * *') return 'Daily at Midnight';
+  if (cron === '0 */4 * * *') return 'Every 4 hours';
+  if (cron === '0 */12 * * *') return 'Every 12 hours';
+  
+  const parts = cron.split(' ');
+  if (parts.length === 5) {
+    const [m, h, dom, mon, dow] = parts;
+    if (dom === '*' && mon === '*' && dow === '*') {
+      const hh = h.padStart(2, '0');
+      const mm = m.padStart(2, '0');
+      return `Daily at ${hh}:${mm}`;
+    }
+  }
+  return 'Custom Schedule';
+};
 
-  const legs = raw.fly_o_myte_legs;
+const JourneyDetails = ({ snapshot, returnDate }: { snapshot: any; returnDate?: string }) => {
+  if (!snapshot) return null;
+  
+  let legs = snapshot.fly_o_myte_legs;
+  if (!legs && snapshot.offer_raw) {
+    try {
+      const raw = typeof snapshot.offer_raw === 'string' ? JSON.parse(snapshot.offer_raw) : snapshot.offer_raw;
+      legs = raw.fly_o_myte_legs;
+    } catch { /* ignore */ }
+  }
+
   if (!legs) return null;
 
   const renderLegs = (title: string, journeyLegs: any[]) => {
@@ -95,7 +117,7 @@ const JourneyDetails = ({ snapshot, returnDate }: { snapshot: any; returnDate?: 
                 <div className="leg-card glass">
                    <div className="leg-airline">
                      <Plane size={14} className="leg-icon"/>
-                     <span className="bold">{leg.airline}</span> {leg.flight_number}
+                     <span className="bold">{leg.airline_code}</span> {leg.flight_number}
                    </div>
                    <div className="leg-times">
                      <div className="time-col">
@@ -235,6 +257,114 @@ const Sidebar = () => {
   );
 };
 
+const TripSettingsModal = ({ trip, profile, onClose, onSave, onDelete }: { trip: any, profile: any, onClose: () => void, onSave: (id: number, data: any) => void, onDelete: (id: number) => void }) => {
+  const [formData, setFormData] = useState({
+    label: trip.label,
+    adults: trip.adults,
+    children: (trip.children && trip.children.length > 0) ? trip.children : (profile?.children || []),
+    bags_per_person: trip.bags_per_person,
+    max_stops: trip.max_stops,
+    alert_email: trip.alert_email,
+    alert_threshold_aud: trip.alert_threshold_aud,
+    group_tag: trip.group_tag,
+    cron_schedule: trip.cron_schedule
+  });
+
+  return (
+    <Modal title={`Trip Settings: ${trip.label}`} onClose={onClose}>
+      <div className="settings-form">
+        <div className="input-group">
+          <label>Label</label>
+          <input type="text" value={formData.label} onChange={e => setFormData({...formData, label: e.target.value})} className="input-field" />
+        </div>
+        <div className="row">
+          <div className="input-group">
+            <label>Adults</label>
+            <input type="number" value={formData.adults} onChange={e => setFormData({...formData, adults: parseInt(e.target.value)})} className="input-field" />
+          </div>
+          <div className="input-group">
+            <label>Bags</label>
+            <input type="number" value={formData.bags_per_person} onChange={e => setFormData({...formData, bags_per_person: parseInt(e.target.value)})} className="input-field" />
+          </div>
+        </div>
+
+        <div className="children-list" style={{ marginBottom: '20px' }}>
+          <label>Children</label>
+          {formData.children.map((c: any, i: number) => (
+            <div key={i} className="child-row" style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <input type="text" value={c.name} onChange={e => {
+                const newChildren = [...formData.children];
+                newChildren[i].name = e.target.value;
+                setFormData({...formData, children: newChildren});
+              }} className="input-field" placeholder="Name" />
+              <input type="date" value={c.dob} onChange={e => {
+                const newChildren = [...formData.children];
+                newChildren[i].dob = e.target.value;
+                setFormData({...formData, children: newChildren});
+              }} className="input-field" />
+              <button type="button" className="btn-icon" onClick={() => {
+                setFormData({...formData, children: formData.children.filter((_: any, idx: number) => idx !== i)});
+              }}><Trash2 size={16} /></button>
+            </div>
+          ))}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
+            setFormData({...formData, children: [...formData.children, {name: '', dob: ''}]})
+          }}><Plus size={14} /> Add Child</button>
+        </div>
+
+        <div className="input-group">
+          <label>Max Stops</label>
+          <select value={formData.max_stops} onChange={e => setFormData({...formData, max_stops: parseInt(e.target.value)})} className="select-field">
+            <option value="0">Non-stop</option>
+            <option value="1">Up to 1 stop</option>
+            <option value="2">Up to 2 stops</option>
+          </select>
+        </div>
+        <div className="row">
+          <div className="input-group">
+            <label>Alert Email</label>
+            <input 
+              type="email" 
+              value={formData.alert_email || ''} 
+              onChange={e => setFormData({...formData, alert_email: e.target.value || null})} 
+              className="input-field" 
+              placeholder={`Default: ${profile?.alert_email || 'Not set'}`} 
+            />
+          </div>
+          <div className="input-group">
+            <label>Budget Threshold (AUD)</label>
+            <input 
+              type="number" 
+              value={formData.alert_threshold_aud || ''} 
+              onChange={e => setFormData({...formData, alert_threshold_aud: e.target.value ? parseFloat(e.target.value) : null})} 
+              className="input-field" 
+              placeholder="No limit" 
+            />
+          </div>
+        </div>
+        <div className="input-group">
+          <label>Group Tag (for multi-option sets)</label>
+          <input type="text" value={formData.group_tag || ''} onChange={e => setFormData({...formData, group_tag: e.target.value || null})} className="input-field" placeholder="e.g. Europe-Summer-26" />
+        </div>
+        <div className="input-group">
+          <label>Polling Schedule</label>
+          <select value={formData.cron_schedule} onChange={e => setFormData({...formData, cron_schedule: e.target.value})} className="select-field">
+            <option value="0 7 * * *">Daily at 7am</option>
+            <option value="0 20 * * *">Daily at 8pm</option>
+            <option value="0 0 * * *">Daily at Midnight</option>
+            <option value="0 */4 * * *">Every 4 hours</option>
+            <option value="0 */12 * * *">Every 12 hours</option>
+          </select>
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-danger" onClick={() => onDelete(trip.id)}>Delete Trip</button>
+          <button className="btn btn-primary" onClick={() => onSave(trip.id, formData)}>Save Changes</button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 const Dashboard = () => {
   const [trips, setTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -245,6 +375,7 @@ const Dashboard = () => {
   const [flexResults, setFlexResults] = useState<any[]>([]);
   const [flexLoading, setFlexLoading] = useState(false);
   const [flexError, setFlexError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<any>(null);
 
   const fetchTrips = () => {
     setLoading(true);
@@ -258,6 +389,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchTrips();
+    fetch('/api/profile').then(res => res.json()).then(setProfile);
     const handler = () => fetchTrips();
     window.addEventListener('fom:recomputed', handler);
     return () => window.removeEventListener('fom:recomputed', handler);
@@ -346,16 +478,24 @@ const Dashboard = () => {
             </div>
 
             <div className="card-body">
-              <div className="trip-dates">
-                <CalendarDays size={14} />
-                <span>{trip.depart_date}</span>
-                {trip.return_date && <span> — {trip.return_date}</span>}
-                {trip.depart_date && trip.return_date && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div className="trip-dates">
+                  <CalendarDays size={14} />
+                  <span>{trip.depart_date}</span>
+                  {trip.return_date && <span> — {trip.return_date}</span>}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Clock size={12} /> {cronToHuman(trip.cron_schedule)}
+                </div>
+              </div>
+
+              {trip.depart_date && trip.return_date && (
+                <div style={{ marginBottom: '8px' }}>
                   <span className="trip-days-badge">
                     {Math.round((new Date(trip.return_date).getTime() - new Date(trip.depart_date).getTime()) / 86400000)} days
                   </span>
-                )}
-              </div>
+                </div>
+              )}
               
               {trip.latest_snapshot && (
                 <div className="flight-info-summary" style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
@@ -485,60 +625,13 @@ const Dashboard = () => {
         )}
 
         {selectedTrip && (
-          <Modal title={`Trip Settings: ${selectedTrip.label}`} onClose={() => setSelectedTrip(null)}>
-            <div className="settings-form">
-              <div className="input-group">
-                <label>Label</label>
-                <input type="text" defaultValue={selectedTrip.label} id="t-label" className="input-field" />
-              </div>
-              <div className="row">
-                <div className="input-group">
-                  <label>Adults</label>
-                  <input type="number" defaultValue={selectedTrip.adults} id="t-adults" className="input-field" />
-                </div>
-                <div className="input-group">
-                  <label>Bags</label>
-                  <input type="number" defaultValue={selectedTrip.bags_per_person} id="t-bags" className="input-field" />
-                </div>
-              </div>
-              <div className="input-group">
-                <label>Max Stops</label>
-                <select defaultValue={selectedTrip.max_stops} id="t-stops" className="select-field">
-                  <option value="0">Non-stop</option>
-                  <option value="1">Up to 1 stop</option>
-                  <option value="2">Up to 2 stops</option>
-                </select>
-              </div>
-              <div className="row">
-                <div className="input-group">
-                  <label>Alert Email</label>
-                  <input type="email" defaultValue={selectedTrip.alert_email} id="t-email" className="input-field" placeholder="Default used if empty" />
-                </div>
-                <div className="input-group">
-                  <label>Budget Threshold (AUD)</label>
-                  <input type="number" defaultValue={selectedTrip.alert_threshold_aud} id="t-threshold" className="input-field" placeholder="No limit" />
-                </div>
-              </div>
-              <div className="input-group">
-                <label>Group Tag (for multi-option sets)</label>
-                <input type="text" defaultValue={selectedTrip.group_tag} id="t-tag" className="input-field" placeholder="e.g. Europe-Summer-26" />
-              </div>
-              <div className="modal-actions">
-                <button className="btn btn-danger" onClick={() => handleDelete(selectedTrip.id)}>Delete Trip</button>
-                <button className="btn btn-primary" onClick={() => {
-                  const label = (document.getElementById('t-label') as HTMLInputElement).value;
-                  const adults = parseInt((document.getElementById('t-adults') as HTMLInputElement).value);
-                  const bags = parseInt((document.getElementById('t-bags') as HTMLInputElement).value);
-                  const stops = parseInt((document.getElementById('t-stops') as HTMLSelectElement).value);
-                  const alert_email = (document.getElementById('t-email') as HTMLInputElement).value || null;
-                  const threshold_val = (document.getElementById('t-threshold') as HTMLInputElement).value;
-                  const alert_threshold_aud = threshold_val ? parseFloat(threshold_val) : null;
-                  const group_tag = (document.getElementById('t-tag') as HTMLInputElement).value || null;
-                  updateTrip(selectedTrip.id, { label, adults, bags_per_person: bags, max_stops: stops, alert_email, alert_threshold_aud, group_tag });
-                }}>Save Changes</button>
-              </div>
-            </div>
-          </Modal>
+          <TripSettingsModal 
+            trip={selectedTrip} 
+            profile={profile}
+            onClose={() => setSelectedTrip(null)} 
+            onSave={updateTrip}
+            onDelete={handleDelete}
+          />
         )}
 
         {flexTrip && (
@@ -669,6 +762,7 @@ const Scout = () => {
   const navigate = useNavigate();
   const [origin, setOrigin] = useState('BNE');
   const [dest, setDest] = useState('');
+  const [mode, setMode] = useState<'flexible' | 'exact'>('flexible');
   
   // Generate next 12 months dynamically
   const availableMonths = Array.from({ length: 12 }, (_, i) => {
@@ -680,6 +774,8 @@ const Scout = () => {
   
   const [months, setMonths] = useState<string[]>([availableMonths[0]]);
   const [tripLen, setTripLen] = useState(14);
+  const [departDate, setDepartDate] = useState('');
+  const [returnDate, setReturnDate] = useState('');
   const [scoutFlexDays, setScoutFlexDays] = useState(3);
   const [scouting, setScouting] = useState(false);
   const [results, setResults] = useState<any[]>([]);
@@ -746,18 +842,33 @@ const Scout = () => {
   
   // Adjust trip length if it exceeds new max
   useEffect(() => {
-    if (tripLen > maxPossibleDays) {
+    if (mode === 'flexible' && tripLen > maxPossibleDays) {
       setTripLen(Math.max(1, Math.min(14, maxPossibleDays)));
     }
-  }, [months]);
+  }, [months, mode]);
 
   const handleScout = () => {
     setScouting(true);
     setError(null);
+
+    const body: any = { origin, destination: dest, flex_days: scoutFlexDays };
+    if (mode === 'flexible') {
+      body.months = months;
+      body.trip_length = tripLen;
+    } else {
+      if (!departDate || !returnDate) {
+        setError("Please select both departure and return dates.");
+        setScouting(false);
+        return;
+      }
+      body.depart_date = departDate;
+      body.return_date = returnDate;
+    }
+
     fetch('/api/scout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ origin, destination: dest, months, trip_length: tripLen, flex_days: scoutFlexDays })
+      body: JSON.stringify(body)
     })
       .then(async res => {
         const data = await res.json();
@@ -786,6 +897,11 @@ const Scout = () => {
       )}
 
       <div className="scout-controls glass" style={{ position: 'relative' }}>
+        <div className="scout-mode-tabs">
+          <button className={`mode-tab ${mode === 'flexible' ? 'active' : ''}`} onClick={() => setMode('flexible')}>Flexible Months</button>
+          <button className={`mode-tab ${mode === 'exact' ? 'active' : ''}`} onClick={() => setMode('exact')}>Exact Dates</button>
+        </div>
+
         <AnimatePresence>
           {scouting && (
             <motion.div
@@ -802,7 +918,7 @@ const Scout = () => {
                 <RefreshCcw size={36} style={{ color: 'var(--primary)' }} />
               </motion.div>
               <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>
-                Scouting {months.length} month{months.length !== 1 ? 's' : ''}...
+                {mode === 'flexible' ? `Scouting ${months.length} month${months.length !== 1 ? 's' : ''}...` : 'Scouting exact dates...'}
               </p>
               <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
                 Checking fares across airlines. This may take a moment.
@@ -814,50 +930,65 @@ const Scout = () => {
           <AirportInput label="From (Origin)" value={origin} onChange={setOrigin} />
           <AirportInput label="To (Destination)" value={dest} onChange={setDest} placeholder="e.g. London, Bali, SYD" />
           
-          <div className="input-group" style={{ gridColumn: 'span 2' }}>
-            <label>Select Months (Max 3-month span)</label>
-            <div className="month-picker">
-              {availableMonths.map(m => (
-                <button 
-                  key={m} 
-                  className={`month-btn ${months.includes(m) ? 'active' : ''}`}
-                  onClick={() => toggleMonth(m)}
-                >
-                  {m.replace('-', ' ')}
-                </button>
-              ))}
-            </div>
-          </div>
+          {mode === 'flexible' ? (
+            <>
+              <div className="input-group" style={{ gridColumn: 'span 2' }}>
+                <label>Select Months (Max 3-month span)</label>
+                <div className="month-picker">
+                  {availableMonths.map(m => (
+                    <button 
+                      key={m} 
+                      className={`month-btn ${months.includes(m) ? 'active' : ''}`}
+                      onClick={() => toggleMonth(m)}
+                    >
+                      {m.replace('-', ' ')}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          <div className="input-group">
-            <label>Trip Length (Nights)</label>
-            <select
-              value={tripLen}
-              onChange={e => setTripLen(parseInt(e.target.value))}
-              className="select-field"
-            >
-              {[...Array(Math.min(90, maxPossibleDays))].map((_, i) => (
-                <option key={i+1} value={i+1}>{i+1} {i+1 === 1 ? 'night' : 'nights'}</option>
-              ))}
-            </select>
-          </div>
+              <div className="input-group">
+                <label>Trip Length (Nights)</label>
+                <select
+                  value={tripLen}
+                  onChange={e => setTripLen(parseInt(e.target.value))}
+                  className="select-field"
+                >
+                  {[...Array(Math.min(90, maxPossibleDays))].map((_, i) => (
+                    <option key={i+1} value={i+1}>{i+1} {i+1 === 1 ? 'night' : 'nights'}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="input-group">
+                <label>Departure Date</label>
+                <input type="date" value={departDate} onChange={e => setDepartDate(e.target.value)} className="input-field" min={new Date().toISOString().split('T')[0]} />
+              </div>
+              <div className="input-group">
+                <label>Return Date</label>
+                <input type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)} className="input-field" min={departDate || new Date().toISOString().split('T')[0]} />
+              </div>
+            </>
+          )}
 
           <div className="input-group">
             <label>Date Flex (±days)</label>
             <input
               type="number"
-              min={1}
+              min={0}
               max={14}
               value={scoutFlexDays}
-              onChange={e => setScoutFlexDays(Math.max(1, Math.min(14, parseInt(e.target.value) || 3)))}
+              onChange={e => setScoutFlexDays(Math.max(0, Math.min(14, parseInt(e.target.value) || 0)))}
               className="input-field"
               placeholder="3"
             />
           </div>
         </div>
-        <button className="btn btn-primary btn-lg" onClick={handleScout} disabled={scouting || !origin || !dest || months.length === 0}>
+        <button className="btn btn-primary btn-lg" onClick={handleScout} disabled={scouting || !origin || !dest || (mode === 'flexible' && months.length === 0) || (mode === 'exact' && (!departDate || !returnDate))}>
           {scouting ? <RefreshCcw className="animate-spin" /> : <Search />}
-          <span>Explore Selected Months</span>
+          <span>{mode === 'flexible' ? 'Explore Selected Months' : 'Search Exact Dates'}</span>
         </button>
       </div>
 
@@ -944,6 +1075,8 @@ const Scout = () => {
                       airline_code: r.airline_code,
                       stops: r.stops,
                       departure_time: r.departure_time,
+                      return_departure_time: r.return_departure_time,
+                      return_arrival_time: r.return_arrival_time,
                       duration_minutes: r.duration_minutes,
                       offer_raw: r.offer_raw || null,
                     }
@@ -960,15 +1093,92 @@ const Scout = () => {
 
 const Monitoring = () => {
   const [cron, setCron] = useState<any>(null);
+  const [trips, setTrips] = useState<any[]>([]);
   const [stats, setStats] = useState({ total_trips: 0, active: 0, snapshots: 0 });
+  const [selectedTrips, setSelectedTrips] = useState<Set<number>>(new Set());
+  const [editingCronId, setEditingCronId] = useState<number | null>(null);
+  const [tempCron, setTempCron] = useState("");
+  const [refreshing, setRefreshing] = useState<Set<number>>(new Set());
 
-  useEffect(() => {
+  const fetchData = () => {
     fetch('/api/cron').then(res => res.json()).then(setCron);
     fetch('/api/trips').then(res => res.json()).then(data => {
+      setTrips(data);
       const active = data.filter((t: any) => t.is_active).length;
-      setStats({ total_trips: data.length, active, snapshots: data.reduce((acc: number, t: any) => acc + (t.snapshots_count || 10), 0) });
+      setStats({ 
+        total_trips: data.length, 
+        active, 
+        snapshots: data.reduce((acc: number, t: any) => acc + (t.snapshots_count || 10), 0) 
+      });
     });
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
+
+  const toggleTrip = (id: number) => {
+    fetch(`/api/trips/${id}/toggle`, { method: 'POST' }).then(() => fetchData());
+  };
+
+  const refreshTrip = (id: number) => {
+    setRefreshing(prev => new Set(prev).add(id));
+    fetch(`/api/trips/${id}/refresh`, { method: 'POST' })
+      .then(() => {
+        setRefreshing(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        fetchData();
+      });
+  };
+
+  const handleBulkRefresh = () => {
+    const promises = Array.from(selectedTrips).map(id => {
+      setRefreshing(prev => new Set(prev).add(id));
+      return fetch(`/api/trips/${id}/refresh`, { method: 'POST' });
+    });
+    Promise.all(promises).then(() => {
+      setRefreshing(new Set());
+      fetchData();
+    });
+  };
+
+  const startEditingCron = (trip: any) => {
+    setEditingCronId(trip.id);
+    setTempCron(trip.cron_schedule || "0 7 * * *");
+  };
+
+  const saveCron = (id: number) => {
+    fetch(`/api/trips/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cron_schedule: tempCron })
+    }).then(() => {
+      setEditingCronId(null);
+      fetchData();
+    });
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedTrips(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedTrips.size === trips.length) setSelectedTrips(new Set());
+    else setSelectedTrips(new Set(trips.map(t => t.id)));
+  };
+
+  const getNextRun = (tripId: number) => {
+    const job = cron?.jobs?.find((j: any) => j.id === `poll_trip_${tripId}`);
+    return job?.next_run;
+  };
 
   return (
     <div className="view monitoring-view">
@@ -1002,21 +1212,98 @@ const Monitoring = () => {
       </div>
 
       <div className="monitoring-details glass">
-        <h3>Cron Configuration</h3>
-        <div className="cron-status">
-          <div className="cron-line">{cron?.cron_lines?.[0] || "No active cron job found."}</div>
-          <button className="btn btn-ghost">Edit Cron</button>
-        </div>
-        <div className="status-log">
-          <div className="log-entry success">
-            <CheckCircle2 size={14} />
-            <span>Poll complete (12:00 PM) - 8 trips updated.</span>
-          </div>
-          <div className="log-entry success">
-            <CheckCircle2 size={14} />
-            <span>SerpAPI quota check: 82/100 remaining.</span>
+        <div className="mon-table-header">
+          <h3>Managed Trips</h3>
+          <div className="mon-table-actions">
+            {selectedTrips.size > 0 && (
+              <button className="btn btn-primary btn-sm" onClick={handleBulkRefresh}>
+                <RefreshCcw size={14} className={refreshing.size > 0 ? "spin" : ""} /> Refresh Selected ({selectedTrips.size})
+              </button>
+            )}
+            <button className="btn btn-ghost btn-sm" onClick={() => fetch('/api/cron', {method: 'POST'}).then(() => fetchData())}>
+              Sync Scheduler
+            </button>
           </div>
         </div>
+
+        <table className="monitoring-table">
+          <thead>
+            <tr>
+              <th style={{ width: '40px' }}>
+                <input type="checkbox" checked={selectedTrips.size === trips.length && trips.length > 0} onChange={toggleAll} />
+              </th>
+              <th>Trip Details</th>
+              <th>Status</th>
+              <th>Schedule (Cron)</th>
+              <th>Next Run</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {trips.map(trip => (
+              <tr key={trip.id}>
+                <td>
+                  <input type="checkbox" checked={selectedTrips.has(trip.id)} onChange={() => toggleSelect(trip.id)} />
+                </td>
+                <td>
+                  <div className="trip-cell">
+                    <span className="trip-name">{trip.label}</span>
+                    <span className="trip-route">{trip.origin} → {trip.destination}</span>
+                  </div>
+                </td>
+                <td>
+                  <div className="action-btns" style={{ alignItems: 'center' }}>
+                    <button 
+                      className={`btn-toggle ${trip.is_active ? 'on' : ''}`} 
+                      onClick={() => toggleTrip(trip.id)}
+                      title={trip.is_active ? "Deactivate" : "Activate"}
+                    >
+                      <div className="toggle-thumb" />
+                    </button>
+                    <span className={`status-badge ${trip.is_active ? 'active' : 'inactive'}`}>
+                      {trip.is_active ? 'Polling' : 'Paused'}
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  {editingCronId === trip.id ? (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input 
+                        type="text" 
+                        value={tempCron} 
+                        onChange={e => setTempCron(e.target.value)}
+                        className="input-field"
+                        style={{ padding: '4px 8px', fontSize: '0.8rem', width: '100px', margin: 0 }}
+                        autoFocus
+                      />
+                      <button className="btn-icon" onClick={() => saveCron(trip.id)}><CheckCircle2 size={16} /></button>
+                      <button className="btn-icon" onClick={() => setEditingCronId(null)}><X size={16} /></button>
+                    </div>
+                  ) : (
+                    <div className="cron-cell" onClick={() => startEditingCron(trip)} title="Click to edit schedule">
+                      {trip.cron_schedule}
+                    </div>
+                  )}
+                </td>
+                <td>
+                  <span className="dim-text" style={{ fontSize: '0.8rem' }}>
+                    {trip.is_active ? (getNextRun(trip.id) ? new Date(getNextRun(trip.id)).toLocaleString() : 'Pending...') : '—'}
+                  </span>
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  <button 
+                    className="btn btn-ghost btn-sm" 
+                    onClick={() => refreshTrip(trip.id)}
+                    disabled={refreshing.has(trip.id)}
+                  >
+                    <RefreshCcw size={14} className={refreshing.has(trip.id) ? "spin" : ""} />
+                    {refreshing.has(trip.id) ? "Polling..." : "Manual Poll"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
