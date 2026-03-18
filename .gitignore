@@ -70,6 +70,15 @@ node_modules/
 .last-branch
 progress.txt
 
+# Internal / Project Management
+scripts/ralph/
+USER_STORIES.md
+prd.json
+CLAUDE.md
+CHANGELOG.md
+docs/exec-plans/
+docs/design-docs/
+
 # Scratch/test scripts
 debug_scout.py
 test_flex.py

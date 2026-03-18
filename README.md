@@ -4,6 +4,8 @@ The smart travel expense optimizer for Australian families. Tracks the specific 
 
 Fly-O-Myte calculates the **True Family Cost** including bags, seat selection, and infant fees, ensuring you never get surprised by "budget" airline add-ons.
 
+![alt text](image.png)
+
 ---
 
 ## 🛠️ Prerequisites
