@@ -6,6 +6,13 @@ Fly-O-Myte calculates the **True Family Cost** including bags, seat selection, a
 
 ---
 
+## 🛠️ Prerequisites
+
+Before installing, ensure you have the following installed:
+- **Python 3.11+**
+- **Node.js 18+** (v20+ recommended)
+- **uv** (Python package manager: `curl -LsSf https://astral.sh/uv/install.sh | sh`)
+
 ## 🚀 Quick Start (Web UI)
 
 The recommended way to use Fly-O-Myte is via the modern Web UI.
@@ -14,6 +21,7 @@ The recommended way to use Fly-O-Myte is via the modern Web UI.
    ```bash
    make install
    ```
+   *This will sync both Python and Node.js dependencies.*
 
 2. **Configure Your Family**
    Set up your passengers, origin airport, and school holiday state in the **Family Profile** tab.

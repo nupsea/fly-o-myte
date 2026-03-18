@@ -4,7 +4,7 @@
 
 install:
 	uv sync --all-extras
-
+	cd ui && npm install
 # ─── Development ──────────────────────────────────────────────────────────────
 
 dev:
