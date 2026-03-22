@@ -22,20 +22,33 @@ from fly_o_myte.config import (
 from fly_o_myte.db.sqlite import (
     PriceSnapshot,
     Trip,
+    TripCampaign,
+    archive_trip,
     create_db_engine,
     create_tables,
     delete_trip,
+    get_active_variant,
+    get_campaign,
+    get_campaign_snapshots,
+    get_campaign_variants,
     get_flex_cache,
     get_latest_recommendation,
     get_latest_snapshot,
     get_session,
+    insert_campaign,
     insert_snapshot,
     insert_trip,
     list_all_trips,
+    list_campaigns,
     set_flex_cache,
     set_trip_active,
 )
-from fly_o_myte.scheduler import start_scheduler, stop_scheduler, update_trip_schedule
+from fly_o_myte.scheduler import (
+    start_scheduler,
+    stop_scheduler,
+    update_campaign_schedule,
+    update_trip_schedule,
+)
 
 
 @asynccontextmanager
@@ -133,6 +146,8 @@ class TripCreate(BaseModel):
     return_date: str | None = None
     label: str | None = None
     group_tag: str | None = None
+    campaign_id: int | None = None  # link to existing campaign
+    campaign_name: str | None = None  # auto-create campaign if provided
     cron_schedule: str | None = "0 7 * * *"
     offer_seed: OfferSeed | None = None  # if provided, skip SerpAPI poll
 
@@ -142,12 +157,241 @@ class TripReplace(BaseModel):
     return_date: str | None = None
 
 
+class CampaignCreate(BaseModel):
+    name: str
+    origin: str
+    destination: str
+    budget_target_aud: float | None = None
+    notes: str = ""
+    cron_schedule: str = "0 7 * * *"
+    # Optional: create first trip variant immediately
+    depart_date: str | None = None
+    return_date: str | None = None
+    offer_seed: OfferSeed | None = None
+
+
+class CampaignUpdate(BaseModel):
+    name: str | None = None
+    status: str | None = None
+    budget_target_aud: float | None = None
+    notes: str | None = None
+    cron_schedule: str | None = None
+
+
 # ─── Endpoints ───────────────────────────────────────────────────────────────
 
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ─── Campaign Endpoints ──────────────────────────────────────────────────────
+
+
+@app.get("/campaigns")
+def get_campaigns_endpoint(session: Annotated[Session, Depends(get_db)]):
+    """List all campaigns with their active variant and latest recommendation."""
+    campaigns = list_campaigns(session)
+    result = []
+    for c in campaigns:
+        assert c.id is not None
+        active = get_active_variant(session, c.id)
+        rec = None
+        snap = None
+        if active and active.id is not None:
+            rec = get_latest_recommendation(session, active.id)
+            snap = get_latest_snapshot(session, active.id)
+        variants = get_campaign_variants(session, c.id)
+        result.append(
+            {
+                "id": c.id,
+                "name": c.name,
+                "origin": c.origin,
+                "destination": c.destination,
+                "status": c.status,
+                "budget_target_aud": c.budget_target_aud,
+                "notes": c.notes,
+                "cron_schedule": c.cron_schedule,
+                "created_at": c.created_at,
+                "active_variant": active,
+                "recommendation": rec,
+                "latest_snapshot": snap,
+                "variant_count": len(variants),
+                "total_snapshots": len(get_campaign_snapshots(session, c.id)),
+            }
+        )
+    return result
+
+
+@app.post("/campaigns")
+def create_campaign_endpoint(
+    data: CampaignCreate, session: Annotated[Session, Depends(get_db)]
+):
+    """Create a campaign, optionally with a first trip variant."""
+    import json as _json
+
+    campaign = insert_campaign(
+        session,
+        TripCampaign(
+            name=data.name,
+            origin=data.origin.upper(),
+            destination=data.destination.upper(),
+            budget_target_aud=data.budget_target_aud,
+            notes=data.notes,
+            cron_schedule=data.cron_schedule,
+        ),
+    )
+    assert campaign.id is not None
+    update_campaign_schedule(campaign)
+
+    # Auto-create first trip variant if dates provided
+    if data.depart_date:
+        profile = load_family_profile()
+        trip = Trip(
+            campaign_id=campaign.id,
+            label=f"{data.origin.upper()}-{data.destination.upper()} {data.depart_date}",
+            origin=data.origin.upper(),
+            destination=data.destination.upper(),
+            depart_date=data.depart_date,
+            return_date=data.return_date,
+            adults=profile.adults,
+            children_json=_json.dumps(
+                [{"name": c.name, "dob": str(c.dob)} for c in profile.children]
+            ),
+            bags_per_person=profile.bags_per_person,
+            max_stops=profile.max_stops,
+            cron_schedule=data.cron_schedule,
+        )
+        inserted_trip = insert_trip(session, trip)
+
+        if data.offer_seed:
+            seed = data.offer_seed
+            insert_snapshot(
+                session,
+                PriceSnapshot(
+                    trip_id=inserted_trip.id,
+                    source="serpapi",
+                    airline_code=seed.airline_code,
+                    base_fare_per_adult=seed.base_fare_per_adult,
+                    true_family_cost=seed.true_family_cost,
+                    true_cost_breakdown=_json.dumps(seed.true_cost_breakdown),
+                    stops=seed.stops,
+                    departure_time=seed.departure_time,
+                    return_departure_time=seed.return_departure_time,
+                    return_arrival_time=seed.return_arrival_time,
+                    duration_minutes=seed.duration_minutes or 0,
+                    offer_raw=_json.dumps(seed.offer_raw) if seed.offer_raw else "{}",
+                    rank=1,
+                ),
+            )
+
+    return campaign
+
+
+@app.get("/campaigns/{campaign_id}")
+def get_campaign_endpoint(
+    campaign_id: int, session: Annotated[Session, Depends(get_db)]
+):
+    """Campaign detail with all variants and aggregate info."""
+    campaign = get_campaign(session, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    variants = get_campaign_variants(session, campaign_id)
+    active = get_active_variant(session, campaign_id)
+    all_snaps = get_campaign_snapshots(session, campaign_id)
+
+    rec = None
+    if active and active.id is not None:
+        rec = get_latest_recommendation(session, active.id)
+
+    # Compute campaign-level stats
+    costs = [s.true_family_cost for s in all_snaps if s.rank == 1]
+    stats = {}
+    if costs:
+        stats = {
+            "total_data_points": len(costs),
+            "min_cost_seen": min(costs),
+            "max_cost_seen": max(costs),
+            "avg_cost": round(sum(costs) / len(costs), 2),
+            "latest_cost": costs[-1] if costs else None,
+        }
+
+    return {
+        "campaign": campaign,
+        "active_variant": active,
+        "variants": variants,
+        "recommendation": rec,
+        "stats": stats,
+    }
+
+
+@app.put("/campaigns/{campaign_id}")
+def update_campaign_endpoint(
+    campaign_id: int,
+    data: CampaignUpdate,
+    session: Annotated[Session, Depends(get_db)],
+):
+    campaign = get_campaign(session, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    if data.name is not None:
+        campaign.name = data.name
+    if data.status is not None:
+        campaign.status = data.status
+    if data.budget_target_aud is not None:
+        campaign.budget_target_aud = data.budget_target_aud
+    if data.notes is not None:
+        campaign.notes = data.notes
+    if data.cron_schedule is not None:
+        campaign.cron_schedule = data.cron_schedule
+
+    session.add(campaign)
+    session.commit()
+    session.refresh(campaign)
+    update_campaign_schedule(campaign)
+    return campaign
+
+
+@app.delete("/campaigns/{campaign_id}")
+def delete_campaign_endpoint(
+    campaign_id: int, session: Annotated[Session, Depends(get_db)]
+):
+    """Soft-delete: set status=cancelled, archive all variants."""
+    campaign = get_campaign(session, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    campaign.status = "cancelled"
+    session.add(campaign)
+
+    # Archive all variants
+    for variant in get_campaign_variants(session, campaign_id):
+        if variant.id is not None:
+            archive_trip(session, variant.id)
+
+    session.commit()
+    update_campaign_schedule(campaign)
+    return {"status": "cancelled"}
+
+
+@app.get("/campaigns/{campaign_id}/history")
+def get_campaign_history(
+    campaign_id: int,
+    session: Annotated[Session, Depends(get_db)],
+    limit: int = 100,
+):
+    """Full price history across all variants in a campaign."""
+    campaign = get_campaign(session, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    snaps = get_campaign_snapshots(session, campaign_id)
+    # Return most recent first, limited
+    snaps.reverse()
+    return snaps[:limit]
 
 
 @app.get("/airports/search")
@@ -266,6 +510,10 @@ def get_trips(session: Annotated[Session, Depends(get_db)]):
         assert trip.id is not None
         rec = get_latest_recommendation(session, trip.id)
         snap = get_latest_snapshot(session, trip.id)
+        campaign_name = None
+        if trip.campaign_id:
+            campaign = get_campaign(session, trip.campaign_id)
+            campaign_name = campaign.name if campaign else None
         result.append(
             {
                 "id": trip.id,
@@ -282,6 +530,8 @@ def get_trips(session: Annotated[Session, Depends(get_db)]):
                 "recommendation": rec,
                 "latest_snapshot": snap,
                 "group_tag": trip.group_tag,
+                "campaign_id": trip.campaign_id,
+                "campaign_name": campaign_name,
                 "alert_threshold_aud": trip.alert_threshold_aud,
                 "alert_email": trip.alert_email,
                 "cron_schedule": trip.cron_schedule,
@@ -296,11 +546,30 @@ def watch_trip(data: TripCreate, session: Annotated[Session, Depends(get_db)]):
 
     profile = load_family_profile()
     trip_label = data.label or f"{data.origin}-{data.destination} {data.depart_date}"
+    origin = data.origin.upper()
+    destination = data.destination.upper()
+
+    # Resolve or create campaign
+    campaign_id = data.campaign_id
+    if not campaign_id:
+        campaign_name = data.campaign_name or trip_label
+        campaign = insert_campaign(
+            session,
+            TripCampaign(
+                name=campaign_name,
+                origin=origin,
+                destination=destination,
+                cron_schedule=data.cron_schedule or "0 7 * * *",
+            ),
+        )
+        campaign_id = campaign.id
+        update_campaign_schedule(campaign)
 
     trip = Trip(
+        campaign_id=campaign_id,
         label=trip_label,
-        origin=data.origin.upper(),
-        destination=data.destination.upper(),
+        origin=origin,
+        destination=destination,
         depart_date=data.depart_date,
         return_date=data.return_date,
         adults=profile.adults,
@@ -311,7 +580,7 @@ def watch_trip(data: TripCreate, session: Annotated[Session, Depends(get_db)]):
         max_stops=profile.max_stops,
         group_tag=data.group_tag,
         alert_threshold_aud=profile.budget_threshold_aud,
-        alert_email=None,  # will use system default if null
+        alert_email=None,
         cron_schedule=data.cron_schedule or "0 7 * * *",
     )
 
@@ -320,7 +589,6 @@ def watch_trip(data: TripCreate, session: Annotated[Session, Depends(get_db)]):
     update_trip_schedule(inserted)
 
     if data.offer_seed:
-        # Seed snapshot directly from scout data — no SerpAPI call, same price as Scout
         seed = data.offer_seed
         insert_snapshot(
             session,
@@ -347,7 +615,6 @@ def watch_trip(data: TripCreate, session: Annotated[Session, Depends(get_db)]):
             seed.airline_code,
         )
     else:
-        # Fallback: fresh poll (uses SerpAPI quota)
         from fly_o_myte.tracker import build_plugin_manager_from_settings, poll_trip
 
         pm = build_plugin_manager_from_settings()
@@ -467,6 +734,11 @@ def refresh_trip(trip_id: int, session: Annotated[Session, Depends(get_db)]):
 def replace_trip_endpoint(
     trip_id: int, session: Annotated[Session, Depends(get_db)], data: TripReplace
 ):
+    """Archive the old trip variant and create a new one under the same campaign.
+
+    This preserves ALL price history — the recommender can use snapshots from
+    all variants in the campaign for smarter initial recommendations.
+    """
     from fly_o_myte.tracker import build_plugin_manager_from_settings, poll_trip
 
     old_trip = session.get(Trip, trip_id)
@@ -476,8 +748,12 @@ def replace_trip_endpoint(
     profile = load_family_profile()
     pm = build_plugin_manager_from_settings()
 
-    # Create new trip
+    # Archive the old variant (soft-delete — keeps all history)
+    archive_trip(session, trip_id)
+
+    # Create new variant under the SAME campaign
     new_trip = Trip(
+        campaign_id=old_trip.campaign_id,
         label=f"{old_trip.origin}-{old_trip.destination} {data.depart_date}",
         origin=old_trip.origin,
         destination=old_trip.destination,
@@ -488,15 +764,16 @@ def replace_trip_endpoint(
         bags_per_person=old_trip.bags_per_person,
         max_stops=old_trip.max_stops,
         alert_email=old_trip.alert_email,
+        alert_threshold_aud=old_trip.alert_threshold_aud,
         group_tag=old_trip.group_tag,
+        cron_schedule=old_trip.cron_schedule,
     )
 
-    # Delete old trip
-    delete_trip(session, trip_id)
-    # Insert new trip
     inserted = insert_trip(session, new_trip)
+    assert inserted.id is not None
+    update_trip_schedule(inserted)
 
-    # Do an initial poll with alerts enabled
+    # Poll the new variant — it will use campaign-level history automatically
     poll_trip(session, inserted, profile, pm, send_alerts=True)
 
     return inserted

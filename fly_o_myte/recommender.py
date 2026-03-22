@@ -164,6 +164,78 @@ class RecommendationResult:
     rationale: str
 
 
+# ─── Campaign-aware snapshot aggregation ──────────────────────────────────────
+
+
+def build_campaign_snapshots(
+    all_snapshots: list,  # list[PriceSnapshot] from all campaign variants
+    current_variant_id: int | None,
+    decay_factor: float = 0.7,
+) -> list[SnapshotPoint]:
+    """Build a recency-weighted snapshot list from all variants in a campaign.
+
+    Snapshots from the current active variant get full weight (1.0).
+    Snapshots from archived variants get exponentially decaying weight,
+    modelling their costs as less representative of current market conditions
+    but still informative for trend analysis.
+
+    The output is a unified list suitable for the standard compute() function.
+    Cost values from older variants are soft-blended toward the campaign average
+    to reduce noise from potentially different date-windows.
+
+    Args:
+        all_snapshots: PriceSnapshot objects from all variants in the campaign.
+        current_variant_id: Trip ID of the current active variant.
+        decay_factor: Weight decay per variant generation (0.7 = 30% discount per gen).
+    """
+    if not all_snapshots:
+        return []
+
+    # Group snapshots by variant (trip_id), keeping only rank-1
+    from collections import defaultdict
+
+    by_variant: dict[int, list] = defaultdict(list)
+    for s in all_snapshots:
+        if s.rank == 1:
+            by_variant[s.trip_id].append(s)
+
+    if not by_variant:
+        return []
+
+    # Sort variants by their newest snapshot (most recent variant first)
+    def _newest_ts(snaps: list) -> str:
+        return max(s.fetched_at for s in snaps)
+
+    sorted_variants = sorted(by_variant.items(), key=lambda x: _newest_ts(x[1]), reverse=True)
+
+    # Compute campaign-wide average cost for blending
+    all_costs = [s.true_family_cost for snaps in by_variant.values() for s in snaps]
+    campaign_avg = sum(all_costs) / len(all_costs) if all_costs else 0.0
+
+    result: list[SnapshotPoint] = []
+    for gen_index, (variant_id, snaps) in enumerate(sorted_variants):
+        is_current = variant_id == current_variant_id
+        weight = 1.0 if is_current else decay_factor ** (gen_index)
+
+        for s in snaps:
+            # Blend older variant costs toward campaign average
+            blended_cost = (
+                s.true_family_cost
+                if is_current
+                else s.true_family_cost * weight + campaign_avg * (1.0 - weight)
+            )
+            result.append(
+                SnapshotPoint(
+                    fetched_at=datetime.fromisoformat(s.fetched_at),
+                    true_family_cost=blended_cost,
+                )
+            )
+
+    # Sort by time for correct trend calculation
+    result.sort(key=lambda sp: sp.fetched_at)
+    return result
+
+
 # ─── Core computation ─────────────────────────────────────────────────────────
 
 

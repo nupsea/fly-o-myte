@@ -24,10 +24,32 @@ from sqlmodel import Field, Session, SQLModel, col, create_engine, select
 # ─── Table models ─────────────────────────────────────────────────────────────
 
 
-class Trip(SQLModel, table=True):
-    """A tracked flight search — the core entity."""
+class TripCampaign(SQLModel, table=True):
+    """A planning intent — the stable anchor across date changes.
+
+    Represents a family's intent to take a trip (e.g. 'Dec India Trip').
+    Persists across date adjustments, watch/monitor changes, and multiple
+    trip variants.  All analytics and history aggregate at this level.
+    """
 
     id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(index=True)  # e.g. "Dec India Trip"
+    origin: str = Field(index=True)  # IATA code
+    destination: str = Field(index=True)  # IATA code
+    status: str = "active"  # active | completed | cancelled
+    budget_target_aud: float | None = None
+    notes: str = Field(default="")
+    cron_schedule: str = Field(default="0 7 * * *")
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+
+class Trip(SQLModel, table=True):
+    """A tracked flight search — one date-specific variant of a campaign."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    campaign_id: int | None = Field(
+        default=None, foreign_key="tripcampaign.id", index=True
+    )
     label: str = Field(index=True)  # e.g. "Easter BNE-SYD 2026"
     origin: str = Field(index=True)  # IATA code
     destination: str = Field(index=True)  # IATA code
@@ -38,6 +60,7 @@ class Trip(SQLModel, table=True):
     bags_per_person: int = 1
     max_stops: int = 1
     is_active: int = 1  # 1 = tracking, 0 = paused
+    is_archived: int = 0  # 1 = soft-deleted variant, kept for history
     created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     alert_threshold_aud: float | None = None
     alert_email: str | None = None
@@ -188,6 +211,55 @@ def create_tables(engine) -> None:
             )
         conn.commit()
 
+        # Migration CAMPAIGN-1: campaign_id and is_archived on trip
+        res5 = conn.execute(sqlalchemy.text("PRAGMA table_info(trip)"))
+        trip_cols = [row[1] for row in res5]
+        if "campaign_id" not in trip_cols:
+            conn.execute(
+                sqlalchemy.text(
+                    "ALTER TABLE trip ADD COLUMN campaign_id INTEGER REFERENCES tripcampaign(id)"
+                )
+            )
+            conn.commit()
+            _logger.debug("Migrated trip table: added campaign_id column")
+        if "is_archived" not in trip_cols:
+            conn.execute(
+                sqlalchemy.text(
+                    "ALTER TABLE trip ADD COLUMN is_archived INTEGER DEFAULT 0"
+                )
+            )
+            conn.commit()
+            _logger.debug("Migrated trip table: added is_archived column")
+
+        # Migration CAMPAIGN-2: auto-wrap orphan trips in campaigns
+        orphans = conn.execute(
+            sqlalchemy.text(
+                "SELECT id, label, origin, destination, cron_schedule, created_at "
+                "FROM trip WHERE campaign_id IS NULL"
+            )
+        ).fetchall()
+        for orphan in orphans:
+            tid, label, origin, dest, cron, created = orphan
+            result = conn.execute(
+                sqlalchemy.text(
+                    "INSERT INTO tripcampaign (name, origin, destination, status, notes, cron_schedule, created_at) "
+                    "VALUES (:name, :origin, :dest, 'active', '', :cron, :created)"
+                ),
+                {"name": label, "origin": origin, "dest": dest, "cron": cron, "created": created},
+            )
+            campaign_id = result.lastrowid
+            conn.execute(
+                sqlalchemy.text(
+                    "UPDATE trip SET campaign_id = :cid WHERE id = :tid"
+                ),
+                {"cid": campaign_id, "tid": tid},
+            )
+        if orphans:
+            conn.commit()
+            _logger.info(
+                "Auto-migrated %d orphan trip(s) into campaigns", len(orphans)
+            )
+
 
 @contextmanager
 def get_session(engine) -> Generator[Session, None, None]:
@@ -210,11 +282,21 @@ def get_trip(session: Session, trip_id: int) -> Trip | None:
 
 
 def list_active_trips(session: Session) -> list[Trip]:
-    return list(session.exec(select(Trip).where(Trip.is_active == 1)))
+    return list(
+        session.exec(
+            select(Trip).where(Trip.is_active == 1, Trip.is_archived == 0)
+        )
+    )
 
 
 def list_all_trips(session: Session) -> list[Trip]:
-    return list(session.exec(select(Trip).order_by(col(Trip.created_at).desc())))
+    return list(
+        session.exec(
+            select(Trip)
+            .where(Trip.is_archived == 0)
+            .order_by(col(Trip.created_at).desc())
+        )
+    )
 
 
 def set_trip_active(session: Session, trip_id: int, active: bool) -> None:
@@ -329,6 +411,86 @@ def mark_email_sent(session: Session, rec_id: int) -> None:
     rec = session.get(Recommendation, rec_id)
     if rec:
         rec.email_sent = 1
+        session.commit()
+
+
+# ─── Campaign CRUD helpers ─────────────────────────────────────────────────────
+
+
+def insert_campaign(session: Session, campaign: TripCampaign) -> TripCampaign:
+    session.add(campaign)
+    session.commit()
+    session.refresh(campaign)
+    return campaign
+
+
+def get_campaign(session: Session, campaign_id: int) -> TripCampaign | None:
+    return session.get(TripCampaign, campaign_id)
+
+
+def list_campaigns(session: Session, include_cancelled: bool = False) -> list[TripCampaign]:
+    q = select(TripCampaign).order_by(col(TripCampaign.created_at).desc())
+    if not include_cancelled:
+        q = q.where(TripCampaign.status != "cancelled")
+    return list(session.exec(q))
+
+
+def get_active_variant(session: Session, campaign_id: int) -> Trip | None:
+    """Return the single active (non-archived) trip variant for a campaign."""
+    result = session.exec(
+        select(Trip)
+        .where(
+            Trip.campaign_id == campaign_id,
+            Trip.is_active == 1,
+            Trip.is_archived == 0,
+        )
+        .limit(1)
+    )
+    return result.first()
+
+
+def get_campaign_variants(
+    session: Session, campaign_id: int, include_archived: bool = True
+) -> list[Trip]:
+    """Return all trip variants for a campaign, newest first."""
+    q = (
+        select(Trip)
+        .where(Trip.campaign_id == campaign_id)
+        .order_by(col(Trip.created_at).desc())
+    )
+    if not include_archived:
+        q = q.where(Trip.is_archived == 0)
+    return list(session.exec(q))
+
+
+def get_campaign_snapshots(
+    session: Session, campaign_id: int
+) -> list[PriceSnapshot]:
+    """Return all snapshots across all variants in a campaign, ordered by time."""
+    variant_ids = [
+        t.id
+        for t in session.exec(
+            select(Trip).where(Trip.campaign_id == campaign_id)
+        )
+        if t.id is not None
+    ]
+    if not variant_ids:
+        return []
+    return list(
+        session.exec(
+            select(PriceSnapshot)
+            .where(col(PriceSnapshot.trip_id).in_(variant_ids))
+            .order_by(PriceSnapshot.fetched_at)
+        )
+    )
+
+
+def archive_trip(session: Session, trip_id: int) -> None:
+    """Soft-delete a trip variant — keeps all history intact."""
+    trip = session.get(Trip, trip_id)
+    if trip:
+        trip.is_archived = 1
+        trip.is_active = 0
         session.commit()
 
 

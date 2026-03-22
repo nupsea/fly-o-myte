@@ -46,7 +46,7 @@ from fly_o_myte.price_sources.serpapi import (
     detect_airport_country,
 )
 from fly_o_myte.price_sources.tequila import TequilaPriceSource
-from fly_o_myte.recommender import RouteType, SnapshotPoint, classify_route, compute
+from fly_o_myte.recommender import RouteType, SnapshotPoint, build_campaign_snapshots, classify_route, compute
 from fly_o_myte.true_cost import (
     TrueCostBreakdown,
     compute_family_score,
@@ -227,17 +227,27 @@ def poll_trip(
     # ─── 4. Build recommendation (rank-1 offer only) ──────────────────────
     primary_offer, primary_breakdown, _ = offers_with_data[0]
 
-    snapshots = get_snapshots_for_trip(session, trip.id)
-    # Use only rank-1 snapshots for recommendation history
-    # (rank-2/3 are alternatives at the same timestamp and should not skew history)
-    snap_points = [
-        SnapshotPoint(
-            fetched_at=datetime.fromisoformat(s.fetched_at),
-            true_family_cost=s.true_family_cost,
+    # Campaign-aware history: use snapshots from all variants in the campaign
+    # so date changes don't reset the recommendation engine.
+    if trip.campaign_id:
+        from fly_o_myte.db.sqlite import get_campaign_snapshots
+
+        all_campaign_snaps = get_campaign_snapshots(session, trip.campaign_id)
+        snap_points = build_campaign_snapshots(
+            all_campaign_snaps, current_variant_id=trip.id
         )
-        for s in snapshots
-        if s.rank == 1
-    ]
+    else:
+        snapshots = get_snapshots_for_trip(session, trip.id)
+        # Use only rank-1 snapshots for recommendation history
+        # (rank-2/3 are alternatives at the same timestamp and should not skew history)
+        snap_points = [
+            SnapshotPoint(
+                fetched_at=datetime.fromisoformat(s.fetched_at),
+                true_family_cost=s.true_family_cost,
+            )
+            for s in snapshots
+            if s.rank == 1
+        ]
 
     days_to_departure = (depart - date.today()).days
 
@@ -293,8 +303,8 @@ def poll_trip(
     )
 
     # ─── 5. Send alerts ────────────────────────────────────────────────────
-    # Identify if this is the first primary snapshot for this trip
-    is_initial_poll = len([s for s in snapshots if s.rank == 1]) <= 1
+    # Identify if this is the first primary snapshot for this trip/campaign
+    is_initial_poll = len(snap_points) <= 1
 
     # Trigger if it's a "book_now", below user's threshold, OR if it's the first poll
     is_book_now = result.decision == "book_now"
