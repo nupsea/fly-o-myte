@@ -31,6 +31,8 @@ const Dashboard = () => {
   const [flexError, setFlexError] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
+  const [pollingAll, setPollingAll] = useState(false);
+  const [refreshingTrips, setRefreshingTrips] = useState<Set<number>>(new Set());
 
   const fetchCampaigns = () => {
     setLoading(true);
@@ -84,7 +86,17 @@ const Dashboard = () => {
   };
 
   const handleRefresh = (tid: number) => {
-    fetch(`/api/trips/${tid}/refresh`, { method: 'POST' }).then(() => fetchCampaigns());
+    setRefreshingTrips(prev => new Set(prev).add(tid));
+    fetch(`/api/trips/${tid}/refresh`, { method: 'POST' })
+      .then(() => fetchCampaigns())
+      .finally(() => setRefreshingTrips(prev => { const next = new Set(prev); next.delete(tid); return next; }));
+  };
+
+  const handlePollAll = () => {
+    setPollingAll(true);
+    fetch('/api/poll', { method: 'POST' })
+      .then(() => fetchCampaigns())
+      .finally(() => setPollingAll(false));
   };
 
   const handleDeleteCampaign = (cid: number) => {
@@ -140,19 +152,20 @@ const Dashboard = () => {
             background: 'linear-gradient(135deg, #0f172a 0%, #3b82f6 100%)',
             WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent',
             marginBottom: '8px'
-          }}>Campaign Command Center</h1>
+          }}>Flight Watch</h1>
           <p className="subtitle" style={{ fontSize: '1.1rem', color: '#475569', maxWidth: '600px' }}>
-            Tracking {campaigns.length} flight campaign{campaigns.length !== 1 ? 's' : ''} across multiple date variants. Total analytics and continuous polling managed automatically.
+            Tracking {campaigns.length} flight watch{campaigns.length !== 1 ? 'es' : ''} across multiple date windows. Prices polled automatically, so you never miss a drop.
           </p>
         </div>
         <div className="header-actions" style={{ position: 'relative', zIndex: 1, alignSelf: 'center' }}>
-          <button className="btn btn-primary" style={{
+          <button className="btn btn-primary" disabled={pollingAll} style={{
             padding: '12px 24px', fontSize: '1rem', borderRadius: '14px',
-            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-            boxShadow: '0 10px 25px -5px rgba(37,99,235,0.4), inset 0 1px 0 rgba(255,255,255,0.2)'
-          }} onClick={() => fetch('/api/poll', {method: 'POST'}).then(() => fetchCampaigns())}>
-            <RefreshCcw size={18} />
-            <span>Poll All Data Now</span>
+            background: pollingAll ? 'linear-gradient(135deg, #93c5fd, #60a5fa)' : 'linear-gradient(135deg, #3b82f6, #2563eb)',
+            boxShadow: '0 10px 25px -5px rgba(37,99,235,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+            cursor: pollingAll ? 'wait' : 'pointer'
+          }} onClick={handlePollAll}>
+            <RefreshCcw size={18} className={pollingAll ? 'spin-icon' : ''} />
+            <span>{pollingAll ? 'Polling…' : 'Poll All Data Now'}</span>
           </button>
         </div>
       </header>
@@ -169,9 +182,10 @@ const Dashboard = () => {
           const trip = campaign.active_variant;
           const rec = campaign.recommendation;
           const snap = campaign.latest_snapshot;
+          const isPaused = campaign.status !== 'active' || (trip && trip.is_active === 0);
 
           return (
-            <motion.div key={campaign.id} className="trip-card glass" layoutId={`campaign-${campaign.id}`}>
+            <motion.div key={campaign.id} className={`trip-card glass ${isPaused ? 'paused-campaign' : ''}`} layoutId={`campaign-${campaign.id}`}>
               <div className="card-top">
                 <div className="route">
                   <span className="iata">{campaign.origin}</span>
@@ -193,40 +207,43 @@ const Dashboard = () => {
 
               <div className="card-body">
                 {trip ? (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <div className="trip-dates">
-                        <CalendarDays size={14} />
-                        <span>{trip.depart_date}</span>
-                        {trip.return_date && <span> — {trip.return_date}</span>}
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Clock size={12} /> {cronToHuman(campaign.cron_schedule)}
-                      </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <div className="trip-dates">
+                      <CalendarDays size={14} />
+                      <span>{trip.depart_date}</span>
+                      {trip.return_date && <span> — {trip.return_date}</span>}
                     </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={12} /> {cronToHuman(campaign.cron_schedule)}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: '8px', color: 'var(--text-muted)', fontSize: '0.8125rem', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CalendarDays size={14} /> Dates not set (Monitoring paused)
+                  </div>
+                )}
 
-                    {trip.depart_date && trip.return_date && (
-                      <div style={{ marginBottom: '8px' }}>
-                        <span className="trip-days-badge">
-                          {Math.round((new Date(trip.return_date).getTime() - new Date(trip.depart_date).getTime()) / 86400000)} days
-                        </span>
-                      </div>
-                    )}
+                {trip && trip.depart_date && trip.return_date && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <span className="trip-days-badge">
+                      {Math.round((new Date(trip.return_date).getTime() - new Date(trip.depart_date).getTime()) / 86400000)} days
+                    </span>
+                  </div>
+                )}
 
-                    {snap && (
-                      <div className="flight-info-summary" style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                        <strong>{snap.airline_code}</strong> &middot; {snap.stops} stop{snap.stops !== 1 ? 's' : ''} &middot; departs {snap.departure_time}
-                      </div>
-                    )}
-
+                {snap ? (
+                  <>
+                    <div className="flight-info-summary" style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                      <strong>{snap.airline_code}</strong> &middot; {snap.stops} stop{snap.stops !== 1 ? 's' : ''} &middot; departs {snap.departure_time}
+                    </div>
                     <div className="price-display">
-                      <span className="price">${snap?.true_family_cost?.toLocaleString() || '---'}</span>
+                      <span className="price">${snap.true_family_cost?.toLocaleString() || '---'}</span>
                       <span className="currency">AUD</span>
                     </div>
                   </>
                 ) : (
                   <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>
-                    No active variant — dates not yet set
+                    No price data yet
                   </div>
                 )}
 
@@ -262,7 +279,7 @@ const Dashboard = () => {
               <div className="card-footer">
                 <button className="btn btn-ghost btn-sm" onClick={() => openCampaignDetails(campaign)}>Details & History</button>
                 {trip && <button className="btn btn-light btn-sm" onClick={() => openFlex(trip)}>Find Better Dates</button>}
-                {trip && <button className="btn btn-icon btn-sm" onClick={() => handleRefresh(trip.id)} title="Manual Refresh"><RefreshCcw size={14} /></button>}
+                {trip && <button className="btn btn-icon btn-sm" disabled={refreshingTrips.has(trip.id)} onClick={() => handleRefresh(trip.id)} title="Manual Refresh"><RefreshCcw size={14} className={refreshingTrips.has(trip.id) ? 'spin-icon' : ''} /></button>}
               </div>
             </motion.div>
           );
@@ -356,9 +373,17 @@ const Dashboard = () => {
                           <span>{timeStr}</span>
                         </div>
                         <div className="history-group-items">
-                          {snaps
-                            .sort((a: any, b: any) => a.true_family_cost - b.true_family_cost)
-                            .map((snap: any, i: number) => {
+                          {(() => {
+                            const seen = new Set();
+                            return snaps
+                              .sort((a: any, b: any) => a.true_family_cost - b.true_family_cost)
+                              .filter((snap: any) => {
+                                 const key = `${snap.rank}-${snap.true_family_cost}-${snap.airline_code}-${snap.departure_time}`;
+                                 if (seen.has(key)) return false;
+                                 seen.add(key);
+                                 return true;
+                              })
+                              .map((snap: any, i: number) => {
                             const isRank1 = snap.rank === 1;
                             return (
                               <div key={i} className={`history-row ${isRank1 ? 'rank-1' : 'rank-alt'}`}>
@@ -373,7 +398,8 @@ const Dashboard = () => {
                                 <span className="h-price">${snap.true_family_cost}</span>
                               </div>
                             );
-                          })}
+                          });
+                          })()}
                         </div>
                       </div>
                     ))}

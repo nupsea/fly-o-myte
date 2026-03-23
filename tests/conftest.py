@@ -255,8 +255,14 @@ class _StubTequilaSource:
                 stops=0,
                 departure_time="10:30",
                 arrival_time="12:10",
+                return_departure_time="14:00",
+                return_arrival_time="15:40",
                 duration_minutes=100,
                 price_level_signal=None,
+                # Must be explicit: FlightOffer uses Pydantic Field() in a @dataclass,
+                # so the default_factory is not invoked — the FieldInfo object becomes
+                # the default. Always pass these to avoid FieldInfo in serialised output.
+                fly_o_myte_legs={"onward": [], "return": []},
                 offer_raw={},
             )
         ]

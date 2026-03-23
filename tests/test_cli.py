@@ -588,7 +588,7 @@ class TestInternationalRouteCheck:
 
 
 class TestPlanCommand:
-    """S35: fom plan command — structured fallback when ANTHROPIC_API_KEY unset."""
+    """S35: fom plan command — structured fallback when OPENAI_API_KEY unset."""
 
     @pytest.fixture(autouse=True)
     def fresh_db(self, tmp_path, monkeypatch):
@@ -610,7 +610,7 @@ class TestPlanCommand:
         result = runner.invoke(app, ["plan"], input="Sri Lanka\ndec-2026\n7\n3\n")
         assert result.exit_code == 0
         # Should show the API key note
-        assert "ANTHROPIC_API_KEY not set" in result.output
+        assert "OPENAI_API_KEY not set" in result.output
         # Should show no results (empty PM in test env)
         assert "No results" in result.output or "CMB" in result.output
 

@@ -12,12 +12,17 @@ dev:
 	@$(MAKE) app
 
 app:
-	@echo "Clearing port 8001 and starting Fly-O-Myte UI..."
+	@echo ""
+	@echo "╔══════════════════════════════════════════════════════╗"
+	@echo "║           ✈  Fly-O-Myte  — Starting Up              ║"
+	@echo "╚══════════════════════════════════════════════════════╝"
+	@echo ""
 	@lsof -ti:8001 | xargs kill -9 2>/dev/null || true
-	@echo "Backend: http://localhost:8001"
-	@echo "Frontend: http://localhost:5173"
+	@echo "[$(shell date '+%H:%M:%S')] 🔧 Backend: http://localhost:8001"
+	@echo "[$(shell date '+%H:%M:%S')] 🌐 Frontend: http://localhost:5173"
+	@echo ""
 	@(trap 'kill 0' SIGINT; \
-	  uv run uvicorn fly_o_myte.api:app --host 0.0.0.0 --port 8001 & \
+	  uv run uvicorn fly_o_myte.api:app --host 0.0.0.0 --port 8001 --log-level info & \
 	  cd ui && npm run dev & \
 	  wait)
 

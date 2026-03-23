@@ -2,31 +2,32 @@
  * Smart Scout view — exploration engine for family flight windows.
  */
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Search,
   Plane,
   Clock,
   RefreshCcw,
   AlertCircle,
-  ArrowRight,
+  CalendarX,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AirportInput, JourneyDetails } from '../components/shared'
 
 const Scout = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [origin, setOrigin] = useState('BNE');
   const [dest, setDest] = useState('');
   const [mode, setMode] = useState<'flexible' | 'exact'>('flexible');
-  
+
   const availableMonths = Array.from({ length: 12 }, (_, i) => {
     const d = new Date();
     d.setMonth(d.getMonth() + i);
     const m = d.toLocaleString('en-US', { month: 'short' }).toLowerCase();
     return `${m}-${d.getFullYear()}`;
   });
-  
+
   const [months, setMonths] = useState<string[]>([availableMonths[0]]);
   const [tripLen, setTripLen] = useState(14);
   const [departDate, setDepartDate] = useState('');
@@ -34,7 +35,9 @@ const Scout = () => {
   const [scoutFlexDays, setScoutFlexDays] = useState(3);
   const [scouting, setScouting] = useState(false);
   const [results, setResults] = useState<any[]>([]);
+  const [searched, setSearched] = useState(false);  // true after first scout attempt
   const [error, setError] = useState<string | null>(null);
+  const [plannerHint, setPlannerHint] = useState<string | null>(null);
 
   const calculateMaxDays = (selectedMonths: string[]) => {
     if (selectedMonths.length === 0) return 0;
@@ -83,6 +86,32 @@ const Scout = () => {
     }
   }, [months, mode]);
 
+  // Pre-fill from AI Planner navigation state (no auto-trigger — user reviews and clicks Scout)
+  useEffect(() => {
+    const sp = location.state?.scoutParams;
+    const hint = location.state?.plannerHint;
+    if (!sp) return;
+
+    setOrigin(sp.origin || 'BNE');
+    setDest(sp.destination || '');
+    if (hint) setPlannerHint(hint);
+
+    if (sp.months) {
+      setMode('flexible');
+      setMonths(sp.months);
+      if (sp.trip_length) setTripLen(sp.trip_length);
+    } else if (sp.depart_date && sp.return_date) {
+      setMode('exact');
+      setDepartDate(sp.depart_date);
+      setReturnDate(sp.return_date);
+      if (sp.flex_days != null) setScoutFlexDays(sp.flex_days);
+    }
+
+    // Clear router state so back-navigation doesn't re-trigger
+    window.history.replaceState({}, '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleScout = () => {
     setScouting(true);
     setError(null);
@@ -111,10 +140,11 @@ const Scout = () => {
         if (!res.ok) throw new Error(data.detail || "Scouting failed");
         return data;
       })
-      .then(data => { setResults(data); setScouting(false); })
+      .then(data => { setResults(data); setScouting(false); setSearched(true); })
       .catch(err => {
         setError(err.message);
         setScouting(false);
+        setSearched(true);
       });
   };
 
@@ -124,6 +154,14 @@ const Scout = () => {
         <h1>Smart Scout</h1>
         <p className="subtitle">Exploration engine for family flight windows</p>
       </header>
+
+      {plannerHint && (
+        <div className="planner-origin-banner">
+          <span className="planner-origin-label">From AI Planner</span>
+          <span>{plannerHint}</span>
+          <button className="btn-icon" style={{ padding: '2px 6px', fontSize: '0.75rem' }} onClick={() => setPlannerHint(null)}>×</button>
+        </div>
+      )}
 
       {error && (
         <motion.div className="error-banner glass" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
@@ -227,6 +265,39 @@ const Scout = () => {
           <span>{mode === 'flexible' ? 'Explore Selected Months' : 'Search Exact Dates'}</span>
         </button>
       </div>
+
+      {searched && !scouting && results.length === 0 && !error && (
+        <motion.div className="scout-empty glass" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          <CalendarX size={32} style={{ color: 'var(--text-muted)' }} />
+          <p style={{ fontWeight: 700, margin: '8px 0 4px' }}>No flights found</p>
+          {mode === 'exact' ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', margin: 0 }}>
+              Flight data for these exact dates may not be available yet — typically bookings open 3–6 months out.
+              Try switching to <strong>Flexible Months</strong> mode to explore the broader period.
+            </p>
+          ) : (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', margin: 0 }}>
+              No results for the selected months and trip length. Try different months or a shorter trip.
+            </p>
+          )}
+          {mode === 'exact' && (
+            <button className="btn btn-light" style={{ marginTop: 12 }} onClick={() => {
+              setMode('flexible');
+              // Convert exact dates to approximate month string
+              if (departDate) {
+                const d = new Date(departDate);
+                const m = d.toLocaleString('en-US', { month: 'short' }).toLowerCase();
+                const approxMonth = `${m}-${d.getFullYear()}`;
+                if (availableMonths.includes(approxMonth)) setMonths([approxMonth]);
+              }
+              setResults([]);
+              setSearched(false);
+            }}>
+              Switch to Flexible Months
+            </button>
+          )}
+        </motion.div>
+      )}
 
       <div className="scout-results-grid">
         {results.map((r, i) => {

@@ -40,8 +40,8 @@
 # ---
 # name: TestPlanCommand.test_plan_snapshot
   '''
-  Note: ANTHROPIC_API_KEY not set. Using structured prompts. (Set this key to 
-  enable natural language input like "Sri Lanka in December".)
+  Note: OPENAI_API_KEY not set. Using structured prompts. (Set this key to enable 
+  natural language input like "Sri Lanka in December".)
   Destination (city or country name):   CMB — Colombo Bandaranaike (Sri Lanka)
   Departure month (e.g. dec-2026): Trip length (nights) (7): Date flexibility (±days) (3): 
   Planning trip to: Colombo Bandaranaike (Sri Lanka)

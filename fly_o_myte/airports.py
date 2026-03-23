@@ -224,6 +224,9 @@ def resolve_destination(query: str) -> list[tuple[str, str]]:
             continue
         if (
             any(q in term for term in terms)
+            # Reverse: term is a substring of query — only for terms ≥ 4 chars to avoid
+            # short codes like "kl" matching spuriously in unrelated words.
+            or any(term in q for term in terms if len(term) >= 4)
             or q in iata.lower()
             or q in display_name.lower()
         ):

@@ -11,6 +11,7 @@ Also supports legacy per-trip scheduling for backward compatibility.
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -21,6 +22,7 @@ from fly_o_myte.db.sqlite import (
     Trip,
     create_db_engine,
     get_active_variant,
+    get_latest_snapshot,
     get_session,
     list_campaigns,
 )
@@ -117,7 +119,7 @@ def _add_campaign_job(campaign: TripCampaign):
             id=job_id,
             args=[campaign.id],
             replace_existing=True,
-            misfire_grace_time=3600,  # 1 hour grace if machine was asleep
+            misfire_grace_time=86400,  # 24 hours grace to catch up when laptop wakes
         )
         logger.info(
             "Scheduled campaign %d (%s) at '%s'",
@@ -144,7 +146,7 @@ def _add_trip_job_legacy(trip: Trip):
             id=job_id,
             args=[trip.id],
             replace_existing=True,
-            misfire_grace_time=3600,
+            misfire_grace_time=86400,
         )
         logger.info(
             "Scheduled trip %d (%s) at '%s'", trip.id, trip.label, trip.cron_schedule
@@ -170,6 +172,14 @@ def _run_campaign_poll(campaign_id: int):
         if not trip:
             logger.warning(
                 "Scheduled poll skipped: campaign %d has no active variant",
+                campaign_id,
+            )
+            return
+
+        # Skip if already polled today (manual or earlier cron run)
+        if _already_polled_today(session, trip.id):
+            logger.info(
+                "Scheduled poll skipped: campaign %d already polled today",
                 campaign_id,
             )
             return
@@ -207,6 +217,14 @@ def _run_trip_poll_legacy(trip_id: int):
             )
             return
 
+        # Skip if already polled today (manual or earlier cron run)
+        if _already_polled_today(session, trip_id):
+            logger.info(
+                "Scheduled poll skipped: trip %d already polled today",
+                trip_id,
+            )
+            return
+
         try:
             logger.info(
                 "Running scheduled poll for trip %d (%s)", trip_id, trip.label
@@ -219,3 +237,15 @@ def _run_trip_poll_legacy(trip_id: int):
                 e,
                 exc_info=True,
             )
+
+
+def _already_polled_today(session, trip_id: int) -> bool:
+    """Return True if the trip already has a snapshot from today."""
+    snap = get_latest_snapshot(session, trip_id)
+    if not snap or not snap.fetched_at:
+        return False
+    try:
+        fetched_date = datetime.fromisoformat(snap.fetched_at).date()
+        return fetched_date == date.today()
+    except (ValueError, TypeError):
+        return False

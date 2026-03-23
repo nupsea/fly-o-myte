@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react'
 import {
   BarChart,
-  Search,
   Activity,
   AlertCircle,
   TrendingUp,

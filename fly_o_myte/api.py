@@ -6,6 +6,12 @@ Exposes core services for scouting, tracking, and profile management.
 from __future__ import annotations
 
 import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
@@ -58,10 +64,23 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     engine = create_db_engine(settings.db_path)
     create_tables(engine)
+    logger.info("✅ Database initialised (%s)", settings.db_path)
+
+    with get_session(engine) as session:
+        campaigns = list_campaigns(session)
+        active = [c for c in campaigns if c.status == "active"]
+        logger.info(
+            "📊 Loaded %d campaign(s) (%d active)",
+            len(campaigns),
+            len(active),
+        )
 
     start_scheduler()
+    logger.info("⏰ Background scheduler started")
+    logger.info("🚀 Fly-O-Myte backend ready on http://localhost:8001")
     yield
     stop_scheduler()
+    logger.info("🛑 Fly-O-Myte backend shut down")
 
 
 app = FastAPI(title="Fly-O-Myte API", lifespan=lifespan)
@@ -199,9 +218,22 @@ def get_campaigns_endpoint(session: Annotated[Session, Depends(get_db)]):
         active = get_active_variant(session, c.id)
         rec = None
         snap = None
+        display_variant = active  # the trip to show on the card
+
         if active and active.id is not None:
             rec = get_latest_recommendation(session, active.id)
             snap = get_latest_snapshot(session, active.id)
+        else:
+            # No active variant — fall back to the most recent variant
+            # (even if archived) so we can display last-known prices
+            variants_all = get_campaign_variants(session, c.id)
+            if variants_all:
+                fallback = variants_all[0]  # newest first
+                display_variant = fallback
+                if fallback.id is not None:
+                    snap = get_latest_snapshot(session, fallback.id)
+                    rec = get_latest_recommendation(session, fallback.id)
+
         variants = get_campaign_variants(session, c.id)
         result.append(
             {
@@ -214,7 +246,7 @@ def get_campaigns_endpoint(session: Annotated[Session, Depends(get_db)]):
                 "notes": c.notes,
                 "cron_schedule": c.cron_schedule,
                 "created_at": c.created_at,
-                "active_variant": active,
+                "active_variant": display_variant,
                 "recommendation": rec,
                 "latest_snapshot": snap,
                 "variant_count": len(variants),
@@ -1045,19 +1077,40 @@ def plan_trip(intent_text: str):
     from fly_o_myte.planner import extract_trip_intent
 
     settings = get_settings()
-    api_key = settings.anthropic_api_key or None
+    api_key = settings.openai_api_key or None
 
-    # We don't want the interactive wizard if API key is missing
-    # In the UI, we might handle the "wizard" differently, but for now
-    # let's assume it only works with API key or returns a basic intent
     if not api_key:
-        # Fallback to a very simple manual parse or error
-        # For the demo, let's pretend we can parse it if it follows a simple pattern
-        # or just return a default intent
-        return {"error": "Anthropic API key required for natural language planning"}
+        return {"error": "OpenAI API key required for natural language planning"}
 
     intent = extract_trip_intent(intent_text, api_key)
     return intent
+
+
+class ChatRequest(BaseModel):
+    messages: list[dict]  # conversation history [{role, content}, ...]
+
+
+class ChatResponse(BaseModel):
+    type: str  # "plan" | "message" | "error"
+    content: str = ""  # assistant message text (for "message" type)
+    intent: dict | None = None  # (for "plan" type)
+    scout_params: dict | None = None  # (for "plan" type)
+    messages: list[dict] = []  # updated conversation history
+
+
+@app.post("/planner/chat")
+def planner_chat(req: ChatRequest):
+    from fly_o_myte.calendar import get_calendar
+    from fly_o_myte.planner import run_planner_loop
+
+    settings = get_settings()
+    if not settings.openai_api_key:
+        return ChatResponse(type="error", content="OpenAI API key required")
+
+    profile = load_family_profile()
+    calendar = get_calendar()
+    result = run_planner_loop(req.messages, settings.openai_api_key, profile, calendar)
+    return ChatResponse(**result)
 
 
 @app.post("/recompute")

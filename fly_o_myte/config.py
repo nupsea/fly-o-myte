@@ -106,6 +106,7 @@ class Settings(BaseSettings):
 
     # LLM
     anthropic_api_key: str = ""
+    openai_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
 
@@ -129,7 +130,7 @@ class Settings(BaseSettings):
     fly_o_myte_log_path: str = str(DEFAULT_LOG_PATH)
 
     @field_validator(
-        "serpapi_api_key", "tequila_api_key", "anthropic_api_key", mode="before"
+        "serpapi_api_key", "tequila_api_key", "anthropic_api_key", "openai_api_key", mode="before"
     )
     @classmethod
     def strip_whitespace(cls, v: str) -> str:
@@ -151,7 +152,9 @@ class Settings(BaseSettings):
     def log_path(self) -> Path:
         return Path(self.fly_o_myte_log_path).expanduser()
 
-    def llm_provider(self) -> Literal["claude", "ollama", "none"]:
+    def llm_provider(self) -> Literal["openai", "claude", "ollama", "none"]:
+        if self.openai_api_key:
+            return "openai"
         if self.anthropic_api_key:
             return "claude"
         if self.ollama_base_url:
