@@ -4,8 +4,7 @@ The smart travel expense optimizer for Australian families. Tracks the specific 
 
 Fly-O-Myte calculates the **True Family Cost** including bags, seat selection, and infant fees, ensuring you never get surprised by "budget" airline add-ons.
 
-![alt text](image.png)
-
+![alt text](fly_o_myte.png)
 ---
 
 ## 🛠️ Prerequisites
@@ -45,8 +44,17 @@ The recommended way to use Fly-O-Myte is via the modern Web UI.
 
 ## ✨ Key Features
 
-### 📊 Dashboard (Command Center)
-Real-time tracking of your watchlisted trips. High-signal **Book Now / Wait / Monitor** badges with vibrant gradients indicate urgency based on historical trends and current price signals.
+### 📊 Dashboard (Flight Watch)
+Real-time tracking of your watchlisted trips. 
+- **Book Now / Wait / Monitor** badges with vibrant gradients indicate urgency based on historical trends.
+- **Price Trend Sparklines**: Every tile features a visual trendline of price variations over the last 20 data points.
+- **Smart Status**: "Polled X ago" badges and "UNDER BUDGET" highlights provide immediate signals for action.
+
+### 📈 Route Analytics
+In-depth historical context for your favorite routes.
+- **Weekly Price Trends**: Visualize historical "low-price windows" with weekly average vs. best price seen.
+- **Airline Value Comparison**: Compare carriers by **True Family Cost** to identify which airlines consistently offer the best overall value for your specific route.
+- **Price Percentiles**: Understand if a current deal is in the 25th, 50th, or 75th percentile of all recorded prices.
 
 ### 🔍 Smart Scout
 Interactive month-at-a-glance heatmaps. Features a **Holiday Shield** overlay that highlights school holiday periods (QLD/NSW/VIC/etc.) so you can identify the cheapest travel windows before prices spike.

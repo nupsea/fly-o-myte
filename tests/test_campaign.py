@@ -12,8 +12,7 @@ Covers:
 
 from __future__ import annotations
 
-import json
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from sqlmodel import create_engine
@@ -34,8 +33,7 @@ from fly_o_myte.db.sqlite import (
     insert_trip,
     list_campaigns,
 )
-from fly_o_myte.recommender import SnapshotPoint, build_campaign_snapshots
-
+from fly_o_myte.recommender import build_campaign_snapshots
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -146,7 +144,7 @@ class TestTripCampaignLinking:
         assert active.depart_date == "2026-12-15"
 
     def test_campaign_variants(self, campaign_session, sample_campaign):
-        t1 = insert_trip(
+        insert_trip(
             campaign_session,
             Trip(
                 campaign_id=sample_campaign.id,
@@ -156,7 +154,7 @@ class TestTripCampaignLinking:
                 depart_date="2026-12-15",
             ),
         )
-        t2 = insert_trip(
+        insert_trip(
             campaign_session,
             Trip(
                 campaign_id=sample_campaign.id,
@@ -187,6 +185,7 @@ class TestDateChangePreservesHistory:
                 return_date="2027-01-10",
             ),
         )
+        assert trip.id is not None
         # Add some price history
         for i in range(5):
             insert_snapshot(
@@ -209,9 +208,7 @@ class TestDateChangePreservesHistory:
         assert archived.is_active == 0
 
         # Verify snapshots are still there
-        campaign_snaps = get_campaign_snapshots(
-            campaign_session, sample_campaign.id
-        )
+        campaign_snaps = get_campaign_snapshots(campaign_session, sample_campaign.id)
         assert len(campaign_snaps) == 5
 
     def test_new_variant_sees_old_history(self, campaign_session, sample_campaign):
@@ -227,6 +224,7 @@ class TestDateChangePreservesHistory:
                 depart_date="2026-12-15",
             ),
         )
+        assert t1.id is not None
         for i in range(3):
             insert_snapshot(
                 campaign_session,
@@ -250,6 +248,7 @@ class TestDateChangePreservesHistory:
                 depart_date="2026-12-20",
             ),
         )
+        assert t2.id is not None
         insert_snapshot(
             campaign_session,
             PriceSnapshot(
@@ -283,6 +282,7 @@ class TestDateChangePreservesHistory:
                 depart_date="2026-12-15",
             ),
         )
+        assert t1.id is not None
         archive_trip(campaign_session, t1.id)
 
         active = list_active_trips(campaign_session)

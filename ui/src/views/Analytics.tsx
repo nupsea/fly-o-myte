@@ -12,6 +12,98 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { AirportInput } from '../components/shared'
 
+const PriceTrendline = ({ data }: { data: { week: string, avg: number, min: number }[] }) => {
+  if (data.length < 2) return null;
+
+  const width = 800;
+  const height = 150;
+  const padding = 40;
+
+  const allValues = data.flatMap(d => [d.avg, d.min]);
+  const minVal = Math.min(...allValues) * 0.95;
+  const maxVal = Math.max(...allValues) * 1.05;
+  const range = maxVal - minVal;
+
+  const getX = (index: number) => (index / (data.length - 1)) * (width - 2 * padding) + padding;
+  const getY = (val: number) => height - ((val - minVal) / range) * (height - 2 * padding) - padding;
+
+  const avgPoints = data.map((d, i) => `${getX(i)},${getY(d.avg)}`).join(' ');
+  const minPoints = data.map((d, i) => `${getX(i)},${getY(d.min)}`).join(' ');
+
+  return (
+    <div style={{ marginTop: '32px', background: 'white', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+      <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '24px', display: 'flex', justifyContent: 'space-between' }}>
+        <span>Weekly Price Trends</span>
+        <div style={{ display: 'flex', gap: '16px', fontSize: '0.75rem', fontWeight: 600 }}>
+          <span style={{ color: '#3b82f6' }}>● Weekly Avg</span>
+          <span style={{ color: '#10b981' }}>● Best Price Seen</span>
+        </div>
+      </h3>
+      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+        {/* Grid lines */}
+        {[0, 0.5, 1].map(p => {
+          const y = getY(minVal + range * p);
+          return (
+            <g key={p}>
+              <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="#f1f5f9" strokeWidth="1" />
+              <text x={padding - 5} y={y + 4} textAnchor="end" fontSize="10" fill="#94a3b8">${Math.round(minVal + range * p)}</text>
+            </g>
+          )
+        })}
+        
+        {/* Lines */}
+        <polyline fill="none" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={avgPoints} opacity="0.3" />
+        <polyline fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={minPoints} />
+        
+        {/* Data points */}
+        {data.map((d, i) => (
+          <circle key={i} cx={getX(i)} cy={getY(d.min)} r="4" fill="white" stroke="#10b981" strokeWidth="2" />
+        ))}
+      </svg>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
+        <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{new Date(data[0].week).toLocaleDateString()}</span>
+        <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Current Week</span>
+      </div>
+    </div>
+  );
+}
+
+const AirlineComparison = ({ data }: { data: { airline: string, avg: number, count: number }[] }) => {
+  if (data.length === 0) return null;
+  const maxAvg = Math.max(...data.map(d => d.avg));
+
+  return (
+    <div style={{ marginTop: '32px' }}>
+      <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', marginBottom: '16px' }}>Airline Value Comparison</h3>
+      <div style={{ display: 'grid', gap: '12px' }}>
+        {data.map((a, i) => (
+          <div key={i} style={{ background: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <div style={{ width: '48px', height: '48px', background: '#f8fafc', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#0f172a', fontSize: '1.1rem' }}>
+              {a.airline}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700 }}>Avg. Family Cost</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 800, color: '#2563eb' }}>${a.avg.toLocaleString()}</span>
+              </div>
+              <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                <motion.div 
+                  initial={{ width: 0 }} 
+                  animate={{ width: `${(a.avg / maxAvg) * 100}%` }} 
+                  style={{ height: '100%', background: 'linear-gradient(90deg, #3b82f6, #60a5fa)', borderRadius: '4px' }} 
+                />
+              </div>
+              <div style={{ marginTop: '6px', fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>
+                Based on {a.count} samples
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const Analytics = () => {
   const [origin, setOrigin] = useState('BNE')
   const [dest, setDest] = useState('')
@@ -160,6 +252,11 @@ const Analytics = () => {
                <p style={{ fontSize: '0.875rem', color: '#475569', textAlign: 'center', margin: 0 }}>
                  50% of all recorded flights fall between <strong>${data.p25}</strong> and <strong>${data.p75}</strong> (the blue zone).
                </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+              <PriceTrendline data={data.weekly_trends || []} />
+              <AirlineComparison data={data.airline_breakdown || []} />
             </div>
           </motion.div>
         )}

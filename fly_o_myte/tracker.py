@@ -46,7 +46,13 @@ from fly_o_myte.price_sources.serpapi import (
     detect_airport_country,
 )
 from fly_o_myte.price_sources.tequila import TequilaPriceSource
-from fly_o_myte.recommender import RouteType, SnapshotPoint, build_campaign_snapshots, classify_route, compute
+from fly_o_myte.recommender import (
+    RouteType,
+    SnapshotPoint,
+    build_campaign_snapshots,
+    classify_route,
+    compute,
+)
 from fly_o_myte.true_cost import (
     TrueCostBreakdown,
     compute_family_score,

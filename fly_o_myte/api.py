@@ -6,12 +6,6 @@ Exposes core services for scouting, tracking, and profile management.
 from __future__ import annotations
 
 import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(message)s",
-    datefmt="%H:%M:%S",
-)
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated
@@ -54,6 +48,12 @@ from fly_o_myte.scheduler import (
     stop_scheduler,
     update_campaign_schedule,
     update_trip_schedule,
+)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(message)s",
+    datefmt="%H:%M:%S",
 )
 
 
@@ -235,6 +235,15 @@ def get_campaigns_endpoint(session: Annotated[Session, Depends(get_db)]):
                     rec = get_latest_recommendation(session, fallback.id)
 
         variants = get_campaign_variants(session, c.id)
+
+        # Get history for sparkline (last 20 rank-1 snapshots across all variants in campaign)
+        all_snaps = get_campaign_snapshots(session, c.id)
+        rank_1_snaps = [s for s in all_snaps if s.rank == 1]
+        history_points = [
+            {"t": s.fetched_at, "v": s.true_family_cost} for s in rank_1_snaps[-20:]
+        ]
+        last_polled = rank_1_snaps[-1].fetched_at if rank_1_snaps else None
+
         result.append(
             {
                 "id": c.id,
@@ -250,7 +259,9 @@ def get_campaigns_endpoint(session: Annotated[Session, Depends(get_db)]):
                 "recommendation": rec,
                 "latest_snapshot": snap,
                 "variant_count": len(variants),
-                "total_snapshots": len(get_campaign_snapshots(session, c.id)),
+                "total_snapshots": len(all_snaps),
+                "last_polled_at": last_polled,
+                "price_history": history_points,
             }
         )
     return result
@@ -296,6 +307,7 @@ def create_campaign_endpoint(
             cron_schedule=data.cron_schedule,
         )
         inserted_trip = insert_trip(session, trip)
+        assert inserted_trip.id is not None
 
         if data.offer_seed:
             seed = data.offer_seed

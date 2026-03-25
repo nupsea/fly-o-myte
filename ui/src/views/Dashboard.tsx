@@ -18,6 +18,64 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Modal, JourneyDetails, cronToHuman } from '../components/shared'
 import { TripSettingsModal, CampaignSettingsForm } from '../components/Settings'
 
+const timeAgo = (isoString: string | null) => {
+  if (!isoString) return 'Never polled'
+  const date = new Date(isoString)
+  const now = new Date()
+  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000)
+  
+  if (diffInMinutes < 1) return 'Just now'
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`
+  const diffInHours = Math.floor(diffInMinutes / 60)
+  if (diffInHours < 24) return `${diffInHours}h ago`
+  return `${Math.floor(diffInHours / 24)}d ago`
+}
+
+const Sparkline = ({ data }: { data: {v: number}[] }) => {
+  if (data.length < 2) return (
+    <div style={{ height: '30px', marginTop: '12px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed #e2e8f0', borderRadius: '6px' }}>
+      <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Gathering data...</span>
+    </div>
+  );
+  
+  const width = 100;
+  const height = 30;
+  const padding = 2;
+  
+  const values = data.map(d => d.v);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * (width - 2 * padding) + padding;
+    const y = height - ((v - min) / range) * (height - 2 * padding) - padding;
+    return `${x},${y}`;
+  }).join(' ');
+  
+  return (
+    <div style={{ marginTop: '12px', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: '#94a3b8', marginBottom: '2px' }}>
+        <span>Price Trend</span>
+        <span>{data.length} pts</span>
+      </div>
+      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+        <polyline
+          fill="none"
+          stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          points={points}
+        />
+        {/* End point marker */}
+        <circle 
+          cx={(values.length - 1) / (values.length - 1) * (width - 2 * padding) + padding} 
+          cy={height - ((values[values.length-1] - min) / range) * (height - 2 * padding) - padding} 
+          r="2" fill="#3b82f6" 
+        />
+      </svg>
+    </div>
+  );
+}
+
 const Dashboard = () => {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,9 +105,16 @@ const Dashboard = () => {
   useEffect(() => {
     fetchCampaigns();
     fetch('/api/profile').then(res => res.json()).then(setProfile);
+    
+    // Auto-refresh every 5 minutes to show latest cron results
+    const interval = setInterval(fetchCampaigns, 300000);
+    
     const handler = () => fetchCampaigns();
     window.addEventListener('fom:recomputed', handler);
-    return () => window.removeEventListener('fom:recomputed', handler);
+    return () => {
+      window.removeEventListener('fom:recomputed', handler);
+      clearInterval(interval);
+    };
   }, []);
 
   const [flexDays, setFlexDays] = useState(3);
@@ -236,9 +301,20 @@ const Dashboard = () => {
                     <div className="flight-info-summary" style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
                       <strong>{snap.airline_code}</strong> &middot; {snap.stops} stop{snap.stops !== 1 ? 's' : ''} &middot; departs {snap.departure_time}
                     </div>
-                    <div className="price-display">
-                      <span className="price">${snap.true_family_cost?.toLocaleString() || '---'}</span>
-                      <span className="currency">AUD</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                      <div className="price-display">
+                        <span className="price">${snap.true_family_cost?.toLocaleString() || '---'}</span>
+                        <span className="currency">AUD</span>
+                      </div>
+                      {campaign.budget_target_aud && snap.true_family_cost <= campaign.budget_target_aud && (
+                        <div style={{ 
+                          padding: '4px 8px', background: 'linear-gradient(135deg, #10b981, #059669)', 
+                          color: 'white', borderRadius: '8px', fontSize: '0.7rem', 
+                          fontWeight: 800, marginBottom: '6px', boxShadow: '0 4px 12px -2px rgba(16,185,129,0.3)'
+                        }}>
+                          UNDER BUDGET
+                        </div>
+                      )}
                     </div>
                   </>
                 ) : (
@@ -247,13 +323,17 @@ const Dashboard = () => {
                   </div>
                 )}
 
+                {/* Price Trend Sparkline */}
+                <Sparkline data={campaign.price_history || []} />
+
                 {/* Campaign meta badges */}
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                  <span className="campaign-meta-badge" title={campaign.last_polled_at}>Polled {timeAgo(campaign.last_polled_at)}</span>
                   {campaign.variant_count > 1 && (
                     <span className="campaign-meta-badge">{campaign.variant_count} variants</span>
                   )}
                   {campaign.total_snapshots > 0 && (
-                    <span className="campaign-meta-badge">{campaign.total_snapshots} data pts</span>
+                    <span className="campaign-meta-badge">{campaign.total_snapshots} pts</span>
                   )}
                   {campaign.budget_target_aud && (
                     <span className="campaign-meta-badge">Budget: ${campaign.budget_target_aud.toLocaleString()}</span>

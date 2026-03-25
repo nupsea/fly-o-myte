@@ -245,20 +245,22 @@ def create_tables(engine) -> None:
                     "INSERT INTO tripcampaign (name, origin, destination, status, notes, cron_schedule, created_at) "
                     "VALUES (:name, :origin, :dest, 'active', '', :cron, :created)"
                 ),
-                {"name": label, "origin": origin, "dest": dest, "cron": cron, "created": created},
+                {
+                    "name": label,
+                    "origin": origin,
+                    "dest": dest,
+                    "cron": cron,
+                    "created": created,
+                },
             )
             campaign_id = result.lastrowid
             conn.execute(
-                sqlalchemy.text(
-                    "UPDATE trip SET campaign_id = :cid WHERE id = :tid"
-                ),
+                sqlalchemy.text("UPDATE trip SET campaign_id = :cid WHERE id = :tid"),
                 {"cid": campaign_id, "tid": tid},
             )
         if orphans:
             conn.commit()
-            _logger.info(
-                "Auto-migrated %d orphan trip(s) into campaigns", len(orphans)
-            )
+            _logger.info("Auto-migrated %d orphan trip(s) into campaigns", len(orphans))
 
 
 @contextmanager
@@ -283,9 +285,7 @@ def get_trip(session: Session, trip_id: int) -> Trip | None:
 
 def list_active_trips(session: Session) -> list[Trip]:
     return list(
-        session.exec(
-            select(Trip).where(Trip.is_active == 1, Trip.is_archived == 0)
-        )
+        session.exec(select(Trip).where(Trip.is_active == 1, Trip.is_archived == 0))
     )
 
 
@@ -428,7 +428,9 @@ def get_campaign(session: Session, campaign_id: int) -> TripCampaign | None:
     return session.get(TripCampaign, campaign_id)
 
 
-def list_campaigns(session: Session, include_cancelled: bool = False) -> list[TripCampaign]:
+def list_campaigns(
+    session: Session, include_cancelled: bool = False
+) -> list[TripCampaign]:
     q = select(TripCampaign).order_by(col(TripCampaign.created_at).desc())
     if not include_cancelled:
         q = q.where(TripCampaign.status != "cancelled")
@@ -463,15 +465,11 @@ def get_campaign_variants(
     return list(session.exec(q))
 
 
-def get_campaign_snapshots(
-    session: Session, campaign_id: int
-) -> list[PriceSnapshot]:
+def get_campaign_snapshots(session: Session, campaign_id: int) -> list[PriceSnapshot]:
     """Return all snapshots across all variants in a campaign, ordered by time."""
     variant_ids = [
         t.id
-        for t in session.exec(
-            select(Trip).where(Trip.campaign_id == campaign_id)
-        )
+        for t in session.exec(select(Trip).where(Trip.campaign_id == campaign_id))
         if t.id is not None
     ]
     if not variant_ids:

@@ -130,7 +130,11 @@ class Settings(BaseSettings):
     fly_o_myte_log_path: str = str(DEFAULT_LOG_PATH)
 
     @field_validator(
-        "serpapi_api_key", "tequila_api_key", "anthropic_api_key", "openai_api_key", mode="before"
+        "serpapi_api_key",
+        "tequila_api_key",
+        "anthropic_api_key",
+        "openai_api_key",
+        mode="before",
     )
     @classmethod
     def strip_whitespace(cls, v: str) -> str:

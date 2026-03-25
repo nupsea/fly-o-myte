@@ -199,17 +199,19 @@ class TestRunPlannerLoop:
         """Create a SchoolCalendar with test data."""
         from fly_o_myte.calendar import SchoolCalendar
 
-        return SchoolCalendar({
-            "QLD": {
-                2026: {
-                    "christmas": {
-                        "label": "Christmas holidays",
-                        "start": "2026-12-13",
-                        "end": "2027-01-25",
+        return SchoolCalendar(
+            {
+                "QLD": {
+                    2026: {
+                        "christmas": {
+                            "label": "Christmas holidays",
+                            "start": "2026-12-13",
+                            "end": "2027-01-25",
+                        }
                     }
                 }
             }
-        })
+        )
 
     def test_loop_confident_plan(self, httpx_mock):
         """LLM calls get_family_profile, resolve_destination, then submit_plan."""
@@ -219,30 +221,32 @@ class TestRunPlannerLoop:
         httpx_mock.add_response(
             url="https://api.openai.com/v1/chat/completions",
             json={
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [
-                            {
-                                "id": "call_1",
-                                "type": "function",
-                                "function": {
-                                    "name": "get_family_profile",
-                                    "arguments": "{}",
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call_1",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "get_family_profile",
+                                        "arguments": "{}",
+                                    },
                                 },
-                            },
-                            {
-                                "id": "call_2",
-                                "type": "function",
-                                "function": {
-                                    "name": "resolve_destination",
-                                    "arguments": json.dumps({"query": "Bangalore"}),
+                                {
+                                    "id": "call_2",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "resolve_destination",
+                                        "arguments": json.dumps({"query": "Bangalore"}),
+                                    },
                                 },
-                            },
-                        ],
+                            ],
+                        }
                     }
-                }],
+                ],
             },
         )
 
@@ -250,32 +254,36 @@ class TestRunPlannerLoop:
         httpx_mock.add_response(
             url="https://api.openai.com/v1/chat/completions",
             json={
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [
-                            {
-                                "id": "call_3",
-                                "type": "function",
-                                "function": {
-                                    "name": "submit_plan",
-                                    "arguments": json.dumps({
-                                        "destination_iata": "BLR",
-                                        "destination_display": "Bangalore Kempegowda",
-                                        "origin_iata": "BNE",
-                                        "nights": 30,
-                                        "month": 12,
-                                        "year": 2026,
-                                        "flex_days": 3,
-                                        "confidence": 0.88,
-                                        "reasoning": "Dec overlaps QLD Christmas holidays.",
-                                    }),
-                                },
-                            }
-                        ],
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [
+                                {
+                                    "id": "call_3",
+                                    "type": "function",
+                                    "function": {
+                                        "name": "submit_plan",
+                                        "arguments": json.dumps(
+                                            {
+                                                "destination_iata": "BLR",
+                                                "destination_display": "Bangalore Kempegowda",
+                                                "origin_iata": "BNE",
+                                                "nights": 30,
+                                                "month": 12,
+                                                "year": 2026,
+                                                "flex_days": 3,
+                                                "confidence": 0.88,
+                                                "reasoning": "Dec overlaps QLD Christmas holidays.",
+                                            }
+                                        ),
+                                    },
+                                }
+                            ],
+                        }
                     }
-                }],
+                ],
             },
         )
 
@@ -304,12 +312,14 @@ class TestRunPlannerLoop:
         httpx_mock.add_response(
             url="https://api.openai.com/v1/chat/completions",
             json={
-                "choices": [{
-                    "message": {
-                        "role": "assistant",
-                        "content": "Could you tell me when you'd like to travel?",
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": "Could you tell me when you'd like to travel?",
+                        }
                     }
-                }],
+                ],
             },
         )
 
@@ -336,20 +346,24 @@ class TestRunPlannerLoop:
             httpx_mock.add_response(
                 url="https://api.openai.com/v1/chat/completions",
                 json={
-                    "choices": [{
-                        "message": {
-                            "role": "assistant",
-                            "content": None,
-                            "tool_calls": [{
-                                "id": f"call_loop",
-                                "type": "function",
-                                "function": {
-                                    "name": "get_family_profile",
-                                    "arguments": "{}",
-                                },
-                            }],
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": None,
+                                "tool_calls": [
+                                    {
+                                        "id": "call_loop",
+                                        "type": "function",
+                                        "function": {
+                                            "name": "get_family_profile",
+                                            "arguments": "{}",
+                                        },
+                                    }
+                                ],
+                            }
                         }
-                    }],
+                    ],
                 },
             )
 
@@ -373,6 +387,7 @@ class TestBuildScoutParams:
 
     def _make_profile(self):
         from fly_o_myte.config import FamilyProfile
+
         return FamilyProfile(origin_airport="BNE", default_trip_length=14)
 
     def test_months_mode(self):
@@ -520,17 +535,19 @@ class TestToolHandlers:
         from fly_o_myte.calendar import SchoolCalendar
         from fly_o_myte.planner import _handle_get_school_holidays
 
-        cal = SchoolCalendar({
-            "QLD": {
-                2026: {
-                    "christmas": {
-                        "label": "Christmas holidays",
-                        "start": "2026-12-13",
-                        "end": "2027-01-25",
+        cal = SchoolCalendar(
+            {
+                "QLD": {
+                    2026: {
+                        "christmas": {
+                            "label": "Christmas holidays",
+                            "start": "2026-12-13",
+                            "end": "2027-01-25",
+                        }
                     }
                 }
             }
-        })
+        )
         result = json.loads(_handle_get_school_holidays(cal, "QLD", 2026))
 
         assert len(result) == 1

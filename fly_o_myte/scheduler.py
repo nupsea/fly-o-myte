@@ -18,8 +18,8 @@ from apscheduler.triggers.cron import CronTrigger
 
 from fly_o_myte.config import get_settings, load_family_profile
 from fly_o_myte.db.sqlite import (
-    TripCampaign,
     Trip,
+    TripCampaign,
     create_db_engine,
     get_active_variant,
     get_latest_snapshot,
@@ -69,6 +69,26 @@ def sync_scheduler_from_db():
             if campaign.status == "active":
                 assert campaign.id is not None
                 _add_campaign_job(campaign)
+
+                # --- STARTUP CATCHUP LOGIC ---
+                # If we just started and haven't polled today, trigger a catchup run now.
+                # This ensures that missed 7am polls (laptop off) run immediately on wake.
+                active_trip = get_active_variant(session, campaign.id)
+                if active_trip and active_trip.id is not None:
+                    if not _already_polled_today(session, active_trip.id):
+                        logger.info(
+                            "Catchup: Campaign %d (%s) missed today's poll. Triggering now.",
+                            campaign.id,
+                            campaign.name,
+                        )
+                        _scheduler.add_job(
+                            _run_campaign_poll,
+                            id=f"catchup_campaign_{campaign.id}",
+                            args=[campaign.id],
+                            # run_date=None in a 'date' trigger defaults to 'now'
+                        )
+                # -----------------------------
+
                 scheduled += 1
 
     logger.debug("Scheduler synced: %d active campaigns scheduled", scheduled)
@@ -176,6 +196,8 @@ def _run_campaign_poll(campaign_id: int):
             )
             return
 
+        assert trip.id is not None
+
         # Skip if already polled today (manual or earlier cron run)
         if _already_polled_today(session, trip.id):
             logger.info(
@@ -226,9 +248,7 @@ def _run_trip_poll_legacy(trip_id: int):
             return
 
         try:
-            logger.info(
-                "Running scheduled poll for trip %d (%s)", trip_id, trip.label
-            )
+            logger.info("Running scheduled poll for trip %d (%s)", trip_id, trip.label)
             poll_trip(session, trip, profile, pm, send_alerts=True)
         except Exception as e:
             logger.error(

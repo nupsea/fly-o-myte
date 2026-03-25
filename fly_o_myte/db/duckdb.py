@@ -31,6 +31,8 @@ class RouteContext:
     max_price: float
     sample_count: int
     school_holiday_premium_pct: float | None
+    weekly_trends: list[dict]  # [{week, avg_cost, min_cost}]
+    airline_breakdown: list[dict]  # [{airline, avg_cost, sample_count}]
 
 
 @contextmanager
@@ -217,6 +219,36 @@ def query_route_context(
                     (holiday_row[0] - holiday_row[1]) / holiday_row[1] * 100, 1
                 )
 
+            # Weekly Trends
+            weekly_rows = conn.execute(f"""
+                SELECT
+                    week_start::VARCHAR AS week,
+                    AVG(avg_cost) AS avg_cost,
+                    MIN(min_cost) AS min_cost
+                FROM read_parquet('{stat_file}')
+                GROUP BY week_start
+                ORDER BY week_start ASC
+            """).fetchall()
+            weekly_trends = [
+                {"week": r[0], "avg": round(r[1], 2), "min": round(r[2], 2)}
+                for r in weekly_rows
+            ]
+
+            # Airline Breakdown
+            airline_rows = conn.execute(f"""
+                SELECT
+                    airline_code,
+                    AVG(avg_cost) AS avg_cost,
+                    COUNT(*) AS sample_count
+                FROM read_parquet('{stat_file}')
+                GROUP BY airline_code
+                ORDER BY avg_cost ASC
+            """).fetchall()
+            airline_breakdown = [
+                {"airline": r[0], "avg": round(r[1], 2), "count": r[2]}
+                for r in airline_rows
+            ]
+
             return RouteContext(
                 p25=round(row[0], 2),
                 p50=round(row[1], 2),
@@ -225,6 +257,8 @@ def query_route_context(
                 max_price=round(row[4], 2),
                 sample_count=row[5],
                 school_holiday_premium_pct=premium_pct,
+                weekly_trends=weekly_trends,
+                airline_breakdown=airline_breakdown,
             )
     except Exception as exc:
         logger.warning("query_route_context failed: %s", exc)

@@ -206,7 +206,9 @@ def build_campaign_snapshots(
     def _newest_ts(snaps: list) -> str:
         return max(s.fetched_at for s in snaps)
 
-    sorted_variants = sorted(by_variant.items(), key=lambda x: _newest_ts(x[1]), reverse=True)
+    sorted_variants = sorted(
+        by_variant.items(), key=lambda x: _newest_ts(x[1]), reverse=True
+    )
 
     # Compute campaign-wide average cost for blending
     all_costs = [s.true_family_cost for snaps in by_variant.values() for s in snaps]

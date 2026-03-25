@@ -126,7 +126,10 @@ def _extract_with_llm(text: str, api_key: str) -> TripIntent:
             "model": "gpt-4o-mini",
             "max_tokens": 256,
             "messages": [
-                {"role": "system", "content": "You are a travel assistant. Respond with valid JSON only, no markdown."},
+                {
+                    "role": "system",
+                    "content": "You are a travel assistant. Respond with valid JSON only, no markdown.",
+                },
                 {"role": "user", "content": prompt},
             ],
         },
@@ -362,7 +365,10 @@ PLANNER_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "state": {"type": "string", "description": "AU state code, e.g. QLD"},
+                    "state": {
+                        "type": "string",
+                        "description": "AU state code, e.g. QLD",
+                    },
                     "year": {"type": "integer"},
                 },
                 "required": ["state", "year"],
@@ -377,7 +383,10 @@ PLANNER_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string", "description": "City, country, or airport name"},
+                    "query": {
+                        "type": "string",
+                        "description": "City, country, or airport name",
+                    },
                 },
                 "required": ["query"],
             },
@@ -394,19 +403,47 @@ PLANNER_TOOLS = [
                     "destination_iata": {"type": "string"},
                     "destination_display": {"type": "string"},
                     "origin_iata": {"type": "string"},
-                    "depart_earliest": {"type": "string", "description": "ISO date or null"},
-                    "depart_latest": {"type": "string", "description": "ISO date or null"},
-                    "return_latest": {"type": "string", "description": "ISO date or null"},
-                    "nights": {"type": "integer", "description": "Trip length in nights"},
-                    "flex_days": {"type": "integer", "description": "Date flexibility +/-days"},
-                    "month": {"type": "integer", "description": "Departure month 1-12 (for month-mode scouting)"},
+                    "depart_earliest": {
+                        "type": "string",
+                        "description": "ISO date or null",
+                    },
+                    "depart_latest": {
+                        "type": "string",
+                        "description": "ISO date or null",
+                    },
+                    "return_latest": {
+                        "type": "string",
+                        "description": "ISO date or null",
+                    },
+                    "nights": {
+                        "type": "integer",
+                        "description": "Trip length in nights",
+                    },
+                    "flex_days": {
+                        "type": "integer",
+                        "description": "Date flexibility +/-days",
+                    },
+                    "month": {
+                        "type": "integer",
+                        "description": "Departure month 1-12 (for month-mode scouting)",
+                    },
                     "year": {"type": "integer"},
-                    "confidence": {"type": "number", "description": "0.0-1.0 confidence score"},
-                    "reasoning": {"type": "string", "description": "Brief explanation for the user"},
+                    "confidence": {
+                        "type": "number",
+                        "description": "0.0-1.0 confidence score",
+                    },
+                    "reasoning": {
+                        "type": "string",
+                        "description": "Brief explanation for the user",
+                    },
                 },
                 "required": [
-                    "destination_iata", "destination_display", "origin_iata",
-                    "nights", "confidence", "reasoning",
+                    "destination_iata",
+                    "destination_display",
+                    "origin_iata",
+                    "nights",
+                    "confidence",
+                    "reasoning",
                 ],
             },
         },
@@ -423,21 +460,24 @@ def _handle_get_family_profile(profile) -> str:
     children_info = []
     for child in profile.children:
         age = (
-            today.year - child.dob.year
+            today.year
+            - child.dob.year
             - ((today.month, today.day) < (child.dob.month, child.dob.day))
         )
         children_info.append({"name": child.name, "age": age})
 
-    return json.dumps({
-        "adults": profile.adults,
-        "children": children_info,
-        "origin_airport": profile.origin_airport,
-        "state": profile.state,
-        "school_type": profile.school_type,
-        "bags_per_person": profile.bags_per_person,
-        "budget_threshold_aud": profile.budget_threshold_aud,
-        "default_trip_length": profile.default_trip_length,
-    })
+    return json.dumps(
+        {
+            "adults": profile.adults,
+            "children": children_info,
+            "origin_airport": profile.origin_airport,
+            "state": profile.state,
+            "school_type": profile.school_type,
+            "bags_per_person": profile.bags_per_person,
+            "budget_threshold_aud": profile.budget_threshold_aud,
+            "default_trip_length": profile.default_trip_length,
+        }
+    )
 
 
 def _handle_get_school_holidays(calendar, state: str, year: int) -> str:
@@ -445,10 +485,12 @@ def _handle_get_school_holidays(calendar, state: str, year: int) -> str:
     import json
 
     periods = calendar.list_periods(state, year)
-    return json.dumps([
-        {"label": p.label, "start": p.start.isoformat(), "end": p.end.isoformat()}
-        for p in periods
-    ])
+    return json.dumps(
+        [
+            {"label": p.label, "start": p.start.isoformat(), "end": p.end.isoformat()}
+            for p in periods
+        ]
+    )
 
 
 def _handle_resolve_destination(query: str) -> str:
@@ -462,7 +504,9 @@ def _handle_resolve_destination(query: str) -> str:
         # Try AU city names as fallback
         origin = _resolve_origin(query)
         if origin:
-            return json.dumps([{"iata": origin, "display": f"{query.title()} (Australia)"}])
+            return json.dumps(
+                [{"iata": origin, "display": f"{query.title()} (Australia)"}]
+            )
         return json.dumps([])
 
     return json.dumps([{"iata": iata, "display": display} for iata, display in matches])
@@ -513,7 +557,6 @@ def build_scout_params(intent: dict, profile) -> dict:
     if month and year:
         # Build month strings covering the trip length
         months = []
-        from calendar import monthrange
         m, y = month, year
         # Start with the primary month, add extras if trip is long
         for _ in range(min(4, max(1, (nights // 28) + 1))):
@@ -569,15 +612,14 @@ def run_planner_loop(
     max_iterations: int = 10,
 ) -> dict:
     """Run the agent loop. Returns one of:
-      {"type": "plan", "intent": {...}, "scout_params": {...}, "messages": [...]}
-      {"type": "message", "content": "...", "messages": [...]}
-      {"type": "error", "content": "..."}
+    {"type": "plan", "intent": {...}, "scout_params": {...}, "messages": [...]}
+    {"type": "message", "content": "...", "messages": [...]}
+    {"type": "error", "content": "..."}
     """
     import json
+    from datetime import date
 
     import httpx
-
-    from datetime import date
 
     # Pre-load family profile so the LLM already has context in the system message
     profile_json = _handle_get_family_profile(profile)
@@ -661,10 +703,12 @@ def run_planner_loop(
                 }
 
             result = _execute_tool(fn_name, fn_args, profile, calendar)
-            working_messages.append({
-                "role": "tool",
-                "tool_call_id": tc["id"],
-                "content": result,
-            })
+            working_messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": result,
+                }
+            )
 
     return {"type": "error", "content": "Max iterations reached"}

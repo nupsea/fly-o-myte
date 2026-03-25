@@ -13,6 +13,7 @@ Test classes:
   TestScoutEndpointWithStub   — /scout with stub price source
   TestPlannerToScoutPipeline  — end-to-end: planner params fed into /scout
 """
+
 from __future__ import annotations
 
 import json
@@ -20,17 +21,18 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-
 # ─── Shared fake settings ──────────────────────────────────────────────────────
 
 
 class _FakeSettings:
     """Minimal settings stub — only exposes fields used by the tested endpoints."""
+
     openai_api_key = "test-integ-key"
 
 
 class _NoKeySettings:
     """Settings stub with no OpenAI key."""
+
     openai_api_key = ""
 
 
@@ -41,6 +43,7 @@ class _NoKeySettings:
 def api_client():
     """FastAPI TestClient that lives for the duration of one test."""
     from fly_o_myte.api import app
+
     with TestClient(app, raise_server_exceptions=True) as c:
         yield c
 
@@ -49,6 +52,7 @@ def api_client():
 def with_openai_key(monkeypatch):
     """Patch get_settings in the api module so openai_api_key is non-empty."""
     import fly_o_myte.api as api_mod
+
     monkeypatch.setattr(api_mod, "get_settings", lambda: _FakeSettings())
 
 
@@ -56,6 +60,7 @@ def with_openai_key(monkeypatch):
 def without_openai_key(monkeypatch):
     """Patch get_settings to simulate no OpenAI key — works even if env has a real key."""
     import fly_o_myte.api as api_mod
+
     monkeypatch.setattr(api_mod, "get_settings", lambda: _NoKeySettings())
 
 
@@ -63,7 +68,10 @@ def without_openai_key(monkeypatch):
 def with_stub_pm(monkeypatch, stub_pm):
     """Replace build_plugin_manager_from_settings with the deterministic stub."""
     import fly_o_myte.tracker as tracker_mod
-    monkeypatch.setattr(tracker_mod, "build_plugin_manager_from_settings", lambda: stub_pm)
+
+    monkeypatch.setattr(
+        tracker_mod, "build_plugin_manager_from_settings", lambda: stub_pm
+    )
 
 
 # ─── Planner chat endpoint ─────────────────────────────────────────────────────
@@ -75,91 +83,105 @@ class TestPlannerChatEndpoint:
 
     def _openai_tool_response(self, tool_calls: list[dict]) -> dict:
         return {
-            "choices": [{
-                "message": {
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": tool_calls,
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": tool_calls,
+                    }
                 }
-            }]
+            ]
         }
 
     def _openai_text_response(self, text: str) -> dict:
-        return {
-            "choices": [{
-                "message": {"role": "assistant", "content": text}
-            }]
-        }
+        return {"choices": [{"message": {"role": "assistant", "content": text}}]}
 
     def test_missing_api_key_returns_error(self, api_client, without_openai_key):
         """Without an OpenAI key the endpoint returns type=error immediately.
         Uses without_openai_key fixture to override any real key in the environment."""
-        resp = api_client.post("/planner/chat", json={"messages": [
-            {"role": "user", "content": "Bali in July for 10 days"}
-        ]})
+        resp = api_client.post(
+            "/planner/chat",
+            json={
+                "messages": [{"role": "user", "content": "Bali in July for 10 days"}]
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["type"] == "error"
         assert "key" in data["content"].lower()
 
-    def test_plan_response_has_required_fields(self, api_client, with_openai_key, httpx_mock):
+    def test_plan_response_has_required_fields(
+        self, api_client, with_openai_key, httpx_mock
+    ):
         """Full agent loop: resolve_destination + submit_plan → type=plan."""
         # Round 1: LLM calls resolve_destination
         httpx_mock.add_response(
             url="https://api.openai.com/v1/chat/completions",
-            json=self._openai_tool_response([
-                {
-                    "id": "call_1",
-                    "type": "function",
-                    "function": {
-                        "name": "resolve_destination",
-                        "arguments": json.dumps({"query": "Bali"}),
+            json=self._openai_tool_response(
+                [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                            "name": "resolve_destination",
+                            "arguments": json.dumps({"query": "Bali"}),
+                        },
                     },
-                },
-            ]),
+                ]
+            ),
         )
         # Round 2: LLM calls get_school_holidays
         httpx_mock.add_response(
             url="https://api.openai.com/v1/chat/completions",
-            json=self._openai_tool_response([
-                {
-                    "id": "call_2",
-                    "type": "function",
-                    "function": {
-                        "name": "get_school_holidays",
-                        "arguments": json.dumps({"state": "QLD", "year": 2026}),
+            json=self._openai_tool_response(
+                [
+                    {
+                        "id": "call_2",
+                        "type": "function",
+                        "function": {
+                            "name": "get_school_holidays",
+                            "arguments": json.dumps({"state": "QLD", "year": 2026}),
+                        },
                     },
-                },
-            ]),
+                ]
+            ),
         )
         # Round 3: LLM submits the plan
         httpx_mock.add_response(
             url="https://api.openai.com/v1/chat/completions",
-            json=self._openai_tool_response([
-                {
-                    "id": "call_3",
-                    "type": "function",
-                    "function": {
-                        "name": "submit_plan",
-                        "arguments": json.dumps({
-                            "destination_iata": "DPS",
-                            "destination_display": "Bali Ngurah Rai",
-                            "origin_iata": "BNE",
-                            "nights": 10,
-                            "month": 7,
-                            "year": 2026,
-                            "flex_days": 3,
-                            "confidence": 0.90,
-                            "reasoning": "July overlaps QLD mid-year school holidays.",
-                        }),
+            json=self._openai_tool_response(
+                [
+                    {
+                        "id": "call_3",
+                        "type": "function",
+                        "function": {
+                            "name": "submit_plan",
+                            "arguments": json.dumps(
+                                {
+                                    "destination_iata": "DPS",
+                                    "destination_display": "Bali Ngurah Rai",
+                                    "origin_iata": "BNE",
+                                    "nights": 10,
+                                    "month": 7,
+                                    "year": 2026,
+                                    "flex_days": 3,
+                                    "confidence": 0.90,
+                                    "reasoning": "July overlaps QLD mid-year school holidays.",
+                                }
+                            ),
+                        },
                     },
-                },
-            ]),
+                ]
+            ),
         )
 
-        resp = api_client.post("/planner/chat", json={"messages": [
-            {"role": "user", "content": "Bali in July for 10 days"}
-        ]})
+        resp = api_client.post(
+            "/planner/chat",
+            json={
+                "messages": [{"role": "user", "content": "Bali in July for 10 days"}]
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
 
@@ -175,16 +197,21 @@ class TestPlannerChatEndpoint:
         assert "months" in sp or ("depart_date" in sp and "return_date" in sp)
         assert sp.get("trip_length") == 10 or "depart_date" in sp
 
-    def test_clarification_returns_message_type(self, api_client, with_openai_key, httpx_mock):
+    def test_clarification_returns_message_type(
+        self, api_client, with_openai_key, httpx_mock
+    ):
         """LLM returns plain text (no tool calls) → type=message."""
         httpx_mock.add_response(
             url="https://api.openai.com/v1/chat/completions",
-            json=self._openai_text_response("Which Bali airport do you prefer: DPS or another nearby option?"),
+            json=self._openai_text_response(
+                "Which Bali airport do you prefer: DPS or another nearby option?"
+            ),
         )
 
-        resp = api_client.post("/planner/chat", json={"messages": [
-            {"role": "user", "content": "somewhere warm"}
-        ]})
+        resp = api_client.post(
+            "/planner/chat",
+            json={"messages": [{"role": "user", "content": "somewhere warm"}]},
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["type"] == "message"
@@ -193,16 +220,19 @@ class TestPlannerChatEndpoint:
         assert isinstance(data["messages"], list)
         assert len(data["messages"]) >= 1
 
-    def test_messages_list_is_serialisable(self, api_client, with_openai_key, httpx_mock):
+    def test_messages_list_is_serialisable(
+        self, api_client, with_openai_key, httpx_mock
+    ):
         """Returned messages must be clean {role, content} dicts — no tool_call objects."""
         httpx_mock.add_response(
             url="https://api.openai.com/v1/chat/completions",
             json=self._openai_text_response("What month were you thinking?"),
         )
 
-        resp = api_client.post("/planner/chat", json={"messages": [
-            {"role": "user", "content": "somewhere warm"}
-        ]})
+        resp = api_client.post(
+            "/planner/chat",
+            json={"messages": [{"role": "user", "content": "somewhere warm"}]},
+        )
         data = resp.json()
         for msg in data["messages"]:
             assert set(msg.keys()) <= {"role", "content"}, (
@@ -221,12 +251,15 @@ class TestScoutEndpointWithStub:
 
     def test_months_mode_returns_results(self, api_client, with_stub_pm):
         """Months mode with stub returns at least one result with required fields."""
-        resp = api_client.post("/scout", json={
-            "origin": "BNE",
-            "destination": "SYD",
-            "months": ["jul-2026"],
-            "trip_length": 7,
-        })
+        resp = api_client.post(
+            "/scout",
+            json={
+                "origin": "BNE",
+                "destination": "SYD",
+                "months": ["jul-2026"],
+                "trip_length": 7,
+            },
+        )
         assert resp.status_code == 200
         results = resp.json()
         assert len(results) >= 1
@@ -238,56 +271,73 @@ class TestScoutEndpointWithStub:
 
     def test_exact_date_mode_returns_results(self, api_client, with_stub_pm):
         """Exact-date mode with stub returns results for the requested window."""
-        resp = api_client.post("/scout", json={
-            "origin": "BNE",
-            "destination": "SYD",
-            "depart_date": "2026-07-20",
-            "return_date": "2026-07-27",
-            "flex_days": 0,
-        })
+        resp = api_client.post(
+            "/scout",
+            json={
+                "origin": "BNE",
+                "destination": "SYD",
+                "depart_date": "2026-07-20",
+                "return_date": "2026-07-27",
+                "flex_days": 0,
+            },
+        )
         assert resp.status_code == 200
         results = resp.json()
         assert len(results) == 1
         assert results[0]["depart_date"] == "2026-07-20"
 
-    def test_exact_date_with_flex_returns_multiple_windows(self, api_client, with_stub_pm):
+    def test_exact_date_with_flex_returns_multiple_windows(
+        self, api_client, with_stub_pm
+    ):
         """flex_days=3 should produce 7 windows (±3 days)."""
-        resp = api_client.post("/scout", json={
-            "origin": "BNE",
-            "destination": "SYD",
-            "depart_date": "2026-07-20",
-            "return_date": "2026-07-27",
-            "flex_days": 3,
-        })
+        resp = api_client.post(
+            "/scout",
+            json={
+                "origin": "BNE",
+                "destination": "SYD",
+                "depart_date": "2026-07-20",
+                "return_date": "2026-07-27",
+                "flex_days": 3,
+            },
+        )
         assert resp.status_code == 200
         assert len(resp.json()) == 7
 
     def test_invalid_month_format_returns_400(self, api_client, with_stub_pm):
         """Month strings that don't match 'mon-yyyy' format return HTTP 400."""
-        resp = api_client.post("/scout", json={
-            "origin": "BNE",
-            "destination": "SYD",
-            "months": ["July-2026"],   # wrong capitalisation / format
-            "trip_length": 7,
-        })
+        resp = api_client.post(
+            "/scout",
+            json={
+                "origin": "BNE",
+                "destination": "SYD",
+                "months": ["July-2026"],  # wrong capitalisation / format
+                "trip_length": 7,
+            },
+        )
         assert resp.status_code == 400
 
     def test_no_months_no_dates_returns_400(self, api_client, with_stub_pm):
         """Omitting both months and exact dates returns HTTP 400."""
-        resp = api_client.post("/scout", json={
-            "origin": "BNE",
-            "destination": "SYD",
-        })
+        resp = api_client.post(
+            "/scout",
+            json={
+                "origin": "BNE",
+                "destination": "SYD",
+            },
+        )
         assert resp.status_code == 400
 
     def test_results_sorted_by_cost_ascending(self, api_client, with_stub_pm):
         """Results from /scout are sorted by true_family_cost ascending."""
-        resp = api_client.post("/scout", json={
-            "origin": "BNE",
-            "destination": "SYD",
-            "months": ["jul-2026"],
-            "trip_length": 7,
-        })
+        resp = api_client.post(
+            "/scout",
+            json={
+                "origin": "BNE",
+                "destination": "SYD",
+                "months": ["jul-2026"],
+                "trip_length": 7,
+            },
+        )
         costs = [r["true_family_cost"] for r in resp.json()]
         assert costs == sorted(costs)
 
@@ -305,6 +355,7 @@ class TestPlannerToScoutPipeline:
 
     def _make_profile(self):
         from fly_o_myte.config import FamilyProfile
+
         return FamilyProfile(origin_airport="BNE", default_trip_length=14)
 
     def test_months_mode_params_accepted_by_scout(self, api_client, with_stub_pm):
@@ -362,15 +413,25 @@ class TestPlannerToScoutPipeline:
         assert params["months"] == ["dec-2026", "jan-2027"]
 
         resp = api_client.post("/scout", json=params)
-        assert resp.status_code == 200, f"Scout rejected multi-month params: {resp.text}"
+        assert resp.status_code == 200, (
+            f"Scout rejected multi-month params: {resp.text}"
+        )
         assert len(resp.json()) >= 1
 
-    def test_planner_result_fields_map_to_scout_response_fields(self, api_client, with_stub_pm):
+    def test_planner_result_fields_map_to_scout_response_fields(
+        self, api_client, with_stub_pm
+    ):
         """Scout response fields match what the UI expects from the planner flow."""
         from fly_o_myte.planner import build_scout_params
 
         params = build_scout_params(
-            {"destination_iata": "SYD", "origin_iata": "BNE", "month": 7, "year": 2026, "nights": 7},
+            {
+                "destination_iata": "SYD",
+                "origin_iata": "BNE",
+                "month": 7,
+                "year": 2026,
+                "nights": 7,
+            },
             self._make_profile(),
         )
         resp = api_client.post("/scout", json=params)
@@ -379,9 +440,15 @@ class TestPlannerToScoutPipeline:
 
         # Fields the UI accesses in Scout.tsx result cards
         required_fields = {
-            "depart_date", "return_date", "trip_length_days",
-            "true_family_cost", "airline_code", "stops",
-            "departure_time", "arrival_time", "duration_minutes",
+            "depart_date",
+            "return_date",
+            "trip_length_days",
+            "true_family_cost",
+            "airline_code",
+            "stops",
+            "departure_time",
+            "arrival_time",
+            "duration_minutes",
         }
         missing = required_fields - set(r.keys())
         assert not missing, f"Scout response missing fields: {missing}"
