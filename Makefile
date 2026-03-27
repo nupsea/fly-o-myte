@@ -22,7 +22,7 @@ app:
 	@echo "[$(shell date '+%H:%M:%S')] 🌐 Frontend: http://localhost:5173"
 	@echo ""
 	@(trap 'kill 0' SIGINT; \
-	  uv run uvicorn fly_o_myte.api:app --host 0.0.0.0 --port 8001 --log-level info & \
+	  uv run uvicorn fly_o_myte.api:app --host 0.0.0.0 --port 8001 --log-level info --reload & \
 	  cd ui && npm run dev & \
 	  wait)
 

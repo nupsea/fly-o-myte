@@ -30,8 +30,13 @@ The recommended way to use Fly-O-Myte is via the modern Web UI.
 3. **Set API Keys**
    Create a `.env` file with your credentials:
    ```bash
+   # Get a free 250 searches/mo key at https://serpapi.com/
    echo "SERPAPI_API_KEY=your_key_here" >> .env
-   echo "ANTHROPIC_API_KEY=your_key_here" >> .env # Optional for AI Planner
+   
+   # Optional: For AI Trip Planner (natural language intent)
+   echo "OPENAI_API_KEY=your_key_here" >> .env
+   # OR
+   echo "ANTHROPIC_API_KEY=your_key_here" >> .env
    ```
 
 4. **Launch the App**

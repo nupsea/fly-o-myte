@@ -94,7 +94,7 @@ const Dashboard = () => {
 
   const fetchCampaigns = () => {
     setLoading(true);
-    fetch('/api/campaigns')
+    fetch(`/api/campaigns?t=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         setCampaigns(data);
@@ -104,7 +104,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchCampaigns();
-    fetch('/api/profile').then(res => res.json()).then(setProfile);
+    fetch('/api/profile', { cache: 'no-store' }).then(res => res.json()).then(setProfile);
     
     // Auto-refresh every 5 minutes to show latest cron results
     const interval = setInterval(fetchCampaigns, 300000);
@@ -124,7 +124,7 @@ const Dashboard = () => {
     setFlexLoading(true);
     setFlexError(null);
     setFlexResults([]);
-    fetch(`/api/trips/${trip.id}/flex?flex_days=${flexDays}`)
+    fetch(`/api/trips/${trip.id}/flex?flex_days=${flexDays}`, { cache: 'no-store' })
       .then(async res => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`);
@@ -142,24 +142,24 @@ const Dashboard = () => {
 
   const openCampaignDetails = (campaign: any) => {
     setDetailsCampaign(campaign);
-    fetch(`/api/campaigns/${campaign.id}/history`)
+    fetch(`/api/campaigns/${campaign.id}/history?t=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => setCampaignHistory(data));
-    fetch(`/api/campaigns/${campaign.id}`)
+    fetch(`/api/campaigns/${campaign.id}?t=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => setCampaignVariants(data.variants || []));
   };
 
   const handleRefresh = (tid: number) => {
     setRefreshingTrips(prev => new Set(prev).add(tid));
-    fetch(`/api/trips/${tid}/refresh`, { method: 'POST' })
+    fetch(`/api/trips/${tid}/refresh`, { method: 'POST', cache: 'no-store' })
       .then(() => fetchCampaigns())
       .finally(() => setRefreshingTrips(prev => { const next = new Set(prev); next.delete(tid); return next; }));
   };
 
   const handlePollAll = () => {
     setPollingAll(true);
-    fetch('/api/poll', { method: 'POST' })
+    fetch('/api/poll', { method: 'POST', cache: 'no-store' })
       .then(() => fetchCampaigns())
       .finally(() => setPollingAll(false));
   };
